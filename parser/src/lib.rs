@@ -6,7 +6,7 @@ pub struct McParser;
 
 #[cfg(test)]
 mod tests {
-  use pest::{parses_to, consumes_to};
+  use pest::{consumes_to, parses_to};
 
   use super::*;
 
