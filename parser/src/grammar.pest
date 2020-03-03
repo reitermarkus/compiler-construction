@@ -1,2 +1,10 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
+
 int = { ASCII_DIGIT+ }
 float = @{ int ~ "." ~ ASCII_DIGIT+ }
+boolean = { "true" | "false" }
+
+string = ${ "\"" ~ inner ~ "\"" }
+inner = @{ char* }
+char = { !("\"") ~ ANY }

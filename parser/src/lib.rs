@@ -29,4 +29,28 @@ mod tests {
       tokens: [float(0, 3)]
     };
   }
+
+  #[test]
+  fn parse_bool() {
+    parses_to! {
+      parser: McParser,
+      input:  "false",
+      rule:   Rule::boolean,
+      tokens: [boolean(0, 5)]
+    }
+  }
+
+  #[test]
+  fn parse_string() {
+    parses_to! {
+      parser: McParser,
+      input:  "\"Str!?\"",
+      rule:   Rule::string,
+      tokens: [
+                string(0, 7, [
+                  inner(1, 6)
+                ])
+              ]
+    }
+  }
 }
