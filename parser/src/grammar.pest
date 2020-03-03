@@ -12,6 +12,8 @@ char = { !("\"") ~ ANY }
 mc_type = { "boolean" | "int" | "float" | "string" }
 literal = { string | float | int | boolean }
 
+identifier = @{ ( ASCII_ALPHA | "_" ) ~ ( ASCII_ALPHANUMERIC | "_" )* }
+
 unary_operator = { "-" | "!" }
 binary_operator = { "+"  | "-" | "*" | "/"
                   | "<"  | ">" | "<=" | ">="

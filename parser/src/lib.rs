@@ -55,6 +55,16 @@ mod tests {
   }
 
   #[test]
+  fn parse_identifier() {
+    parses_to! {
+      parser: McParser,
+      input:  "var_Nam3",
+      rule:   Rule::identifier,
+      tokens: [identifier(0, 8)]
+    }
+  }
+
+  #[test]
   fn parse_binary_op() {
     parses_to! {
       parser: McParser,
