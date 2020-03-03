@@ -8,3 +8,14 @@ boolean = { "true" | "false" }
 string = ${ "\"" ~ inner ~ "\"" }
 inner = @{ char* }
 char = { !("\"") ~ ANY }
+
+mc_type = { "boolean" | "int" | "float" | "string" }
+literal = { string | float | int | boolean }
+
+unary_operator = { "-" | "!" }
+binary_operator = { "+"  | "-" | "*" | "/"
+                  | "<"  | ">" | "<=" | ">="
+                  | "&&" | "||"
+                  | "==" | "!=" }
+
+binary_op = { literal ~ binary_operator ~ literal }

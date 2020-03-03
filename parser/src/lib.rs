@@ -53,4 +53,24 @@ mod tests {
               ]
     }
   }
+
+  #[test]
+  fn parse_binary_op() {
+    parses_to! {
+      parser: McParser,
+      input:  "192 + 3.14",
+      rule:   Rule::binary_op,
+      tokens: [
+                binary_op(0, 10, [
+                  literal(0, 3, [
+                    int(0, 3)
+                  ]),
+                  binary_operator(4, 5),
+                  literal(6, 10, [
+                    float(6, 10)
+                  ])
+                ])
+              ]
+    }
+  }
 }
