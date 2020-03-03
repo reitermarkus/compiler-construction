@@ -21,3 +21,6 @@ binary_operator = { "+"  | "-" | "*" | "/"
                   | "==" | "!=" }
 
 binary_op = { literal ~ binary_operator ~ literal }
+
+declaration = { declaration_type ~ " " ~ identifier }
+declaration_type = ${ (mc_type ~ "[" ~ int ~ "]") | mc_type }

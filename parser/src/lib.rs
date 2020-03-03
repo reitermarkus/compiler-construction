@@ -65,6 +65,24 @@ mod tests {
   }
 
   #[test]
+  fn parse_declaration() {
+    parses_to! {
+      parser: McParser,
+      input:  "float[10] array",
+      rule:   Rule::declaration,
+      tokens: [
+                declaration(0, 16, [
+                  declaration_type(0, 9, [
+                    mc_type(0, 5),
+                    int(6, 8)
+                  ]),
+                  identifier(10, 16)
+                ])
+              ]
+    }
+  }
+
+  #[test]
   fn parse_binary_op() {
     parses_to! {
       parser: McParser,
