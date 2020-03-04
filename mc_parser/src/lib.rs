@@ -214,6 +214,29 @@ mod tests {
 
     parses_to! {
       parser: McParser,
+      input:  "42 * (192 + 3.14)",
+      rule:   Rule::expression,
+      tokens: [
+                expression(0, 17, [
+                  literal(0, 2, [
+                    int(0, 2)
+                  ]),
+                  times(3, 4),
+                  expression(6, 16, [
+                    literal(6, 9, [
+                      int(6, 9)
+                    ]),
+                    plus(10, 11),
+                    literal(12, 16, [
+                      float(12, 16)
+                    ])
+                  ])
+                ])
+              ]
+    }
+
+    parses_to! {
+      parser: McParser,
       input:  "1 <= 2",
       rule:   Rule::expression,
       tokens: [
@@ -257,6 +280,15 @@ mod tests {
                   ]),
                 ]),
               ]
+    }
+
+    fails_with! {
+      parser: McParser,
+      input:  "(42",
+      rule:   Rule::expression,
+      positives: vec![Rule::plus, Rule::minus, Rule::times, Rule::divide, Rule::lte, Rule::lt, Rule::gte, Rule::gt, Rule::land, Rule::lor, Rule::eq, Rule::neq],
+      negatives: vec![],
+      pos: 3
     }
   }
 
