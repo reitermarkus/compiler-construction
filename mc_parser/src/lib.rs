@@ -1,8 +1,13 @@
+use pest::{error::Error, iterators::Pairs, Parser};
 use pest_derive::Parser;
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
-pub struct McParser;
+struct McParser;
+
+pub fn parse(program: &str) -> Result<Pairs<'_, Rule>, Error<Rule>> {
+  McParser::parse(Rule::program, program)
+}
 
 #[cfg(test)]
 mod tests {
@@ -138,6 +143,23 @@ mod tests {
 
     parses_to! {
       parser: McParser,
+      input:  "1 <= 2",
+      rule:   Rule::expression,
+      tokens: [
+                expression(0, 6, [
+                  literal(0, 1, [
+                    int(0, 1)
+                  ]),
+                  binary_operator(2, 4),
+                  literal(5, 6, [
+                    int(5, 6)
+                  ])
+                ])
+              ]
+    }
+
+    parses_to! {
+      parser: McParser,
       input:  "47.1",
       rule:   Rule::expression,
       tokens: [
@@ -163,6 +185,35 @@ mod tests {
                     ]),
                   ]),
                 ]),
+              ]
+    }
+  }
+
+  #[test]
+  fn parse_call_expr() {
+    parses_to! {
+      parser: McParser,
+      input:  "main()",
+      rule:   Rule::call_expr,
+      tokens: [
+                call_expr(0, 6, [
+                  identifier(0, 4),
+                ])
+              ]
+    }
+  }
+
+  #[test]
+  fn parse_function_def() {
+    parses_to! {
+      parser: McParser,
+      input:  "void main() { }",
+      rule:   Rule::function_def,
+      tokens: [
+                function_def(0, 15, [
+                  identifier(5, 9),
+                  compound_stmt(12, 15)
+                ])
               ]
     }
   }

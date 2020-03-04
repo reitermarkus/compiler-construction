@@ -1,0 +1,9 @@
+[package]
+name = "mc_parser"
+version = "0.1.0"
+authors = ["Markus Reiter <me@reitermark.us>"]
+edition = "2018"
+
+[dependencies]
+pest = "2.1.3"
+pest_derive = "2.1.0"

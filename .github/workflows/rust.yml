@@ -29,4 +29,4 @@ jobs:
       - name: Coverage
         uses: actions-rs/tarpaulin@v0.1
         with:
-          args: '-- --test-threads 1'
+          args: -- --test-threads 1

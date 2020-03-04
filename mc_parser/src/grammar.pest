@@ -12,7 +12,7 @@ COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
 
 // Types
 
-ty = { "boolean" | "int" | "float" | "string" }
+ty = { "bool" | "int" | "float" | "string" }
 
 
 // Operators
@@ -20,7 +20,7 @@ ty = { "boolean" | "int" | "float" | "string" }
 unary_operator = { "-" | "!" }
 binary_operator = {
     "+"  | "-" | "*" | "/"
-  | "<"  | ">" | "<=" | ">="
+  | "<=" | "<" | ">=" | ">"
   | "&&" | "||"
   | "==" | "!="
 }
@@ -28,8 +28,8 @@ binary_operator = {
 
 // Literals
 
-boolean = { "true" | "false" }
-int = { ASCII_DIGIT+ }
+boolean = @{ "true" | "false" }
+int = @{ ASCII_DIGIT+ }
 float = @{ int ~ "." ~ ASCII_DIGIT+ }
 
 quote = _{ "\"" }
@@ -51,8 +51,8 @@ assignment = { identifier ~ ("[" ~ expression ~ "]")? ~ "=" ~ expression }
 
 term = _{
     literal
-  | identifier ~ ("[" ~ expression ~ "]")?
   | call_expr
+  | identifier ~ ("[" ~ expression ~ "]")?
   | unary_operator ~ term
   | "(" ~ expression ~ ")"
 }
@@ -76,12 +76,12 @@ condition = _{ "(" ~ expression ~ ")" }
 if_stmt = { "if" ~ condition ~ statement ~ ("else" ~ statement)? }
 while_stmt = { "while" ~ condition ~ statement }
 ret_stmt = { "return" ~ expression? ~ ";" }
-compound_stmt = { "{" ~ statement? ~ "}" }
+compound_stmt = { "{" ~ statement* ~ "}" }
 
 
 // Functions
 
-function_def = { "void" | ty ~ identifier ~ "(" ~ parameters? ~ ")" ~ compound_stmt }
+function_def = { ("void" | ty) ~ identifier ~ "(" ~ parameters? ~ ")" ~ compound_stmt }
 parameters = { declaration ~ ("," ~ declaration)* }
 
 call_expr = { identifier ~ "(" ~ arguments? ~ ")" }
@@ -90,4 +90,4 @@ arguments = { expression ~ ("," ~ expression)* }
 
 // Program
 
-program = { function_def* }
+program = { SOI ~ function_def* ~ EOI }
