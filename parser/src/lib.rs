@@ -52,6 +52,17 @@ mod tests {
                 ])
               ]
     }
+
+    parses_to! {
+      parser: McParser,
+      input:  "\"\twith whitespace\n\"",
+      rule:   Rule::string,
+      tokens: [
+                string(0, 19, [
+                  inner(1, 18)
+                ])
+              ]
+    }
   }
 
   #[test]
@@ -65,18 +76,33 @@ mod tests {
   }
 
   #[test]
+  fn parse_declaration_type() {
+    parses_to! {
+      parser: McParser,
+      input:  "float[10]",
+      rule:   Rule::declaration_type,
+      tokens: [
+                declaration_type(0, 9, [
+                  ty(0, 5),
+                  int(6, 8)
+                ]),
+              ]
+    }
+  }
+
+  #[test]
   fn parse_declaration() {
     parses_to! {
       parser: McParser,
       input:  "float[10] array",
       rule:   Rule::declaration,
       tokens: [
-                declaration(0, 16, [
+                declaration(0, 15, [
                   declaration_type(0, 9, [
-                    mc_type(0, 5),
+                    ty(0, 5),
                     int(6, 8)
                   ]),
-                  identifier(10, 16)
+                  identifier(10, 15)
                 ])
               ]
     }
