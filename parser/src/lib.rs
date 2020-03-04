@@ -138,5 +138,35 @@ mod tests {
                 ])
               ]
     }
+
+    parses_to! {
+      parser: McParser,
+      input:  "47.1",
+      rule:   Rule::expression,
+      tokens: [
+                expression(0, 4, [
+                  literal(0, 4, [
+                    float(0, 4)
+                  ]),
+                ])
+              ]
+    }
+
+    parses_to! {
+      parser: McParser,
+      input:  r#"("")"#,
+      rule:   Rule::expression,
+      tokens: [
+                expression(0, 4, [
+                  expression(1, 3, [
+                    literal(1, 3, [
+                      string(1, 3, [
+                        inner(2, 2)
+                      ]),
+                    ]),
+                  ]),
+                ]),
+              ]
+    }
   }
 }
