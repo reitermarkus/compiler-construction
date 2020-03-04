@@ -5,8 +5,8 @@ use clap::{value_t, App, Arg};
 
 fn main() -> std::io::Result<()> {
   let matches = App::new("mC AST to DOT Converter")
-  .set_term_width(0)
-  .max_term_width(0)
+    .set_term_width(0)
+    .max_term_width(0)
     .about(
       "Utility for printing an abstract syntax tree in the DOT format. The output can be visualised using Graphviz. Errors are reported on invalid inputs."
     )
