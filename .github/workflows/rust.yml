@@ -8,16 +8,25 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build
-        run: cargo build --verbose
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
       - name: Test
-        run: cargo test --verbose
-      - name: Rustfmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features --no-fail-fast
+      - name: Format
         uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all -- --check
-      - name: Clippy
+      - name: Lint
         uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: -- -D warnings
+      - name: Coverage
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          args: '-- --test-threads 1'
