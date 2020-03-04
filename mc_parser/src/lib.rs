@@ -17,6 +17,9 @@ pub fn parse(program: &str) -> Result<Pairs<'_, Rule>, Error<Rule>> {
 #[derive(Debug)]
 enum Ast {
   LiteralInt(i64),
+  LiteralFloat(f64),
+  LiteralBoolean(bool),
+  LiteralString(String),
   Addition(Box<Ast>, Box<Ast>),
   Subtraction(Box<Ast>, Box<Ast>),
   Multiplication(Box<Ast>, Box<Ast>),
@@ -45,7 +48,10 @@ fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Ast {
     Rule::literal => {
       let pair = pair.into_inner().next().expect("no pair in literal");
       match pair.as_rule() {
+        Rule::float => Ast::LiteralFloat(pair.as_str().parse::<f64>().unwrap()),
         Rule::int => Ast::LiteralInt(pair.as_str().parse::<i64>().unwrap()),
+        Rule::boolean => Ast::LiteralBoolean(pair.as_str().parse::<bool>().unwrap()),
+        Rule::string => Ast::LiteralString(pair.as_str().to_owned()),
         _ => unreachable!(),
       }
     }
@@ -61,7 +67,7 @@ mod tests {
 
   #[test]
   fn climb() {
-    let expr = "2 * 2 + 4 * 4";
+    let expr = "2 * 2 + 4 / 4.9";
     let mut pairs = McParser::parse(Rule::expression, &expr).unwrap();
 
     let climber = PrecClimber::new(vec![
