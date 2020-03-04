@@ -1,38 +1,93 @@
+// Primitives
+
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+
+identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+
+
+// Comment
+
 COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" }
 
+
+// Types
+
+ty = { "boolean" | "int" | "float" | "string" }
+
+
+// Operators
+
+unary_operator = { "-" | "!" }
+binary_operator = {
+    "+"  | "-" | "*" | "/"
+  | "<"  | ">" | "<=" | ">="
+  | "&&" | "||"
+  | "==" | "!="
+}
+
+
+// Literals
+
+boolean = { "true" | "false" }
 int = { ASCII_DIGIT+ }
 float = @{ int ~ "." ~ ASCII_DIGIT+ }
-boolean = { "true" | "false" }
 
 quote = _{ "\"" }
 string = ${ quote ~ inner ~ quote }
 inner = @{ (!quote ~ ANY)* }
 
-ty = { "boolean" | "int" | "float" | "string" }
 literal = { string | float | int | boolean }
 
-identifier = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 
-unary_operator = { "-" | "!" }
-binary_operator = { "+"  | "-" | "*" | "/"
-                  | "<"  | ">" | "<=" | ">="
-                  | "&&" | "||"
-                  | "==" | "!=" }
+// Declarations / Assignments
 
 declaration_type = ${ ty ~ ("[" ~ int ~ "]")? }
 declaration = { declaration_type ~ identifier }
 
-arguments = { expression ~ ("," ~ expression)* }
+assignment = { identifier ~ ("[" ~ expression ~ "]")? ~ "=" ~ expression }
 
-call_expr = { identifier ~ "(" ~ arguments? ~ ")" }
+
+// Expressions
 
 term = _{
-  literal
+    literal
   | identifier ~ ("[" ~ expression ~ "]")?
   | call_expr
-  | unary_operator ~ expression
+  | unary_operator ~ term
   | "(" ~ expression ~ ")"
 }
 
 expression = { term ~ (binary_operator ~ term)* }
+
+
+// Statements
+
+statement = {
+    if_stmt
+  | while_stmt
+  | ret_stmt
+  | declaration ~ ";"
+  | assignment ~ ";"
+  | expression ~ ";"
+  | compound_stmt
+}
+
+condition = _{ "(" ~ expression ~ ")" }
+if_stmt = { "if" ~ condition ~ statement ~ ("else" ~ statement)? }
+while_stmt = { "while" ~ condition ~ statement }
+ret_stmt = { "return" ~ expression? ~ ";" }
+compound_stmt = { "{" ~ statement? ~ "}" }
+
+
+// Functions
+
+function_def = { "void" | ty ~ identifier ~ "(" ~ parameters? ~ ")" ~ compound_stmt }
+parameters = { declaration ~ ("," ~ declaration)* }
+
+call_expr = { identifier ~ "(" ~ arguments? ~ ")" }
+arguments = { expression ~ ("," ~ expression)* }
+
+
+// Program
+
+program = { function_def* }
