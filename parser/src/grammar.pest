@@ -20,7 +20,19 @@ binary_operator = { "+"  | "-" | "*" | "/"
                   | "&&" | "||"
                   | "==" | "!=" }
 
-binary_op = { literal ~ binary_operator ~ literal }
-
 declaration_type = ${ ty ~ ("[" ~ int ~ "]")? }
 declaration = { declaration_type ~ identifier }
+
+arguments = { expression ~ ("," ~ expression)* }
+
+call_expr = { identifier ~ "(" ~ arguments? ~ ")" }
+
+term = _{
+  literal
+  | identifier ~ ("[" ~ expression ~ "]")?
+  | call_expr
+  | unary_operator ~ expression
+  | "(" ~ expression ~ ")"
+}
+
+expression = { term ~ (binary_operator ~ term)* }

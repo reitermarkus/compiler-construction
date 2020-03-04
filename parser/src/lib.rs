@@ -1,12 +1,15 @@
 use pest_derive::Parser;
 
+#[macro_use]
+extern crate pest;
+
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
 pub struct McParser;
 
 #[cfg(test)]
 mod tests {
-  use pest::{consumes_to, parses_to};
+  use pest::{consumes_to, fails_with, parses_to};
 
   use super::*;
 
@@ -73,6 +76,15 @@ mod tests {
       rule:   Rule::identifier,
       tokens: [identifier(0, 8)]
     }
+
+    fails_with! {
+      parser: McParser,
+      input:  "3var_Nam",
+      rule:   Rule::identifier,
+      positives: vec![Rule::identifier],
+      negatives: vec![],
+      pos: 0
+    }
   }
 
   #[test]
@@ -109,13 +121,13 @@ mod tests {
   }
 
   #[test]
-  fn parse_binary_op() {
+  fn parse_expression() {
     parses_to! {
       parser: McParser,
       input:  "192 + 3.14",
-      rule:   Rule::binary_op,
+      rule:   Rule::expression,
       tokens: [
-                binary_op(0, 10, [
+                expression(0, 10, [
                   literal(0, 3, [
                     int(0, 3)
                   ]),
