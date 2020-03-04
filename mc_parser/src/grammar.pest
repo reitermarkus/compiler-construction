@@ -17,12 +17,26 @@ ty = { "bool" | "int" | "float" | "string" }
 
 // Operators
 
-unary_operator = { "-" | "!" }
-binary_operator = {
-    "+"  | "-" | "*" | "/"
-  | "<=" | "<" | ">=" | ">"
-  | "&&" | "||"
-  | "==" | "!="
+not = { "!" }
+unary_minus = { "-" }
+plus = { "+" }
+minus = { "-" }
+times = { "*" }
+divide = { "/" }
+lte = { "<=" }
+lt = { "<" }
+gte = { ">=" }
+gt = { ">" }
+land = { "&&" }
+lor = { "||" }
+eq = { "==" }
+neq = { "!=" }
+unary_operator = _{ unary_minus | not }
+binary_operator = _{
+    plus | minus | times | divide
+  | lte | lt | gte | gt
+  | land | lor
+  | eq | neq
 }
 
 

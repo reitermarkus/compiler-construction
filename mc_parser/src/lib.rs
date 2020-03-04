@@ -1,4 +1,9 @@
-use pest::{error::Error, iterators::Pairs, Parser};
+use pest::{
+  error::Error,
+  iterators::{Pair, Pairs},
+  prec_climber::{Assoc, Operator, PrecClimber},
+  Parser,
+};
 use pest_derive::Parser;
 
 #[derive(Parser)]
@@ -9,11 +14,77 @@ pub fn parse(program: &str) -> Result<Pairs<'_, Rule>, Error<Rule>> {
   McParser::parse(Rule::program, program)
 }
 
+#[derive(Debug)]
+enum Ast {
+  LiteralInt(i64),
+  Addition(Box<Ast>, Box<Ast>),
+  Subtraction(Box<Ast>, Box<Ast>),
+  Multiplication(Box<Ast>, Box<Ast>),
+  Division(Box<Ast>, Box<Ast>),
+}
+
+fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Ast {
+  let primary = |pair| consume(pair, climber);
+
+  let infix = |lhs: Ast, op: Pair<Rule>, rhs: Ast| {
+    eprintln!("OP: {:?}", op);
+
+    match op.as_rule() {
+      Rule::plus => Ast::Addition(Box::new(lhs), Box::new(rhs)),
+      Rule::minus => Ast::Subtraction(Box::new(lhs), Box::new(rhs)),
+      Rule::times => Ast::Multiplication(Box::new(lhs), Box::new(rhs)),
+      Rule::divide => Ast::Division(Box::new(lhs), Box::new(rhs)),
+      _ => unreachable!(),
+    }
+  };
+
+  eprintln!("PAIR: {:?}", pair);
+
+  match pair.as_rule() {
+    Rule::expression => climber.climb(pair.into_inner(), primary, infix),
+    Rule::literal => {
+      let pair = pair.into_inner().next().expect("no pair in literal");
+      match pair.as_rule() {
+        Rule::int => Ast::LiteralInt(pair.as_str().parse::<i64>().unwrap()),
+        _ => unreachable!(),
+      }
+    }
+    _ => unreachable!(),
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use pest::{consumes_to, fails_with, parses_to};
 
   use super::*;
+
+  #[test]
+  fn climb() {
+    let expr = "2 * 2 + 4 * 4";
+    let mut pairs = McParser::parse(Rule::expression, &expr).unwrap();
+
+    let climber = PrecClimber::new(vec![
+      Operator::new(Rule::lor, Assoc::Left),
+      Operator::new(Rule::land, Assoc::Left),
+      Operator::new(Rule::eq, Assoc::Left) | Operator::new(Rule::neq, Assoc::Left),
+      Operator::new(Rule::lte, Assoc::Left)
+        | Operator::new(Rule::lt, Assoc::Left)
+        | Operator::new(Rule::gte, Assoc::Left)
+        | Operator::new(Rule::gt, Assoc::Left),
+      Operator::new(Rule::plus, Assoc::Left) | Operator::new(Rule::minus, Assoc::Left),
+      Operator::new(Rule::times, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left),
+      Operator::new(Rule::not, Assoc::Left) | Operator::new(Rule::unary_minus, Assoc::Left),
+    ]);
+
+    let ps = pairs.next().expect("no pair found");
+
+    eprintln!("{:#?}", ps);
+
+    let result = consume(ps, &climber);
+
+    eprintln!("RESULT:\n{:#?}", result);
+  }
 
   #[test]
   fn parse_int() {
@@ -133,7 +204,7 @@ mod tests {
                   literal(0, 3, [
                     int(0, 3)
                   ]),
-                  binary_operator(4, 5),
+                  plus(4, 5),
                   literal(6, 10, [
                     float(6, 10)
                   ])
@@ -150,7 +221,7 @@ mod tests {
                   literal(0, 1, [
                     int(0, 1)
                   ]),
-                  binary_operator(2, 4),
+                  lte(2, 4),
                   literal(5, 6, [
                     int(5, 6)
                   ])
