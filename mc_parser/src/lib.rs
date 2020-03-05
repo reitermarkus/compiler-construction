@@ -1,3 +1,6 @@
+#![deny(missing_debug_implementations, rust_2018_idioms)]
+
+use from_pest::{ConversionError, FromPest};
 use pest::{
   error::Error,
   iterators::{Pair, Pairs},
@@ -15,47 +18,241 @@ pub fn parse(program: &str) -> Result<Pairs<'_, Rule>, Error<Rule>> {
 }
 
 #[derive(Debug)]
-enum Ast {
-  LiteralInt(i64),
-  LiteralFloat(f64),
-  LiteralBoolean(bool),
-  LiteralString(String),
-  Addition(Box<Ast>, Box<Ast>),
-  Subtraction(Box<Ast>, Box<Ast>),
-  Multiplication(Box<Ast>, Box<Ast>),
-  Division(Box<Ast>, Box<Ast>),
+pub enum Ty {
+  Bool,
+  Int,
+  Float,
+  String,
 }
 
-fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Ast {
+#[derive(Debug)]
+pub enum Literal {
+  Bool(bool),
+  Int(i64),
+  Float(f64),
+  String(String),
+}
+
+#[derive(Debug)]
+pub enum UnaryOp {
+  Minus,
+  Not,
+}
+
+#[derive(Debug)]
+pub enum BinaryOp {
+  Plus,
+  Minus,
+  Times,
+  Divide,
+  Eq,
+  Neq,
+  Lte,
+  Lt,
+  Gte,
+  Gt,
+  Land,
+  Lor,
+}
+
+impl FromPest<'_> for BinaryOp {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(
+    pest: &mut Pairs<'_, Self::Rule>,
+  ) -> Result<Self, ConversionError<Self::FatalError>> {
+    let op = pest.next().unwrap();
+    assert!(pest.next().is_none());
+
+    Ok(match op.as_rule() {
+      Rule::plus => Self::Plus,
+      Rule::minus => Self::Minus,
+      Rule::times => Self::Times,
+      Rule::divide => Self::Divide,
+      Rule::eq => Self::Eq,
+      Rule::neq => Self::Neq,
+      Rule::lte => Self::Lte,
+      Rule::lt => Self::Lt,
+      Rule::gte => Self::Gte,
+      Rule::gt => Self::Gt,
+      Rule::land => Self::Land,
+      Rule::lor => Self::Lor,
+      rule => {
+        return Err(ConversionError::Malformed(format!(
+          "unknown binary operation: {:?}",
+          rule
+        )))
+      }
+    })
+  }
+}
+
+#[derive(Debug)]
+pub enum Expression {
+  Literal(Literal),
+  Variable {
+    identifier: String,
+    index: Option<usize>,
+  },
+  FunctionCall {
+    identifier: String,
+    arguments: Vec<Expression>,
+  },
+  Unary {
+    op: UnaryOp,
+    expression: Box<Expression>,
+  },
+  Binary {
+    op: BinaryOp,
+    lhs: Box<Expression>,
+    rhs: Box<Expression>,
+  },
+}
+
+#[derive(Debug)]
+pub struct Parameter;
+
+#[derive(Debug)]
+pub struct Assignment {
+  identifier: String,
+  index_expression: Option<Expression>,
+  rvalue: Expression,
+}
+
+#[derive(Debug)]
+pub struct Declaration {
+  ty: Ty,
+  count: Option<usize>,
+  identifier: String,
+}
+
+#[derive(Debug)]
+pub struct IfStatement {
+  condition: Expression,
+  block: Statement,
+  else_block: Option<Statement>,
+}
+
+#[derive(Debug)]
+pub struct WhileStatement {
+  condition: Expression,
+  block: Statement,
+}
+
+#[derive(Debug)]
+pub struct ReturnStatement {
+  expression: Expression,
+}
+
+#[derive(Debug)]
+pub enum Statement {
+  If(Box<IfStatement>),
+  While(Box<WhileStatement>),
+  Ret(ReturnStatement),
+  Decl(Declaration),
+  Assignment(Assignment),
+  Expression(Expression),
+  Compound(CompoundStatement),
+}
+
+#[derive(Debug)]
+pub struct CompoundStatement {
+  statements: Vec<Statement>,
+}
+
+#[derive(Debug)]
+pub struct FunctionDeclaration {
+  ty: Option<String>,
+  identifier: String,
+  parameters: Vec<Parameter>,
+  body: CompoundStatement,
+}
+
+#[derive(Debug)]
+pub struct Program(Vec<FunctionDeclaration>);
+
+pub fn climber() -> PrecClimber<Rule> {
+  // Reference: https://en.cppreference.com/w/c/language/operator_precedence
+  PrecClimber::new(vec![
+    Operator::new(Rule::lor, Assoc::Left),
+    Operator::new(Rule::land, Assoc::Left),
+    Operator::new(Rule::eq, Assoc::Left) | Operator::new(Rule::neq, Assoc::Left),
+    Operator::new(Rule::lte, Assoc::Left)
+      | Operator::new(Rule::lt, Assoc::Left)
+      | Operator::new(Rule::gte, Assoc::Left)
+      | Operator::new(Rule::gt, Assoc::Left),
+    Operator::new(Rule::plus, Assoc::Left) | Operator::new(Rule::minus, Assoc::Left),
+    Operator::new(Rule::times, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left),
+    Operator::new(Rule::not, Assoc::Left) | Operator::new(Rule::unary_minus, Assoc::Left),
+  ])
+}
+
+pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Expression {
   let primary = |pair| consume(pair, climber);
 
-  let infix = |lhs: Ast, op: Pair<Rule>, rhs: Ast| {
-    eprintln!("OP: {:?}", op);
-
-    match op.as_rule() {
-      Rule::plus => Ast::Addition(Box::new(lhs), Box::new(rhs)),
-      Rule::minus => Ast::Subtraction(Box::new(lhs), Box::new(rhs)),
-      Rule::times => Ast::Multiplication(Box::new(lhs), Box::new(rhs)),
-      Rule::divide => Ast::Division(Box::new(lhs), Box::new(rhs)),
-      _ => unreachable!(),
-    }
+  let infix = |lhs: Expression, op: Pair<'_, Rule>, rhs: Expression| Expression::Binary {
+    op: BinaryOp::from_pest(&mut Pairs::single(op)).unwrap(),
+    lhs: Box::new(lhs),
+    rhs: Box::new(rhs),
   };
 
   eprintln!("PAIR: {:?}", pair);
 
   match pair.as_rule() {
-    Rule::expression => climber.climb(pair.into_inner(), primary, infix),
-    Rule::literal => {
-      let pair = pair.into_inner().next().expect("no pair in literal");
-      match pair.as_rule() {
-        Rule::float => Ast::LiteralFloat(pair.as_str().parse::<f64>().unwrap()),
-        Rule::int => Ast::LiteralInt(pair.as_str().parse::<i64>().unwrap()),
-        Rule::boolean => Ast::LiteralBoolean(pair.as_str().parse::<bool>().unwrap()),
-        Rule::string => Ast::LiteralString(pair.as_str().to_owned()),
+    Rule::unary_expression => {
+      let mut pairs = pair.into_inner();
+
+      let op = match pairs
+        .next()
+        .expect("no unary operator inside unary expression")
+        .as_rule()
+      {
+        Rule::unary_minus => UnaryOp::Minus,
+        Rule::not => UnaryOp::Not,
         _ => unreachable!(),
+      };
+
+      Expression::Unary {
+        op,
+        expression: Box::new(climber.climb(pairs, primary, infix)),
       }
     }
-    _ => unreachable!(),
+    Rule::expression => climber.climb(pair.into_inner(), primary, infix),
+    Rule::call_expr => {
+      let mut pairs = pair.into_inner();
+
+      let identifier = pairs
+        .next()
+        .expect("no identifier in call expression")
+        .as_str()
+        .to_string();
+      let arguments = pairs
+        .next()
+        .map(|args| {
+          args
+            .into_inner()
+            .map(|p| climber.climb(p.into_inner(), primary, infix))
+            .collect()
+        })
+        .unwrap_or_else(Vec::new);
+
+      Expression::FunctionCall {
+        identifier,
+        arguments,
+      }
+    }
+    Rule::literal => {
+      let pair = pair.into_inner().next().unwrap();
+      match pair.as_rule() {
+        Rule::float => Expression::Literal(Literal::Float(pair.as_str().parse::<f64>().unwrap())),
+        Rule::int => Expression::Literal(Literal::Int(pair.as_str().parse::<i64>().unwrap())),
+        Rule::boolean => Expression::Literal(Literal::Bool(pair.as_str().parse::<bool>().unwrap())),
+        Rule::string => Expression::Literal(Literal::String(pair.as_str().to_owned())),
+        _ => unreachable!("binary rule"),
+      }
+    }
+    _ => unreachable!("pair: {:?}", pair),
   }
 }
 
@@ -67,21 +264,10 @@ mod tests {
 
   #[test]
   fn climb() {
-    let expr = "2 * 2 + 4 / 4.9";
+    let expr = "2 * 2 + 4 / (-4.9 - pi(true, nested()))";
     let mut pairs = McParser::parse(Rule::expression, &expr).unwrap();
 
-    let climber = PrecClimber::new(vec![
-      Operator::new(Rule::lor, Assoc::Left),
-      Operator::new(Rule::land, Assoc::Left),
-      Operator::new(Rule::eq, Assoc::Left) | Operator::new(Rule::neq, Assoc::Left),
-      Operator::new(Rule::lte, Assoc::Left)
-        | Operator::new(Rule::lt, Assoc::Left)
-        | Operator::new(Rule::gte, Assoc::Left)
-        | Operator::new(Rule::gt, Assoc::Left),
-      Operator::new(Rule::plus, Assoc::Left) | Operator::new(Rule::minus, Assoc::Left),
-      Operator::new(Rule::times, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left),
-      Operator::new(Rule::not, Assoc::Left) | Operator::new(Rule::unary_minus, Assoc::Left),
-    ]);
+    let climber = climber();
 
     let ps = pairs.next().expect("no pair found");
 

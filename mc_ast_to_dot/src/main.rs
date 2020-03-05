@@ -1,3 +1,5 @@
+#![deny(missing_debug_implementations, rust_2018_idioms)]
+
 use std::fs::File;
 use std::io::{prelude::*, stdin, stdout};
 
