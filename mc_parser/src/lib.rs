@@ -19,70 +19,6 @@ pub fn parse(program: &str) -> Result<Pairs<'_, Rule>, Error<Rule>> {
   McParser::parse(Rule::program, program)
 }
 
-pub fn climber() -> PrecClimber<Rule> {
-  // Reference: https://en.cppreference.com/w/c/language/operator_precedence
-  PrecClimber::new(vec![
-    Operator::new(Rule::lor, Assoc::Left),
-    Operator::new(Rule::land, Assoc::Left),
-    Operator::new(Rule::eq, Assoc::Left) | Operator::new(Rule::neq, Assoc::Left),
-    Operator::new(Rule::lte, Assoc::Left)
-      | Operator::new(Rule::lt, Assoc::Left)
-      | Operator::new(Rule::gte, Assoc::Left)
-      | Operator::new(Rule::gt, Assoc::Left),
-    Operator::new(Rule::plus, Assoc::Left) | Operator::new(Rule::minus, Assoc::Left),
-    Operator::new(Rule::times, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left),
-    Operator::new(Rule::not, Assoc::Left) | Operator::new(Rule::unary_minus, Assoc::Left),
-  ])
-}
-
-pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> ast::Expression {
-  let primary = |pair| consume(pair, climber);
-
-  let infix = |lhs: ast::Expression, op: Pair<'_, Rule>, rhs: ast::Expression| ast::Expression::Binary {
-    op: ast::BinaryOp::from_pest(&mut Pairs::single(op)).unwrap(),
-    lhs: Box::new(lhs),
-    rhs: Box::new(rhs),
-  };
-
-  eprintln!("PAIR: {:?}", pair);
-
-  match pair.as_rule() {
-    Rule::unary_expression => {
-      let mut pairs = pair.into_inner();
-
-      let op = match pairs.next().expect("no unary operator inside unary expression").as_rule() {
-        Rule::unary_minus => ast::UnaryOp::Minus,
-        Rule::not => ast::UnaryOp::Not,
-        _ => unreachable!(),
-      };
-
-      ast::Expression::Unary { op, expression: Box::new(climber.climb(pairs, primary, infix)) }
-    }
-    Rule::expression => climber.climb(pair.into_inner(), primary, infix),
-    Rule::call_expr => {
-      let mut pairs = pair.into_inner();
-
-      let identifier = pairs.next().expect("no identifier in call expression").as_str().to_string();
-      let arguments = pairs
-        .next()
-        .map(|args| args.into_inner().map(|p| climber.climb(p.into_inner(), primary, infix)).collect())
-        .unwrap_or_else(Vec::new);
-
-      ast::Expression::FunctionCall { identifier, arguments }
-    }
-    Rule::literal => {
-      let pair = pair.into_inner().next().unwrap();
-      match pair.as_rule() {
-        Rule::float => ast::Expression::Literal(ast::Literal::Float(pair.as_str().parse::<f64>().unwrap())),
-        Rule::int => ast::Expression::Literal(ast::Literal::Int(pair.as_str().parse::<i64>().unwrap())),
-        Rule::boolean => ast::Expression::Literal(ast::Literal::Bool(pair.as_str().parse::<bool>().unwrap())),
-        Rule::string => ast::Expression::Literal(ast::Literal::String(pair.as_str().to_owned())),
-        _ => unreachable!("binary rule"),
-      }
-    }
-    _ => unreachable!("pair: {:?}", pair),
-  }
-}
 
 #[cfg(test)]
 mod tests {
@@ -95,13 +31,7 @@ mod tests {
     let expr = "2 * 2 + 4 / (-4.9 - pi(true, nested()))";
     let mut pairs = McParser::parse(Rule::expression, &expr).unwrap();
 
-    let climber = climber();
-
-    let ps = pairs.next().expect("no pair found");
-
-    eprintln!("{:#?}", ps);
-
-    let result = consume(ps, &climber);
+    let result = ast::Expression::from_pest(&mut pairs).unwrap();
 
     eprintln!("RESULT:\n{:#?}", result);
   }

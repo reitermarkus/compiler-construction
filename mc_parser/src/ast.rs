@@ -1,9 +1,66 @@
 use std::fmt;
 
 use from_pest::{ConversionError, FromPest};
-use pest::iterators::Pairs;
+use pest::{
+  iterators::{Pair, Pairs},
+  prec_climber::{Assoc, Operator, PrecClimber},
+};
 
 use crate::Rule;
+
+
+pub fn climber() -> PrecClimber<Rule> {
+  // Reference: https://en.cppreference.com/w/c/language/operator_precedence
+  PrecClimber::new(vec![
+    Operator::new(Rule::lor, Assoc::Left),
+    Operator::new(Rule::land, Assoc::Left),
+    Operator::new(Rule::eq, Assoc::Left) | Operator::new(Rule::neq, Assoc::Left),
+    Operator::new(Rule::lte, Assoc::Left)
+      | Operator::new(Rule::lt, Assoc::Left)
+      | Operator::new(Rule::gte, Assoc::Left)
+      | Operator::new(Rule::gt, Assoc::Left),
+    Operator::new(Rule::plus, Assoc::Left) | Operator::new(Rule::minus, Assoc::Left),
+    Operator::new(Rule::times, Assoc::Left) | Operator::new(Rule::divide, Assoc::Left),
+    Operator::new(Rule::not, Assoc::Left) | Operator::new(Rule::unary_minus, Assoc::Left),
+  ])
+}
+
+pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Expression {
+
+  let primary = |pair| consume(pair, climber);
+
+  let infix = |lhs: Expression, op: Pair<'_, Rule>, rhs: Expression| Expression::Binary {
+    op: BinaryOp::from_pest(&mut Pairs::single(op)).unwrap(),
+    lhs: Box::new(lhs),
+    rhs: Box::new(rhs),
+  };
+
+  eprintln!("PAIR: {:?}", pair);
+
+  match pair.as_rule() {
+    Rule::unary_expression => {
+      let mut pairs = pair.into_inner();
+      
+      Expression::Unary { 
+        op: UnaryOp::from_pest(&mut pairs).unwrap(), 
+        expression: Box::new(climber.climb(pairs, primary, infix)) }
+    }
+    Rule::expression => climber.climb(pair.into_inner(), primary, infix),
+    Rule::call_expr => {
+      let mut pairs = pair.into_inner();
+
+      let identifier = pairs.next().expect("no identifier in call expression").as_str().to_string();
+      let arguments = pairs
+        .next()
+        .map(|args| args.into_inner().map(|p| climber.climb(p.into_inner(), primary, infix)).collect())
+        .unwrap_or_else(Vec::new);
+
+      Expression::FunctionCall { identifier, arguments }
+    }
+    Rule::literal => Expression::Literal(Literal::from_pest(&mut pair.into_inner()).unwrap()),
+    _ => unreachable!("pair {:?}", pair),
+  }
+}
 
 #[derive(Debug)]
 pub enum Ty {
@@ -22,24 +79,6 @@ impl fmt::Display for Ty {
       Self::String => "string",
     }
     .fmt(f)
-  }
-}
-
-impl FromPest<'_> for Ty {
-  type Rule = Rule;
-  type FatalError = String;
-
-  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pest.next().unwrap();
-    assert!(pest.next().is_none());
-
-    Ok(match pair.as_rule() {
-      Rule::boolean => Self::Bool,
-      Rule::int => Self::Int,
-      Rule::float => Self::Float,
-      Rule::string => Self::String,
-      rule => return Err(ConversionError::Malformed(format!("unknown type: {:?}", rule))),
-    })
   }
 }
 
@@ -91,7 +130,6 @@ impl FromPest<'_> for UnaryOp {
 
   fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let op = pest.next().unwrap();
-    assert!(pest.next().is_none());
 
     Ok(match op.as_rule() {
       Rule::unary_minus => Self::Minus,
@@ -170,6 +208,19 @@ pub enum Expression {
   FunctionCall { identifier: String, arguments: Vec<Expression> },
   Unary { op: UnaryOp, expression: Box<Expression> },
   Binary { op: BinaryOp, lhs: Box<Expression>, rhs: Box<Expression> },
+}
+
+impl FromPest<'_> for Expression {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let pair = pest.next().expect("no pair found");
+    eprintln!("{:#?}", pair);
+    let climber = climber();
+
+    Ok(consume(pair, &climber))
+  }
 }
 
 #[derive(Debug)]
