@@ -2,8 +2,15 @@
 
 use std::fs::File;
 use std::io::{prelude::*, stdin, stdout};
+use std::string::ToString;
 
 use clap::{value_t, App, Arg};
+use petgraph::dot::Dot;
+
+use mc_parser::ast::*;
+
+mod add_to_graph;
+use add_to_graph::{AddToGraph, *};
 
 fn main() -> std::io::Result<()> {
   let matches = App::new("mC AST to DOT Converter")
@@ -34,12 +41,39 @@ fn main() -> std::io::Result<()> {
     }
   }
 
-  let ast = format!("{:#?}", mc_parser::parse(&contents));
+  let ast = Program {
+    function_declarations: vec![FunctionDeclaration {
+      ty: Some("int".to_string()),
+      identifier: String::from("main"),
+      parameters: vec![
+        Parameter {
+          ty: "float".into(),
+          identifier: "n".to_owned(),
+        },
+        Parameter {
+          ty: "string".into(),
+          identifier: "message".to_owned(),
+        },
+      ],
+      body: CompoundStatement {
+        statements: vec![Statement::If(Box::new(IfStatement {
+          condition: Expression::Literal(Literal::Bool(false)),
+          block: Statement::Compound(CompoundStatement { statements: vec![] }),
+          else_block: None,
+        }))],
+      },
+    }],
+  };
+
+  let mut deps = AstGraph::new();
+  ast.add_to_graph(&mut deps);
+
+  let output = Dot::new(&deps).to_string();
 
   if let Some(out_file) = out_file.map(File::create) {
-    out_file?.write_all(ast.as_bytes())?;
+    out_file?.write_all(output.as_bytes())?;
   } else {
-    stdout().write_all(ast.as_bytes())?;
+    stdout().write_all(output.as_bytes())?;
   }
 
   Ok(())

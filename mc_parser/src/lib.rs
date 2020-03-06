@@ -9,7 +9,7 @@ use pest::{
 };
 use pest_derive::Parser;
 
-mod ast;
+pub mod ast;
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
@@ -71,11 +71,12 @@ pub fn climber() -> PrecClimber<Rule> {
 pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> ast::Expression {
   let primary = |pair| consume(pair, climber);
 
-  let infix = |lhs: ast::Expression, op: Pair<'_, Rule>, rhs: ast::Expression| ast::Expression::Binary {
-    op: ast::BinaryOp::from_pest(&mut Pairs::single(op)).unwrap(),
-    lhs: Box::new(lhs),
-    rhs: Box::new(rhs),
-  };
+  let infix =
+    |lhs: ast::Expression, op: Pair<'_, Rule>, rhs: ast::Expression| ast::Expression::Binary {
+      op: ast::BinaryOp::from_pest(&mut Pairs::single(op)).unwrap(),
+      lhs: Box::new(lhs),
+      rhs: Box::new(rhs),
+    };
 
   eprintln!("PAIR: {:?}", pair);
 
@@ -117,7 +118,7 @@ pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> ast::Ex
         })
         .unwrap_or_else(Vec::new);
 
-        ast::Expression::FunctionCall {
+      ast::Expression::FunctionCall {
         identifier,
         arguments,
       }
@@ -125,9 +126,15 @@ pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> ast::Ex
     Rule::literal => {
       let pair = pair.into_inner().next().unwrap();
       match pair.as_rule() {
-        Rule::float => ast::Expression::Literal(ast::Literal::Float(pair.as_str().parse::<f64>().unwrap())),
-        Rule::int => ast::Expression::Literal(ast::Literal::Int(pair.as_str().parse::<i64>().unwrap())),
-        Rule::boolean => ast::Expression::Literal(ast::Literal::Bool(pair.as_str().parse::<bool>().unwrap())),
+        Rule::float => {
+          ast::Expression::Literal(ast::Literal::Float(pair.as_str().parse::<f64>().unwrap()))
+        }
+        Rule::int => {
+          ast::Expression::Literal(ast::Literal::Int(pair.as_str().parse::<i64>().unwrap()))
+        }
+        Rule::boolean => {
+          ast::Expression::Literal(ast::Literal::Bool(pair.as_str().parse::<bool>().unwrap()))
+        }
         Rule::string => ast::Expression::Literal(ast::Literal::String(pair.as_str().to_owned())),
         _ => unreachable!("binary rule"),
       }

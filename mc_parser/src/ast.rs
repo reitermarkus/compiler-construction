@@ -1,4 +1,4 @@
-#![deny(missing_debug_implementations, rust_2018_idioms)]
+use std::fmt;
 
 #[derive(Debug)]
 pub enum Ty {
@@ -6,6 +6,18 @@ pub enum Ty {
   Int,
   Float,
   String,
+}
+
+impl fmt::Display for Ty {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::Bool => "bool",
+      Self::Int => "int",
+      Self::Float => "float",
+      Self::String => "string",
+    }
+    .fmt(f)
+  }
 }
 
 #[derive(Debug)]
@@ -20,6 +32,16 @@ pub enum Literal {
 pub enum UnaryOp {
   Minus,
   Not,
+}
+
+impl fmt::Display for UnaryOp {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::Minus => "-",
+      Self::Not => "!",
+    }
+    .fmt(f)
+  }
 }
 
 #[derive(Debug)]
@@ -38,12 +60,32 @@ pub enum BinaryOp {
   Lor,
 }
 
+impl fmt::Display for BinaryOp {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::Plus => "+",
+      Self::Minus => "-",
+      Self::Times => "*",
+      Self::Divide => "/",
+      Self::Eq => "==",
+      Self::Neq => "!=",
+      Self::Lte => "<=",
+      Self::Lt => "<",
+      Self::Gte => ">=",
+      Self::Gt => ">",
+      Self::Land => "&&",
+      Self::Lor => "||",
+    }
+    .fmt(f)
+  }
+}
+
 #[derive(Debug)]
 pub enum Expression {
   Literal(Literal),
   Variable {
     identifier: String,
-    index: Option<usize>,
+    index_expression: Option<Box<Expression>>,
   },
   FunctionCall {
     identifier: String,
@@ -61,38 +103,41 @@ pub enum Expression {
 }
 
 #[derive(Debug)]
-pub struct Parameter;
+pub struct Parameter {
+  pub ty: String,
+  pub identifier: String,
+}
 
 #[derive(Debug)]
 pub struct Assignment {
-  identifier: String,
-  index_expression: Option<Expression>,
-  rvalue: Expression,
+  pub identifier: String,
+  pub index_expression: Option<Expression>,
+  pub rvalue: Expression,
 }
 
 #[derive(Debug)]
 pub struct Declaration {
-  ty: Ty,
-  count: Option<usize>,
-  identifier: String,
+  pub ty: Ty,
+  pub count: Option<usize>,
+  pub identifier: String,
 }
 
 #[derive(Debug)]
 pub struct IfStatement {
-  condition: Expression,
-  block: Statement,
-  else_block: Option<Statement>,
+  pub condition: Expression,
+  pub block: Statement,
+  pub else_block: Option<Statement>,
 }
 
 #[derive(Debug)]
 pub struct WhileStatement {
-  condition: Expression,
-  block: Statement,
+  pub condition: Expression,
+  pub block: Statement,
 }
 
 #[derive(Debug)]
 pub struct ReturnStatement {
-  expression: Expression,
+  pub expression: Expression,
 }
 
 #[derive(Debug)]
@@ -108,16 +153,18 @@ pub enum Statement {
 
 #[derive(Debug)]
 pub struct CompoundStatement {
-  statements: Vec<Statement>,
+  pub statements: Vec<Statement>,
 }
 
 #[derive(Debug)]
 pub struct FunctionDeclaration {
-  ty: Option<String>,
-  identifier: String,
-  parameters: Vec<Parameter>,
-  body: CompoundStatement,
+  pub ty: Option<String>,
+  pub identifier: String,
+  pub parameters: Vec<Parameter>,
+  pub body: CompoundStatement,
 }
 
 #[derive(Debug)]
-pub struct Program(Vec<FunctionDeclaration>);
+pub struct Program {
+  pub function_declarations: Vec<FunctionDeclaration>,
+}
