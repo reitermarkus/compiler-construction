@@ -45,26 +45,17 @@ fn main() -> std::io::Result<()> {
     function_declarations: vec![FunctionDeclaration {
       ty: Some("int".to_string()),
       identifier: String::from("fib"),
-      parameters: vec![Parameter {
-        ty: "int".into(),
-        identifier: "n".to_owned(),
-      }],
+      parameters: vec![Parameter { ty: "int".into(), identifier: "n".to_owned() }],
       body: CompoundStatement {
         statements: vec![
           Statement::If(Box::new(IfStatement {
             condition: Expression::Binary {
               op: BinaryOp::Lt,
-              lhs: Box::new(Expression::Variable {
-                identifier: "n".to_string(),
-                index_expression: None,
-              }),
+              lhs: Box::new(Expression::Variable { identifier: "n".to_string(), index_expression: None }),
               rhs: Box::new(Expression::Literal(Literal::Int(2))),
             },
             block: Statement::Ret(ReturnStatement {
-              expression: Expression::Variable {
-                identifier: "n".to_string(),
-                index_expression: None,
-              },
+              expression: Expression::Variable { identifier: "n".to_string(), index_expression: None },
             }),
             else_block: None,
           })),
@@ -75,10 +66,7 @@ fn main() -> std::io::Result<()> {
                 identifier: "fib".to_string(),
                 arguments: vec![Expression::Binary {
                   op: BinaryOp::Minus,
-                  lhs: Box::new(Expression::Variable {
-                    identifier: "n".to_string(),
-                    index_expression: None,
-                  }),
+                  lhs: Box::new(Expression::Variable { identifier: "n".to_string(), index_expression: None }),
                   rhs: Box::new(Expression::Literal(Literal::Int(1))),
                 }],
               }),
@@ -86,10 +74,7 @@ fn main() -> std::io::Result<()> {
                 identifier: "fib".to_string(),
                 arguments: vec![Expression::Binary {
                   op: BinaryOp::Minus,
-                  lhs: Box::new(Expression::Variable {
-                    identifier: "n".to_string(),
-                    index_expression: None,
-                  }),
+                  lhs: Box::new(Expression::Variable { identifier: "n".to_string(), index_expression: None }),
                   rhs: Box::new(Expression::Literal(Literal::Int(2))),
                 }],
               }),
@@ -106,17 +91,10 @@ fn main() -> std::io::Result<()> {
   fn output(mut writer: impl Write, graph: &AstGraph) -> std::io::Result<()> {
     writeln!(writer, "digraph {{")?;
 
-    writeln!(
-      writer,
-      r##"    node [fontname="sans-serif", color="#c8e6ff", style=filled]"##
-    )?;
+    writeln!(writer, r##"    node [fontname="sans-serif", color="#c8e6ff", style=filled]"##)?;
     writeln!(writer, r##"    edge [fontname="sans-serif"]"##)?;
 
-    write!(
-      writer,
-      "{}",
-      Dot::with_config(&graph, &[Config::GraphContentOnly])
-    )?;
+    write!(writer, "{}", Dot::with_config(&graph, &[Config::GraphContentOnly]))?;
 
     writeln!(writer, "}}")
   };

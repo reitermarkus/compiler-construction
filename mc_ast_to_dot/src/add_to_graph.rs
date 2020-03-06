@@ -25,10 +25,7 @@ impl AddToGraph for Expression {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     match self {
       Self::Literal(lit) => lit.add_to_graph(g),
-      Self::Variable {
-        identifier,
-        index_expression,
-      } => {
+      Self::Variable { identifier, index_expression } => {
         let v = g.add_node(identifier.clone());
 
         if let Some(index_expression) = index_expression {
@@ -38,10 +35,7 @@ impl AddToGraph for Expression {
 
         v
       }
-      Self::FunctionCall {
-        identifier,
-        arguments,
-      } => {
+      Self::FunctionCall { identifier, arguments } => {
         let f = g.add_node(format!("{}()", identifier));
 
         for (i, argument) in arguments.iter().enumerate() {
@@ -120,10 +114,7 @@ impl AddToGraph for ReturnStatement {
 
 impl AddToGraph for Declaration {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
-    let index = self
-      .count
-      .map(|c| format!("[{}]", c))
-      .unwrap_or_else(|| "".into());
+    let index = self.count.map(|c| format!("[{}]", c)).unwrap_or_else(|| "".into());
     g.add_node(format!("{}{} {}", self.ty, index, self.identifier))
   }
 }
@@ -177,18 +168,9 @@ impl AddToGraph for CompoundStatement {
 
 impl AddToGraph for FunctionDeclaration {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
-    let parameters = self
-      .parameters
-      .iter()
-      .map(|p| format!("{} {}", p.ty, p.identifier))
-      .collect::<Vec<_>>()
-      .join(", ");
-    let label = format!(
-      "{} {}({})",
-      self.ty.as_ref().unwrap_or(&"void".to_string()),
-      self.identifier,
-      parameters
-    );
+    let parameters =
+      self.parameters.iter().map(|p| format!("{} {}", p.ty, p.identifier)).collect::<Vec<_>>().join(", ");
+    let label = format!("{} {}({})", self.ty.as_ref().unwrap_or(&"void".to_string()), self.identifier, parameters);
     let f = g.add_node(label);
 
     let b = self.body.add_to_graph(g);

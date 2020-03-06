@@ -1,9 +1,7 @@
 use std::fmt;
 
 use from_pest::{ConversionError, FromPest};
-use pest::{
-  iterators::{Pairs}
-};
+use pest::iterators::Pairs;
 
 use crate::Rule;
 
@@ -31,9 +29,7 @@ impl FromPest<'_> for Ty {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(
-    pest: &mut Pairs<'_, Self::Rule>,
-  ) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let pair = pest.next().unwrap();
     assert!(pest.next().is_none());
 
@@ -42,12 +38,7 @@ impl FromPest<'_> for Ty {
       Rule::int => Self::Int,
       Rule::float => Self::Float,
       Rule::string => Self::String,
-      rule => {
-        return Err(ConversionError::Malformed(format!(
-          "unknown type: {:?}",
-          rule
-        )))
-      }
+      rule => return Err(ConversionError::Malformed(format!("unknown type: {:?}", rule))),
     })
   }
 }
@@ -64,9 +55,7 @@ impl FromPest<'_> for Literal {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(
-    pest: &mut Pairs<'_, Self::Rule>,
-  ) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let pair = pest.next().unwrap();
     assert!(pest.next().is_none());
 
@@ -75,12 +64,7 @@ impl FromPest<'_> for Literal {
       Rule::int => Self::Int(pair.as_str().parse::<i64>().unwrap()),
       Rule::boolean => Self::Bool(pair.as_str().parse::<bool>().unwrap()),
       Rule::string => Self::String(pair.as_str().to_owned()),
-      rule => {
-        return Err(ConversionError::Malformed(format!(
-          "unknown literal: {:?}",
-          rule
-        )))
-      }
+      rule => return Err(ConversionError::Malformed(format!("unknown literal: {:?}", rule))),
     })
   }
 }
@@ -105,21 +89,14 @@ impl FromPest<'_> for UnaryOp {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(
-    pest: &mut Pairs<'_, Self::Rule>,
-  ) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let op = pest.next().unwrap();
     assert!(pest.next().is_none());
 
     Ok(match op.as_rule() {
       Rule::unary_minus => Self::Minus,
       Rule::not => Self::Not,
-      rule => {
-        return Err(ConversionError::Malformed(format!(
-          "unknown unary operation: {:?}",
-          rule
-        )))
-      }
+      rule => return Err(ConversionError::Malformed(format!("unknown unary operation: {:?}", rule))),
     })
   }
 }
@@ -164,9 +141,7 @@ impl FromPest<'_> for BinaryOp {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(
-    pest: &mut Pairs<'_, Self::Rule>,
-  ) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let op = pest.next().unwrap();
     assert!(pest.next().is_none());
 
@@ -183,12 +158,7 @@ impl FromPest<'_> for BinaryOp {
       Rule::gt => Self::Gt,
       Rule::land => Self::Land,
       Rule::lor => Self::Lor,
-      rule => {
-        return Err(ConversionError::Malformed(format!(
-          "unknown binary operation: {:?}",
-          rule
-        )))
-      }
+      rule => return Err(ConversionError::Malformed(format!("unknown binary operation: {:?}", rule))),
     })
   }
 }
@@ -196,23 +166,10 @@ impl FromPest<'_> for BinaryOp {
 #[derive(Debug)]
 pub enum Expression {
   Literal(Literal),
-  Variable {
-    identifier: String,
-    index_expression: Option<Box<Expression>>,
-  },
-  FunctionCall {
-    identifier: String,
-    arguments: Vec<Expression>,
-  },
-  Unary {
-    op: UnaryOp,
-    expression: Box<Expression>,
-  },
-  Binary {
-    op: BinaryOp,
-    lhs: Box<Expression>,
-    rhs: Box<Expression>,
-  },
+  Variable { identifier: String, index_expression: Option<Box<Expression>> },
+  FunctionCall { identifier: String, arguments: Vec<Expression> },
+  Unary { op: UnaryOp, expression: Box<Expression> },
+  Binary { op: BinaryOp, lhs: Box<Expression>, rhs: Box<Expression> },
 }
 
 #[derive(Debug)]
