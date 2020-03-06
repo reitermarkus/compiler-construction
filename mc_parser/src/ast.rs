@@ -1,5 +1,12 @@
 use std::fmt;
 
+use from_pest::{ConversionError, FromPest};
+use pest::{
+  iterators::{Pair, Pairs}
+};
+
+use crate::Rule;
+
 #[derive(Debug)]
 pub enum Ty {
   Bool,
@@ -17,6 +24,31 @@ impl fmt::Display for Ty {
       Self::String => "string",
     }
     .fmt(f)
+  }
+}
+
+impl FromPest<'_> for Ty {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(
+    pest: &mut Pairs<'_, Self::Rule>,
+  ) -> Result<Self, ConversionError<Self::FatalError>> {
+    let pair = pest.next().unwrap();
+    assert!(pest.next().is_none());
+
+    Ok(match pair.as_rule() {
+      Rule::boolean => Self::Bool,
+      Rule::int => Self::Int,
+      Rule::float => Self::Float,
+      Rule::string => Self::String,
+      rule => {
+        return Err(ConversionError::Malformed(format!(
+          "unknown literal: {:?}",
+          rule
+        )))
+      }
+    })
   }
 }
 
@@ -41,6 +73,29 @@ impl fmt::Display for UnaryOp {
       Self::Not => "!",
     }
     .fmt(f)
+  }
+}
+
+impl FromPest<'_> for UnaryOp {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(
+    pest: &mut Pairs<'_, Self::Rule>,
+  ) -> Result<Self, ConversionError<Self::FatalError>> {
+    let op = pest.next().unwrap();
+    assert!(pest.next().is_none());
+
+    Ok(match op.as_rule() {
+      Rule::unary_minus => Self::Minus,
+      Rule::not => Self::Not,
+      rule => {
+        return Err(ConversionError::Malformed(format!(
+          "unknown unary operation: {:?}",
+          rule
+        )))
+      }
+    })
   }
 }
 
@@ -77,6 +132,39 @@ impl fmt::Display for BinaryOp {
       Self::Lor => "||",
     }
     .fmt(f)
+  }
+}
+
+impl FromPest<'_> for BinaryOp {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(
+    pest: &mut Pairs<'_, Self::Rule>,
+  ) -> Result<Self, ConversionError<Self::FatalError>> {
+    let op = pest.next().unwrap();
+    assert!(pest.next().is_none());
+
+    Ok(match op.as_rule() {
+      Rule::plus => Self::Plus,
+      Rule::minus => Self::Minus,
+      Rule::times => Self::Times,
+      Rule::divide => Self::Divide,
+      Rule::eq => Self::Eq,
+      Rule::neq => Self::Neq,
+      Rule::lte => Self::Lte,
+      Rule::lt => Self::Lt,
+      Rule::gte => Self::Gte,
+      Rule::gt => Self::Gt,
+      Rule::land => Self::Land,
+      Rule::lor => Self::Lor,
+      rule => {
+        return Err(ConversionError::Malformed(format!(
+          "unknown binary operation: {:?}",
+          rule
+        )))
+      }
+    })
   }
 }
 

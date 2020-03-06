@@ -19,39 +19,6 @@ pub fn parse(program: &str) -> Result<Pairs<'_, Rule>, Error<Rule>> {
   McParser::parse(Rule::program, program)
 }
 
-impl FromPest<'_> for ast::BinaryOp {
-  type Rule = Rule;
-  type FatalError = String;
-
-  fn from_pest(
-    pest: &mut Pairs<'_, Self::Rule>,
-  ) -> Result<Self, ConversionError<Self::FatalError>> {
-    let op = pest.next().unwrap();
-    assert!(pest.next().is_none());
-
-    Ok(match op.as_rule() {
-      Rule::plus => Self::Plus,
-      Rule::minus => Self::Minus,
-      Rule::times => Self::Times,
-      Rule::divide => Self::Divide,
-      Rule::eq => Self::Eq,
-      Rule::neq => Self::Neq,
-      Rule::lte => Self::Lte,
-      Rule::lt => Self::Lt,
-      Rule::gte => Self::Gte,
-      Rule::gt => Self::Gt,
-      Rule::land => Self::Land,
-      Rule::lor => Self::Lor,
-      rule => {
-        return Err(ConversionError::Malformed(format!(
-          "unknown binary operation: {:?}",
-          rule
-        )))
-      }
-    })
-  }
-}
-
 pub fn climber() -> PrecClimber<Rule> {
   // Reference: https://en.cppreference.com/w/c/language/operator_precedence
   PrecClimber::new(vec![
