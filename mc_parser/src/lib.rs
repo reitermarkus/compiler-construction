@@ -9,6 +9,8 @@ use pest::{
 };
 use pest_derive::Parser;
 
+mod ast;
+
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
 struct McParser;
@@ -17,45 +19,7 @@ pub fn parse(program: &str) -> Result<Pairs<'_, Rule>, Error<Rule>> {
   McParser::parse(Rule::program, program)
 }
 
-#[derive(Debug)]
-pub enum Ty {
-  Bool,
-  Int,
-  Float,
-  String,
-}
-
-#[derive(Debug)]
-pub enum Literal {
-  Bool(bool),
-  Int(i64),
-  Float(f64),
-  String(String),
-}
-
-#[derive(Debug)]
-pub enum UnaryOp {
-  Minus,
-  Not,
-}
-
-#[derive(Debug)]
-pub enum BinaryOp {
-  Plus,
-  Minus,
-  Times,
-  Divide,
-  Eq,
-  Neq,
-  Lte,
-  Lt,
-  Gte,
-  Gt,
-  Land,
-  Lor,
-}
-
-impl FromPest<'_> for BinaryOp {
+impl FromPest<'_> for ast::BinaryOp {
   type Rule = Rule;
   type FatalError = String;
 
@@ -88,90 +52,6 @@ impl FromPest<'_> for BinaryOp {
   }
 }
 
-#[derive(Debug)]
-pub enum Expression {
-  Literal(Literal),
-  Variable {
-    identifier: String,
-    index: Option<usize>,
-  },
-  FunctionCall {
-    identifier: String,
-    arguments: Vec<Expression>,
-  },
-  Unary {
-    op: UnaryOp,
-    expression: Box<Expression>,
-  },
-  Binary {
-    op: BinaryOp,
-    lhs: Box<Expression>,
-    rhs: Box<Expression>,
-  },
-}
-
-#[derive(Debug)]
-pub struct Parameter;
-
-#[derive(Debug)]
-pub struct Assignment {
-  identifier: String,
-  index_expression: Option<Expression>,
-  rvalue: Expression,
-}
-
-#[derive(Debug)]
-pub struct Declaration {
-  ty: Ty,
-  count: Option<usize>,
-  identifier: String,
-}
-
-#[derive(Debug)]
-pub struct IfStatement {
-  condition: Expression,
-  block: Statement,
-  else_block: Option<Statement>,
-}
-
-#[derive(Debug)]
-pub struct WhileStatement {
-  condition: Expression,
-  block: Statement,
-}
-
-#[derive(Debug)]
-pub struct ReturnStatement {
-  expression: Expression,
-}
-
-#[derive(Debug)]
-pub enum Statement {
-  If(Box<IfStatement>),
-  While(Box<WhileStatement>),
-  Ret(ReturnStatement),
-  Decl(Declaration),
-  Assignment(Assignment),
-  Expression(Expression),
-  Compound(CompoundStatement),
-}
-
-#[derive(Debug)]
-pub struct CompoundStatement {
-  statements: Vec<Statement>,
-}
-
-#[derive(Debug)]
-pub struct FunctionDeclaration {
-  ty: Option<String>,
-  identifier: String,
-  parameters: Vec<Parameter>,
-  body: CompoundStatement,
-}
-
-#[derive(Debug)]
-pub struct Program(Vec<FunctionDeclaration>);
-
 pub fn climber() -> PrecClimber<Rule> {
   // Reference: https://en.cppreference.com/w/c/language/operator_precedence
   PrecClimber::new(vec![
@@ -188,11 +68,11 @@ pub fn climber() -> PrecClimber<Rule> {
   ])
 }
 
-pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Expression {
+pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> ast::Expression {
   let primary = |pair| consume(pair, climber);
 
-  let infix = |lhs: Expression, op: Pair<'_, Rule>, rhs: Expression| Expression::Binary {
-    op: BinaryOp::from_pest(&mut Pairs::single(op)).unwrap(),
+  let infix = |lhs: ast::Expression, op: Pair<'_, Rule>, rhs: ast::Expression| ast::Expression::Binary {
+    op: ast::BinaryOp::from_pest(&mut Pairs::single(op)).unwrap(),
     lhs: Box::new(lhs),
     rhs: Box::new(rhs),
   };
@@ -208,12 +88,12 @@ pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Express
         .expect("no unary operator inside unary expression")
         .as_rule()
       {
-        Rule::unary_minus => UnaryOp::Minus,
-        Rule::not => UnaryOp::Not,
+        Rule::unary_minus => ast::UnaryOp::Minus,
+        Rule::not => ast::UnaryOp::Not,
         _ => unreachable!(),
       };
 
-      Expression::Unary {
+      ast::Expression::Unary {
         op,
         expression: Box::new(climber.climb(pairs, primary, infix)),
       }
@@ -237,7 +117,7 @@ pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Express
         })
         .unwrap_or_else(Vec::new);
 
-      Expression::FunctionCall {
+        ast::Expression::FunctionCall {
         identifier,
         arguments,
       }
@@ -245,10 +125,10 @@ pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Express
     Rule::literal => {
       let pair = pair.into_inner().next().unwrap();
       match pair.as_rule() {
-        Rule::float => Expression::Literal(Literal::Float(pair.as_str().parse::<f64>().unwrap())),
-        Rule::int => Expression::Literal(Literal::Int(pair.as_str().parse::<i64>().unwrap())),
-        Rule::boolean => Expression::Literal(Literal::Bool(pair.as_str().parse::<bool>().unwrap())),
-        Rule::string => Expression::Literal(Literal::String(pair.as_str().to_owned())),
+        Rule::float => ast::Expression::Literal(ast::Literal::Float(pair.as_str().parse::<f64>().unwrap())),
+        Rule::int => ast::Expression::Literal(ast::Literal::Int(pair.as_str().parse::<i64>().unwrap())),
+        Rule::boolean => ast::Expression::Literal(ast::Literal::Bool(pair.as_str().parse::<bool>().unwrap())),
+        Rule::string => ast::Expression::Literal(ast::Literal::String(pair.as_str().to_owned())),
         _ => unreachable!("binary rule"),
       }
     }
