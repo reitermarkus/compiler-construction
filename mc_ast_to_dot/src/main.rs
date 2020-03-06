@@ -100,26 +100,30 @@ fn main() -> std::io::Result<()> {
     }],
   };
 
-  let mut deps = AstGraph::new();
-  ast.add_to_graph(&mut deps);
+  let mut graph = AstGraph::new();
+  ast.add_to_graph(&mut graph);
 
-  let output = format!(
-    r##"
-    digraph {{
-      node [fontname="sans-serif", color="#c8e6ff", style=filled]
-      edge [fontname="sans-serif"]
+  fn output(mut writer: impl Write, graph: &AstGraph) -> std::io::Result<()> {
+    writeln!(writer, "digraph {{")?;
 
-      {}
-    }}
-    "##,
-    Dot::with_config(&deps, &[Config::GraphContentOnly])
-  );
+    writeln!(
+      writer,
+      r##"    node [fontname="sans-serif", color="#c8e6ff", style=filled]"##
+    )?;
+    writeln!(writer, r##"    edge [fontname="sans-serif"]"##)?;
+
+    write!(
+      writer,
+      "{}",
+      Dot::with_config(&graph, &[Config::GraphContentOnly])
+    )?;
+
+    writeln!(writer, "}}")
+  };
 
   if let Some(out_file) = out_file.map(File::create) {
-    out_file?.write_all(output.as_bytes())?;
+    output(out_file?, &graph)
   } else {
-    stdout().write_all(output.as_bytes())?;
+    output(stdout(), &graph)
   }
-
-  Ok(())
 }
