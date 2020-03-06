@@ -2,7 +2,7 @@ use std::fmt;
 
 use from_pest::{ConversionError, FromPest};
 use pest::{
-  iterators::{Pair, Pairs}
+  iterators::{Pairs}
 };
 
 use crate::Rule;
@@ -44,7 +44,7 @@ impl FromPest<'_> for Ty {
       Rule::string => Self::String,
       rule => {
         return Err(ConversionError::Malformed(format!(
-          "unknown literal: {:?}",
+          "unknown type: {:?}",
           rule
         )))
       }
@@ -58,6 +58,31 @@ pub enum Literal {
   Int(i64),
   Float(f64),
   String(String),
+}
+
+impl FromPest<'_> for Literal {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(
+    pest: &mut Pairs<'_, Self::Rule>,
+  ) -> Result<Self, ConversionError<Self::FatalError>> {
+    let pair = pest.next().unwrap();
+    assert!(pest.next().is_none());
+
+    Ok(match pair.as_rule() {
+      Rule::float => Self::Float(pair.as_str().parse::<f64>().unwrap()),
+      Rule::int => Self::Int(pair.as_str().parse::<i64>().unwrap()),
+      Rule::boolean => Self::Bool(pair.as_str().parse::<bool>().unwrap()),
+      Rule::string => Self::String(pair.as_str().to_owned()),
+      rule => {
+        return Err(ConversionError::Malformed(format!(
+          "unknown literal: {:?}",
+          rule
+        )))
+      }
+    })
+  }
 }
 
 #[derive(Debug)]

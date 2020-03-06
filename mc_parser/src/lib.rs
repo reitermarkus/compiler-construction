@@ -1,6 +1,6 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
-use from_pest::{ConversionError, FromPest};
+use from_pest::{FromPest};
 use pest::{
   error::Error,
   iterators::{Pair, Pairs},
