@@ -204,7 +204,7 @@ impl AddToGraph for Program {
 
     for function in &self.function_declarations {
       let f = function.add_to_graph(g);
-      g.add_edge(p, f, "function declaration".into());
+      g.add_edge(p, f, "function".into());
     }
 
     p

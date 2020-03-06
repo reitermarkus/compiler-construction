@@ -5,7 +5,7 @@ use std::io::{prelude::*, stdin, stdout};
 use std::string::ToString;
 
 use clap::{value_t, App, Arg};
-use petgraph::dot::Dot;
+use petgraph::dot::{Config, Dot};
 
 use mc_parser::ast::*;
 
@@ -44,23 +44,58 @@ fn main() -> std::io::Result<()> {
   let ast = Program {
     function_declarations: vec![FunctionDeclaration {
       ty: Some("int".to_string()),
-      identifier: String::from("main"),
-      parameters: vec![
-        Parameter {
-          ty: "float".into(),
-          identifier: "n".to_owned(),
-        },
-        Parameter {
-          ty: "string".into(),
-          identifier: "message".to_owned(),
-        },
-      ],
+      identifier: String::from("fib"),
+      parameters: vec![Parameter {
+        ty: "int".into(),
+        identifier: "n".to_owned(),
+      }],
       body: CompoundStatement {
-        statements: vec![Statement::If(Box::new(IfStatement {
-          condition: Expression::Literal(Literal::Bool(false)),
-          block: Statement::Compound(CompoundStatement { statements: vec![] }),
-          else_block: None,
-        }))],
+        statements: vec![
+          Statement::If(Box::new(IfStatement {
+            condition: Expression::Binary {
+              op: BinaryOp::Lt,
+              lhs: Box::new(Expression::Variable {
+                identifier: "n".to_string(),
+                index_expression: None,
+              }),
+              rhs: Box::new(Expression::Literal(Literal::Int(2))),
+            },
+            block: Statement::Ret(ReturnStatement {
+              expression: Expression::Variable {
+                identifier: "n".to_string(),
+                index_expression: None,
+              },
+            }),
+            else_block: None,
+          })),
+          Statement::Ret(ReturnStatement {
+            expression: Expression::Binary {
+              op: BinaryOp::Plus,
+              lhs: Box::new(Expression::FunctionCall {
+                identifier: "fib".to_string(),
+                arguments: vec![Expression::Binary {
+                  op: BinaryOp::Minus,
+                  lhs: Box::new(Expression::Variable {
+                    identifier: "n".to_string(),
+                    index_expression: None,
+                  }),
+                  rhs: Box::new(Expression::Literal(Literal::Int(1))),
+                }],
+              }),
+              rhs: Box::new(Expression::FunctionCall {
+                identifier: "fib".to_string(),
+                arguments: vec![Expression::Binary {
+                  op: BinaryOp::Minus,
+                  lhs: Box::new(Expression::Variable {
+                    identifier: "n".to_string(),
+                    index_expression: None,
+                  }),
+                  rhs: Box::new(Expression::Literal(Literal::Int(2))),
+                }],
+              }),
+            },
+          }),
+        ],
       },
     }],
   };
@@ -68,7 +103,17 @@ fn main() -> std::io::Result<()> {
   let mut deps = AstGraph::new();
   ast.add_to_graph(&mut deps);
 
-  let output = Dot::new(&deps).to_string();
+  let output = format!(
+    r##"
+    digraph {{
+      node [fontname="sans-serif", color="#c8e6ff", style=filled]
+      edge [fontname="sans-serif"]
+
+      {}
+    }}
+    "##,
+    Dot::with_config(&deps, &[Config::GraphContentOnly])
+  );
 
   if let Some(out_file) = out_file.map(File::create) {
     out_file?.write_all(output.as_bytes())?;
