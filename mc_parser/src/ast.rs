@@ -411,14 +411,26 @@ mod tests {
 
   #[test]
   fn assignment_from_pest() {
-    let assignment = "numbers[10] = 12.4";
-    let mut pairs = McParser::parse(Rule::assignment, &assignment).unwrap();
+    let assignment_with_index = "numbers[10] = 12.4";
+    let mut pairs = McParser::parse(Rule::assignment, &assignment_with_index).unwrap();
 
     assert_eq!(
       Assignment::from_pest(&mut pairs).unwrap(),
       Assignment {
         identifier: Identifier("numbers".to_string()),
         index_expression: Option::Some(Expression::Literal(Literal::Int(10))),
+        rvalue: Expression::Literal(Literal::Float(12.4))
+      }
+    );
+
+    let assignment_no_index = "number = 12.4";
+    pairs = McParser::parse(Rule::assignment, &assignment_no_index).unwrap();
+
+    assert_eq!(
+      Assignment::from_pest(&mut pairs).unwrap(),
+      Assignment {
+        identifier: Identifier("number".to_string()),
+        index_expression: Option::None,
         rvalue: Expression::Literal(Literal::Float(12.4))
       }
     )

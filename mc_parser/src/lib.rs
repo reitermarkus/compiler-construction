@@ -282,4 +282,52 @@ mod tests {
               ]
     }
   }
+
+  #[test]
+  fn parse_if_stmt() {
+    parses_to! {
+      parser: McParser,
+      input:  "if (i > 0) { j = 1; } else { j = 0; }",
+      rule:   Rule::if_stmt,
+      tokens: [
+                if_stmt(0, 37, [
+                  expression(4, 9, [
+                    identifier(4, 5),
+                    gt(6, 7),
+                    literal(8, 9, [
+                      int(8, 9)
+                    ]),
+                  ]),
+                  statement(11, 21, [
+                    compound_stmt(11, 21, [
+                      statement(13, 19, [
+                        assignment(13, 18, [
+                          identifier(13, 14),
+                          expression(17, 18, [
+                            literal(17, 18, [
+                              int(17, 18)
+                            ])
+                          ])
+                        ])
+                      ])
+                    ])
+                  ]),
+                  statement(27, 37, [
+                    compound_stmt(27, 37, [
+                      statement(29, 35, [
+                        assignment(29, 34, [
+                          identifier(29, 30),
+                          expression(33, 34, [
+                            literal(33, 34, [
+                              int(33, 34)
+                            ])
+                          ])
+                        ])
+                      ])
+                    ])
+                  ])
+                ])
+              ]
+    }
+  }
 }
