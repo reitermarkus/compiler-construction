@@ -270,7 +270,7 @@ impl FromPest<'_> for Parameter {
     let typ = inner.next().unwrap().as_str();
     assert!(!inner.next().is_none());
     Ok(Self {
-      ty: typ.to_owned(), 
+      ty: typ.to_owned(),
       identifier: Identifier::from_pest(&mut inner).unwrap()
     })
   }
@@ -290,11 +290,25 @@ impl FromPest<'_> for Assignment {
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no pair found").into_inner();
 
+    let identifier = Identifier::from_pest(&mut inner).unwrap();
+
+    let (index_expression, rvalue) = match (inner.next(), inner.next()) {
+      (Some(index), Some(rvalue)) => {
+        (
+           Some(Expression::from_pest(&mut Pairs::single(index)).unwrap()),
+           Expression::from_pest(&mut Pairs::single(rvalue)).unwrap()
+        )
+      },
+      (Some(rvalue), None) => {
+        (None, Expression::from_pest(&mut Pairs::single(rvalue)).unwrap())
+      },
+      _ => unreachable!(),
+    };
 
     Ok(Self {
-      identifier: Identifier::from_pest(&mut inner).unwrap(),
-      index_expression: Option::Some(Expression::from_pest(&mut inner).unwrap()),
-      rvalue: Expression::from_pest(&mut inner).unwrap()
+      identifier,
+      index_expression,
+      rvalue
     })
   }
 }
