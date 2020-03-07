@@ -251,7 +251,6 @@ impl FromPest<'_> for Identifier {
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let identifier = pairs.next().unwrap().as_str();
-    assert!(pairs.next().is_none());
     Ok(Self(identifier.to_owned()))
   }
 }
@@ -262,11 +261,42 @@ pub struct Parameter {
   pub identifier: Identifier,
 }
 
+impl FromPest<'_> for Parameter {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let mut inner = pairs.next().expect("no pair found").into_inner();
+    let typ = inner.next().unwrap().as_str();
+    assert!(!inner.next().is_none());
+    Ok(Self {
+      ty: typ.to_owned(), 
+      identifier: Identifier::from_pest(&mut inner).unwrap()
+    })
+  }
+}
+
 #[derive(PartialEq, Debug)]
 pub struct Assignment {
   pub identifier: Identifier,
   pub index_expression: Option<Expression>,
   pub rvalue: Expression,
+}
+
+impl FromPest<'_> for Assignment {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let mut inner = pairs.next().expect("no pair found").into_inner();
+
+
+    Ok(Self {
+      identifier: Identifier::from_pest(&mut inner).unwrap(),
+      index_expression: Option::Some(Expression::from_pest(&mut inner).unwrap()),
+      rvalue: Expression::from_pest(&mut inner).unwrap()
+    })
+  }
 }
 
 #[derive(PartialEq, Debug)]
@@ -363,5 +393,20 @@ mod tests {
         }),
       }
     );
+  }
+
+  #[test]
+  fn assignment_from_pest() {
+    let assignment = "numbers[10] = 12.4";
+    let mut pairs = McParser::parse(Rule::assignment, &assignment).unwrap();
+
+    assert_eq!(
+      Assignment::from_pest(&mut pairs).unwrap(),
+      Assignment {
+        identifier: Identifier("numbers".to_string()),
+        index_expression: Option::Some(Expression::Literal(Literal::Int(10))),
+        rvalue: Expression::Literal(Literal::Float(12.4))
+      }
+    )
   }
 }
