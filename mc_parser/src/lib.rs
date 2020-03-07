@@ -15,20 +15,9 @@ pub fn parse(program: &str) -> Result<Pairs<'_, Rule>, Error<Rule>> {
 
 #[cfg(test)]
 mod tests {
-  use from_pest::FromPest;
   use pest::{consumes_to, fails_with, parses_to};
 
   use super::*;
-
-  #[test]
-  fn climb() {
-    let expr = "2 * 2 + 4 / (-4.9 - pi(true, nested()))";
-    let mut pairs = McParser::parse(Rule::expression, &expr).unwrap();
-
-    let result = ast::Expression::from_pest(&mut pairs).unwrap();
-
-    eprintln!("RESULT:\n{:#?}", result);
-  }
 
   #[test]
   fn parse_int() {
@@ -230,7 +219,12 @@ mod tests {
       parser: McParser,
       input:  "(42",
       rule:   Rule::expression,
-      positives: vec![Rule::plus, Rule::minus, Rule::times, Rule::divide, Rule::lte, Rule::lt, Rule::gte, Rule::gt, Rule::land, Rule::lor, Rule::eq, Rule::neq],
+      positives: vec![
+        Rule::plus, Rule::minus,
+        Rule::times, Rule::divide,
+        Rule::lte, Rule::lt, Rule::gte, Rule::gt,
+        Rule::land, Rule::lor, Rule::eq, Rule::neq,
+      ],
       negatives: vec![],
       pos: 3
     }

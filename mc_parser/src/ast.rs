@@ -61,7 +61,7 @@ pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Express
   }
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum Ty {
   Bool,
   Int,
@@ -98,7 +98,7 @@ impl FromPest<'_> for Ty {
   }
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum Literal {
   Bool(bool),
   Int(i64),
@@ -124,7 +124,7 @@ impl FromPest<'_> for Literal {
   }
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum UnaryOp {
   Minus,
   Not,
@@ -155,7 +155,7 @@ impl FromPest<'_> for UnaryOp {
   }
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum BinaryOp {
   Plus,
   Minus,
@@ -217,7 +217,7 @@ impl FromPest<'_> for BinaryOp {
   }
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum Expression {
   Literal(Literal),
   Variable { identifier: String, index_expression: Option<Box<Expression>> },
@@ -239,45 +239,45 @@ impl FromPest<'_> for Expression {
   }
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub struct Parameter {
   pub ty: String,
   pub identifier: String,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub struct Assignment {
   pub identifier: String,
   pub index_expression: Option<Expression>,
   pub rvalue: Expression,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub struct Declaration {
   pub ty: Ty,
   pub count: Option<usize>,
   pub identifier: String,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub struct IfStatement {
   pub condition: Expression,
   pub block: Statement,
   pub else_block: Option<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub struct WhileStatement {
   pub condition: Expression,
   pub block: Statement,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub struct ReturnStatement {
   pub expression: Expression,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum Statement {
   If(Box<IfStatement>),
   While(Box<WhileStatement>),
@@ -288,12 +288,12 @@ pub enum Statement {
   Compound(CompoundStatement),
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub struct CompoundStatement {
   pub statements: Vec<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub struct FunctionDeclaration {
   pub ty: Option<String>,
   pub identifier: String,
@@ -301,7 +301,50 @@ pub struct FunctionDeclaration {
   pub body: CompoundStatement,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub struct Program {
   pub function_declarations: Vec<FunctionDeclaration>,
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::{McParser, Rule};
+  use pest::Parser;
+
+  #[test]
+  fn expression_from_pest() {
+    let expr = "2 * 2 + 4 / (-4.9 - pi(true, nested()))";
+    let mut pairs = McParser::parse(Rule::expression, &expr).unwrap();
+
+    assert_eq!(
+      Expression::from_pest(&mut pairs).unwrap(),
+      Expression::Binary {
+        op: BinaryOp::Plus,
+        lhs: Box::new(Expression::Binary {
+          op: BinaryOp::Times,
+          lhs: Box::new(Expression::Literal(Literal::Int(2))),
+          rhs: Box::new(Expression::Literal(Literal::Int(2)))
+        }),
+        rhs: Box::new(Expression::Binary {
+          op: BinaryOp::Divide,
+          lhs: Box::new(Expression::Literal(Literal::Int(4))),
+          rhs: Box::new(Expression::Binary {
+            op: BinaryOp::Minus,
+            lhs: Box::new(Expression::Unary {
+              op: UnaryOp::Minus,
+              expression: Box::new(Expression::Literal(Literal::Float(4.9)))
+            }),
+            rhs: Box::new(Expression::FunctionCall {
+              identifier: "pi".to_string(),
+              arguments: vec![
+                Expression::Literal(Literal::Bool(true)),
+                Expression::FunctionCall { identifier: "nested".to_string(), arguments: vec![] },
+              ],
+            }),
+          }),
+        }),
+      }
+    );
+  }
 }
