@@ -26,7 +26,7 @@ impl AddToGraph for Expression {
     match self {
       Self::Literal(lit) => lit.add_to_graph(g),
       Self::Variable { identifier, index_expression } => {
-        let v = g.add_node(identifier.clone());
+        let v = g.add_node(identifier.to_string());
 
         if let Some(index_expression) = index_expression {
           let e = index_expression.add_to_graph(g);
@@ -170,7 +170,12 @@ impl AddToGraph for FunctionDeclaration {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     let parameters =
       self.parameters.iter().map(|p| format!("{} {}", p.ty, p.identifier)).collect::<Vec<_>>().join(", ");
-    let label = format!("{} {}({})", self.ty.as_ref().unwrap_or(&"void".to_string()), self.identifier, parameters);
+    let label = format!(
+      "{} {}({})",
+      self.ty.as_ref().map(ToString::to_string).unwrap_or_else(|| "void".to_string()),
+      self.identifier,
+      parameters
+    );
     let f = g.add_node(label);
 
     let b = self.body.add_to_graph(g);

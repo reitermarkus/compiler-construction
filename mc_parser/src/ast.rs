@@ -48,7 +48,7 @@ pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Express
     Rule::call_expr => {
       let mut pairs = pair.into_inner();
 
-      let identifier = pairs.next().expect("no identifier in call expression").as_str().to_string();
+      let identifier = Identifier(pairs.next().expect("no identifier in call expression").as_str().to_string());
       let arguments = pairs
         .next()
         .map(|args| args.into_inner().map(|p| climber.climb(p.into_inner(), primary, infix)).collect())
@@ -80,6 +80,7 @@ impl fmt::Display for Ty {
     .fmt(f)
   }
 }
+
 impl FromPest<'_> for Ty {
   type Rule = Rule;
   type FatalError = String;
@@ -220,8 +221,8 @@ impl FromPest<'_> for BinaryOp {
 #[derive(PartialEq, Debug)]
 pub enum Expression {
   Literal(Literal),
-  Variable { identifier: String, index_expression: Option<Box<Expression>> },
-  FunctionCall { identifier: String, arguments: Vec<Expression> },
+  Variable { identifier: Identifier, index_expression: Option<Box<Expression>> },
+  FunctionCall { identifier: Identifier, arguments: Vec<Expression> },
   Unary { op: UnaryOp, expression: Box<Expression> },
   Binary { op: BinaryOp, lhs: Box<Expression>, rhs: Box<Expression> },
 }
@@ -240,14 +241,34 @@ impl FromPest<'_> for Expression {
 }
 
 #[derive(PartialEq, Debug)]
+pub struct Identifier(pub String);
+
+impl fmt::Display for Identifier {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    self.0.fmt(f)
+  }
+}
+
+impl FromPest<'_> for Identifier {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let identifier = pairs.next().unwrap().as_str();
+    assert!(pairs.next().is_none());
+    Ok(Self(identifier.to_owned()))
+  }
+}
+
+#[derive(PartialEq, Debug)]
 pub struct Parameter {
   pub ty: String,
-  pub identifier: String,
+  pub identifier: Identifier,
 }
 
 #[derive(PartialEq, Debug)]
 pub struct Assignment {
-  pub identifier: String,
+  pub identifier: Identifier,
   pub index_expression: Option<Expression>,
   pub rvalue: Expression,
 }
@@ -256,7 +277,7 @@ pub struct Assignment {
 pub struct Declaration {
   pub ty: Ty,
   pub count: Option<usize>,
-  pub identifier: String,
+  pub identifier: Identifier,
 }
 
 #[derive(PartialEq, Debug)]
@@ -295,8 +316,8 @@ pub struct CompoundStatement {
 
 #[derive(PartialEq, Debug)]
 pub struct FunctionDeclaration {
-  pub ty: Option<String>,
-  pub identifier: String,
+  pub ty: Option<Ty>,
+  pub identifier: Identifier,
   pub parameters: Vec<Parameter>,
   pub body: CompoundStatement,
 }
@@ -336,10 +357,10 @@ mod tests {
               expression: Box::new(Expression::Literal(Literal::Float(4.9)))
             }),
             rhs: Box::new(Expression::FunctionCall {
-              identifier: "pi".to_string(),
+              identifier: Identifier("pi".to_string()),
               arguments: vec![
                 Expression::Literal(Literal::Bool(true)),
-                Expression::FunctionCall { identifier: "nested".to_string(), arguments: vec![] },
+                Expression::FunctionCall { identifier: Identifier("nested".to_string()), arguments: vec![] },
               ],
             }),
           }),
