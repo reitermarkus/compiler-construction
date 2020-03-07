@@ -258,4 +258,28 @@ mod tests {
               ]
     }
   }
+
+  #[test]
+  fn parse_assignment() {
+    parses_to! {
+      parser: McParser,
+      input:  "numbers[10] = 12.4",
+      rule:   Rule::assignment,
+      tokens: [
+                assignment(0, 18, [
+                  identifier(0, 7),
+                  expression(8, 10, [
+                    literal(8, 10, [
+                      int(8, 10)
+                    ])
+                  ]),
+                  expression(14, 18, [
+                    literal(14, 18, [
+                      float(14, 18)
+                    ])
+                  ])
+                ])
+              ]
+    }
+  }
 }
