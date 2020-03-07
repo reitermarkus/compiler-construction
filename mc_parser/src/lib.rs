@@ -1,12 +1,6 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
-use from_pest::FromPest;
-use pest::{
-  error::Error,
-  iterators::{Pair, Pairs},
-  prec_climber::{Assoc, Operator, PrecClimber},
-  Parser,
-};
+use pest::{error::Error, iterators::Pairs, Parser};
 use pest_derive::Parser;
 
 pub mod ast;
@@ -19,9 +13,9 @@ pub fn parse(program: &str) -> Result<Pairs<'_, Rule>, Error<Rule>> {
   McParser::parse(Rule::program, program)
 }
 
-
 #[cfg(test)]
 mod tests {
+  use from_pest::FromPest;
   use pest::{consumes_to, fails_with, parses_to};
 
   use super::*;

@@ -8,7 +8,6 @@ use pest::{
 
 use crate::Rule;
 
-
 pub fn climber() -> PrecClimber<Rule> {
   // Reference: https://en.cppreference.com/w/c/language/operator_precedence
   PrecClimber::new(vec![
@@ -26,7 +25,6 @@ pub fn climber() -> PrecClimber<Rule> {
 }
 
 pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Expression {
-
   let primary = |pair| consume(pair, climber);
 
   let infix = |lhs: Expression, op: Pair<'_, Rule>, rhs: Expression| Expression::Binary {
@@ -40,10 +38,11 @@ pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Express
   match pair.as_rule() {
     Rule::unary_expression => {
       let mut pairs = pair.into_inner();
-      
-      Expression::Unary { 
-        op: UnaryOp::from_pest(&mut pairs).unwrap(), 
-        expression: Box::new(climber.climb(pairs, primary, infix)) }
+
+      Expression::Unary {
+        op: UnaryOp::from_pest(&mut pairs).unwrap(),
+        expression: Box::new(climber.climb(pairs, primary, infix)),
+      }
     }
     Rule::expression => climber.climb(pair.into_inner(), primary, infix),
     Rule::call_expr => {
@@ -79,6 +78,23 @@ impl fmt::Display for Ty {
       Self::String => "string",
     }
     .fmt(f)
+  }
+}
+impl FromPest<'_> for Ty {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let pair = pest.next().unwrap();
+    assert!(pest.next().is_none());
+
+    Ok(match pair.as_rule() {
+      Rule::boolean => Self::Bool,
+      Rule::int => Self::Int,
+      Rule::float => Self::Float,
+      Rule::string => Self::String,
+      rule => return Err(ConversionError::Malformed(format!("unknown type: {:?}", rule))),
+    })
   }
 }
 
