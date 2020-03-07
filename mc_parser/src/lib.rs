@@ -5,9 +5,9 @@ use pest_derive::Parser;
 
 pub mod ast;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[grammar = "grammar.pest"]
-struct McParser;
+pub struct McParser;
 
 pub fn parse(program: &str) -> Result<Pairs<'_, Rule>, Error<Rule>> {
   McParser::parse(Rule::program, program)

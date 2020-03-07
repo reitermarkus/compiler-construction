@@ -33,8 +33,6 @@ pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Express
     rhs: Box::new(rhs),
   };
 
-  eprintln!("PAIR: {:?}", pair);
-
   match pair.as_rule() {
     Rule::unary_expression => {
       let mut pairs = pair.into_inner();
@@ -233,9 +231,7 @@ impl FromPest<'_> for Expression {
 
   fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let pair = pest.next().expect("no pair found");
-    eprintln!("{:#?}", pair);
     let climber = climber();
-
     Ok(consume(pair, &climber))
   }
 }

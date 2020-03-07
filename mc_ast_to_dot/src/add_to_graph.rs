@@ -197,3 +197,117 @@ impl AddToGraph for Program {
     p
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use indoc::indoc;
+  use petgraph::dot::{Config, Dot};
+  use pretty_assertions::assert_eq;
+  use unindent::unindent;
+
+  use super::*;
+
+  #[test]
+  fn ast_to_dot() {
+    let ast = Program {
+      function_declarations: vec![FunctionDeclaration {
+        ty: Some(Ty::Int),
+        identifier: Identifier(String::from("fib")),
+        parameters: vec![Parameter { ty: "int".into(), identifier: Identifier("n".to_string()) }],
+        body: CompoundStatement {
+          statements: vec![
+            Statement::If(Box::new(IfStatement {
+              condition: Expression::Binary {
+                op: BinaryOp::Lt,
+                lhs: Box::new(Expression::Variable { identifier: Identifier("n".to_string()), index_expression: None }),
+                rhs: Box::new(Expression::Literal(Literal::Int(2))),
+              },
+              block: Statement::Ret(ReturnStatement {
+                expression: Expression::Variable { identifier: Identifier("n".to_string()), index_expression: None },
+              }),
+              else_block: None,
+            })),
+            Statement::Ret(ReturnStatement {
+              expression: Expression::Binary {
+                op: BinaryOp::Plus,
+                lhs: Box::new(Expression::FunctionCall {
+                  identifier: Identifier("fib".to_string()),
+                  arguments: vec![Expression::Binary {
+                    op: BinaryOp::Minus,
+                    lhs: Box::new(Expression::Variable {
+                      identifier: Identifier("n".to_string()),
+                      index_expression: None,
+                    }),
+                    rhs: Box::new(Expression::Literal(Literal::Int(1))),
+                  }],
+                }),
+                rhs: Box::new(Expression::FunctionCall {
+                  identifier: Identifier("fib".to_string()),
+                  arguments: vec![Expression::Binary {
+                    op: BinaryOp::Minus,
+                    lhs: Box::new(Expression::Variable {
+                      identifier: Identifier("n".to_string()),
+                      index_expression: None,
+                    }),
+                    rhs: Box::new(Expression::Literal(Literal::Int(2))),
+                  }],
+                }),
+              },
+            }),
+          ],
+        },
+      }],
+    };
+
+    let mut graph = AstGraph::new();
+    ast.add_to_graph(&mut graph);
+
+    let dot = Dot::with_config(&graph, &[Config::GraphContentOnly]);
+
+    assert_eq!(
+      unindent(&dot.to_string().trim()),
+      indoc!(
+        r##"
+          0 [label="program"]
+          1 [label="int fib(int n)"]
+          2 [label="{ }"]
+          3 [label="if"]
+          4 [label="<"]
+          5 [label="n"]
+          6 [label="2"]
+          7 [label="return"]
+          8 [label="n"]
+          9 [label="return"]
+          10 [label="+"]
+          11 [label="fib()"]
+          12 [label="-"]
+          13 [label="n"]
+          14 [label="1"]
+          15 [label="fib()"]
+          16 [label="-"]
+          17 [label="n"]
+          18 [label="2"]
+          4 -> 5 [label="left"]
+          4 -> 6 [label="right"]
+          3 -> 4 [label="cond"]
+          7 -> 8 [label="expr"]
+          3 -> 7 [label="on_true"]
+          2 -> 3 [label="0"]
+          12 -> 13 [label="left"]
+          12 -> 14 [label="right"]
+          11 -> 12 [label="0"]
+          10 -> 11 [label="left"]
+          16 -> 17 [label="left"]
+          16 -> 18 [label="right"]
+          15 -> 16 [label="0"]
+          10 -> 15 [label="right"]
+          9 -> 10 [label="expr"]
+          2 -> 9 [label="1"]
+          1 -> 2 [label="body"]
+          0 -> 1 [label="function"]
+        "##
+      )
+      .trim(),
+    )
+  }
+}

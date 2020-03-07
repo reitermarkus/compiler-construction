@@ -2,12 +2,13 @@
 
 use std::fs::File;
 use std::io::{prelude::*, stdin, stdout};
-use std::string::ToString;
 
 use clap::{value_t, App, Arg};
+use from_pest::FromPest;
+use pest::Parser;
 use petgraph::dot::{Config, Dot};
 
-use mc_parser::ast::*;
+use mc_parser::{ast::*, McParser, Rule};
 
 mod add_to_graph;
 use add_to_graph::{AddToGraph, *};
@@ -41,55 +42,9 @@ fn main() -> std::io::Result<()> {
     }
   }
 
-  let ast = Program {
-    function_declarations: vec![FunctionDeclaration {
-      ty: Some(Ty::Int),
-      identifier: Identifier(String::from("fib")),
-      parameters: vec![Parameter { ty: "int".into(), identifier: Identifier("n".to_string()) }],
-      body: CompoundStatement {
-        statements: vec![
-          Statement::If(Box::new(IfStatement {
-            condition: Expression::Binary {
-              op: BinaryOp::Lt,
-              lhs: Box::new(Expression::Variable { identifier: Identifier("n".to_string()), index_expression: None }),
-              rhs: Box::new(Expression::Literal(Literal::Int(2))),
-            },
-            block: Statement::Ret(ReturnStatement {
-              expression: Expression::Variable { identifier: Identifier("n".to_string()), index_expression: None },
-            }),
-            else_block: None,
-          })),
-          Statement::Ret(ReturnStatement {
-            expression: Expression::Binary {
-              op: BinaryOp::Plus,
-              lhs: Box::new(Expression::FunctionCall {
-                identifier: Identifier("fib".to_string()),
-                arguments: vec![Expression::Binary {
-                  op: BinaryOp::Minus,
-                  lhs: Box::new(Expression::Variable {
-                    identifier: Identifier("n".to_string()),
-                    index_expression: None,
-                  }),
-                  rhs: Box::new(Expression::Literal(Literal::Int(1))),
-                }],
-              }),
-              rhs: Box::new(Expression::FunctionCall {
-                identifier: Identifier("fib".to_string()),
-                arguments: vec![Expression::Binary {
-                  op: BinaryOp::Minus,
-                  lhs: Box::new(Expression::Variable {
-                    identifier: Identifier("n".to_string()),
-                    index_expression: None,
-                  }),
-                  rhs: Box::new(Expression::Literal(Literal::Int(2))),
-                }],
-              }),
-            },
-          }),
-        ],
-      },
-    }],
-  };
+  let mut parse_tree = McParser::parse(Rule::expression, &contents).unwrap();
+
+  let ast = Expression::from_pest(&mut parse_tree).unwrap();
 
   let mut graph = AstGraph::new();
   ast.add_to_graph(&mut graph);
