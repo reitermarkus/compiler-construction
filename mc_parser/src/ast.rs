@@ -87,11 +87,11 @@ impl FromPest<'_> for Ty {
     let pair = pest.next().unwrap();
     assert!(pest.next().is_none());
 
-    Ok(match pair.as_rule() {
-      Rule::boolean => Self::Bool,
-      Rule::int => Self::Int,
-      Rule::float => Self::Float,
-      Rule::string => Self::String,
+    Ok(match pair.as_str() {
+      "bool" => Self::Bool,
+      "int" => Self::Int,
+      "float" => Self::Float,
+      "string" => Self::String,
       rule => return Err(ConversionError::Malformed(format!("unknown type: {:?}", rule))),
     })
   }
@@ -541,6 +541,33 @@ mod tests {
         identifier: Identifier("number".to_string()),
         index_expression: Option::None,
         rvalue: Expression::Literal(Literal::Float(12.4))
+      }
+    )
+  }
+
+  #[test]
+  fn declaration_from_pest() {
+    let declaration_with_index = "int[5] numbers";
+    let mut pairs = McParser::parse(Rule::declaration, &declaration_with_index).unwrap();
+
+    assert_eq!(
+      Declaration::from_pest(&mut pairs).unwrap(),
+      Declaration {
+        ty: Ty::Int,
+        count: Option::Some("5".to_string().parse::<usize>().unwrap()),
+        identifier: Identifier("numbers".to_string())
+      }
+    );
+
+    let declaration_no_index = "float x";
+    pairs = McParser::parse(Rule::declaration, &declaration_no_index).unwrap();
+
+    assert_eq!(
+      Declaration::from_pest(&mut pairs).unwrap(),
+      Declaration {
+        ty: Ty::Float,
+        count: Option::None,
+        identifier: Identifier("x".to_string())
       }
     )
   }
