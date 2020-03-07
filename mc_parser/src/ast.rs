@@ -320,11 +320,60 @@ pub struct Declaration {
   pub identifier: Identifier,
 }
 
+impl FromPest<'_> for Declaration {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let mut inner = pairs.next().expect("no pair found").into_inner();
+
+    let mut dec_type = inner.next().expect("no declaration type").into_inner();
+    let (ty, count) = match (dec_type.next(), dec_type.next()) {
+      (Some(ty), Some(int)) => {
+        (
+          Ty::from_pest(&mut Pairs::single(ty)).unwrap(),
+          Some(int.as_str().parse::<usize>().unwrap())
+        )
+      },
+      (Some(ty), None) => {
+        (Ty::from_pest(&mut Pairs::single(ty)).unwrap(), None)
+      }
+      _ => unreachable!(),
+    };
+
+    let identifier = Identifier::from_pest(&mut inner).unwrap();
+
+    Ok(Self {
+      ty,
+      count,
+      identifier
+    })
+  }
+}
+
 #[derive(PartialEq, Debug)]
 pub struct IfStatement {
   pub condition: Expression,
   pub block: Statement,
   pub else_block: Option<Statement>,
+}
+
+impl FromPest<'_> for IfStatement {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let mut inner = pairs.next().expect("no pair found").into_inner();
+
+    Ok(Self {
+      condition: Expression::from_pest(&mut inner).unwrap(),
+      block: Statement::from_pest(&mut inner).unwrap(),
+      else_block: match inner.next() {
+          Some(statement) => Some(Statement::from_pest(&mut Pairs::single(statement)).unwrap()),
+          None => None
+        }
+    })
+  }
 }
 
 #[derive(PartialEq, Debug)]
@@ -333,9 +382,53 @@ pub struct WhileStatement {
   pub block: Statement,
 }
 
+impl FromPest<'_> for WhileStatement {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let mut inner = pairs.next().expect("no pair found").into_inner();
+
+    Ok(Self {
+      condition: Expression::from_pest(&mut inner).unwrap(),
+      block: Statement::from_pest(&mut inner).unwrap()
+    })
+  }
+}
+
 #[derive(PartialEq, Debug)]
 pub struct ReturnStatement {
   pub expression: Expression,
+}
+
+impl FromPest<'_> for ReturnStatement {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let mut inner = pairs.next().expect("no pair found").into_inner();
+
+    Ok(Self {
+      expression: Expression::from_pest(&mut inner).unwrap()
+    })
+  }
+}
+
+#[derive(PartialEq, Debug)]
+pub struct CompoundStatement {
+  pub statements: Vec<Statement>,
+}
+
+impl FromPest<'_> for CompoundStatement {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    Ok(Self {
+      statements: pairs.next().expect("no pair found").into_inner()
+        .map(|stmt| Statement::from_pest(&mut Pairs::single(stmt)).unwrap()).collect()
+    })
+  }
 }
 
 #[derive(PartialEq, Debug)]
@@ -349,9 +442,25 @@ pub enum Statement {
   Compound(CompoundStatement),
 }
 
-#[derive(PartialEq, Debug)]
-pub struct CompoundStatement {
-  pub statements: Vec<Statement>,
+impl FromPest<'_> for Statement {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let mut inner = pairs.next().expect("no pair found").into_inner();
+    let stmt = inner.next().unwrap();
+
+    Ok(match stmt.as_rule() {
+      Rule::if_stmt       => Self::If(Box::new(IfStatement::from_pest(&mut Pairs::single(stmt)).unwrap())),
+      Rule::while_stmt    => Self::While(Box::new(WhileStatement::from_pest(&mut Pairs::single(stmt)).unwrap())),
+      Rule::ret_stmt      => Self::Ret(ReturnStatement::from_pest(&mut Pairs::single(stmt)).unwrap()),
+      Rule::declaration   => Self::Decl(Declaration::from_pest(&mut Pairs::single(stmt)).unwrap()),
+      Rule::assignment    => Self::Assignment(Assignment::from_pest(&mut Pairs::single(stmt)).unwrap()),
+      Rule::expression    => Self::Expression(Expression::from_pest(&mut Pairs::single(stmt)).unwrap()),
+      Rule::compound_stmt => Self::Compound(CompoundStatement::from_pest(&mut Pairs::single(stmt)).unwrap()),
+      rule => return Err(ConversionError::Malformed(format!("unknown statement: {:?}", rule))),
+    })
+  }
 }
 
 #[derive(PartialEq, Debug)]
