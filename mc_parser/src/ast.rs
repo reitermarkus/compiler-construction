@@ -556,4 +556,43 @@ mod tests {
       Declaration { ty: Ty::Float, count: Option::None, identifier: Identifier("x".to_string()) }
     )
   }
+
+  #[test]
+  fn if_stmt_from_pest() {
+    let if_stmt = "if (lol == true) { i = 1; } else { return i; }";
+    let mut pairs = McParser::parse(Rule::if_stmt, &if_stmt).unwrap();
+
+    assert_eq!(
+      IfStatement::from_pest(&mut pairs).unwrap(),
+      IfStatement {
+        condition: Expression::Binary {
+          op: BinaryOp::Eq,
+          lhs: Box::new(Expression::Variable {
+            identifier: Identifier("lol".to_string()),
+            index_expression: Option::None
+          }),
+          rhs: Box::new(Expression::Literal(Literal::Bool(true)))
+        },
+        block: Statement::Compound(CompoundStatement {
+          statements: vec![
+            Statement::Assignment(Assignment {
+              identifier: Identifier("i".to_string()),
+              index_expression: Option::None,
+              rvalue: Expression::Literal(Literal::Int(1))
+            })
+          ]
+        }),
+        else_block: Option::Some(Statement::Compound( CompoundStatement {
+          statements: vec![
+            Statement::Ret(ReturnStatement {
+              expression: Expression::Variable {
+                identifier: Identifier("i".to_string()),
+                index_expression: Option::None
+              }
+            })
+          ]
+        }))
+      }
+    )
+  }
 }
