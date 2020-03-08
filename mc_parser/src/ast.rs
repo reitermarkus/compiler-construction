@@ -269,10 +269,7 @@ impl FromPest<'_> for Parameter {
     let mut inner = pairs.next().expect("no pair found").into_inner();
     let typ = inner.next().unwrap().as_str();
     assert!(!inner.next().is_none());
-    Ok(Self {
-      ty: typ.to_owned(),
-      identifier: Identifier::from_pest(&mut inner).unwrap()
-    })
+    Ok(Self { ty: typ.to_owned(), identifier: Identifier::from_pest(&mut inner).unwrap() })
   }
 }
 
@@ -293,23 +290,15 @@ impl FromPest<'_> for Assignment {
     let identifier = Identifier::from_pest(&mut inner).unwrap();
 
     let (index_expression, rvalue) = match (inner.next(), inner.next()) {
-      (Some(index), Some(rvalue)) => {
-        (
-           Some(Expression::from_pest(&mut Pairs::single(index)).unwrap()),
-           Expression::from_pest(&mut Pairs::single(rvalue)).unwrap()
-        )
-      },
-      (Some(rvalue), None) => {
-        (None, Expression::from_pest(&mut Pairs::single(rvalue)).unwrap())
-      },
+      (Some(index), Some(rvalue)) => (
+        Some(Expression::from_pest(&mut Pairs::single(index)).unwrap()),
+        Expression::from_pest(&mut Pairs::single(rvalue)).unwrap(),
+      ),
+      (Some(rvalue), None) => (None, Expression::from_pest(&mut Pairs::single(rvalue)).unwrap()),
       _ => unreachable!(),
     };
 
-    Ok(Self {
-      identifier,
-      index_expression,
-      rvalue
-    })
+    Ok(Self { identifier, index_expression, rvalue })
   }
 }
 
@@ -330,24 +319,15 @@ impl FromPest<'_> for Declaration {
     let mut dec_type = inner.next().expect("no declaration type").into_inner();
     let (ty, count) = match (dec_type.next(), dec_type.next()) {
       (Some(ty), Some(int)) => {
-        (
-          Ty::from_pest(&mut Pairs::single(ty)).unwrap(),
-          Some(int.as_str().parse::<usize>().unwrap())
-        )
-      },
-      (Some(ty), None) => {
-        (Ty::from_pest(&mut Pairs::single(ty)).unwrap(), None)
+        (Ty::from_pest(&mut Pairs::single(ty)).unwrap(), Some(int.as_str().parse::<usize>().unwrap()))
       }
+      (Some(ty), None) => (Ty::from_pest(&mut Pairs::single(ty)).unwrap(), None),
       _ => unreachable!(),
     };
 
     let identifier = Identifier::from_pest(&mut inner).unwrap();
 
-    Ok(Self {
-      ty,
-      count,
-      identifier
-    })
+    Ok(Self { ty, count, identifier })
   }
 }
 
@@ -369,9 +349,9 @@ impl FromPest<'_> for IfStatement {
       condition: Expression::from_pest(&mut inner).unwrap(),
       block: Statement::from_pest(&mut inner).unwrap(),
       else_block: match inner.next() {
-          Some(statement) => Some(Statement::from_pest(&mut Pairs::single(statement)).unwrap()),
-          None => None
-        }
+        Some(statement) => Some(Statement::from_pest(&mut Pairs::single(statement)).unwrap()),
+        None => None,
+      },
     })
   }
 }
@@ -389,10 +369,7 @@ impl FromPest<'_> for WhileStatement {
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no pair found").into_inner();
 
-    Ok(Self {
-      condition: Expression::from_pest(&mut inner).unwrap(),
-      block: Statement::from_pest(&mut inner).unwrap()
-    })
+    Ok(Self { condition: Expression::from_pest(&mut inner).unwrap(), block: Statement::from_pest(&mut inner).unwrap() })
   }
 }
 
@@ -408,9 +385,7 @@ impl FromPest<'_> for ReturnStatement {
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no pair found").into_inner();
 
-    Ok(Self {
-      expression: Expression::from_pest(&mut inner).unwrap()
-    })
+    Ok(Self { expression: Expression::from_pest(&mut inner).unwrap() })
   }
 }
 
@@ -425,8 +400,12 @@ impl FromPest<'_> for CompoundStatement {
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     Ok(Self {
-      statements: pairs.next().expect("no pair found").into_inner()
-        .map(|stmt| Statement::from_pest(&mut Pairs::single(stmt)).unwrap()).collect()
+      statements: pairs
+        .next()
+        .expect("no pair found")
+        .into_inner()
+        .map(|stmt| Statement::from_pest(&mut Pairs::single(stmt)).unwrap())
+        .collect(),
     })
   }
 }
@@ -451,12 +430,12 @@ impl FromPest<'_> for Statement {
     let stmt = inner.next().unwrap();
 
     Ok(match stmt.as_rule() {
-      Rule::if_stmt       => Self::If(Box::new(IfStatement::from_pest(&mut Pairs::single(stmt)).unwrap())),
-      Rule::while_stmt    => Self::While(Box::new(WhileStatement::from_pest(&mut Pairs::single(stmt)).unwrap())),
-      Rule::ret_stmt      => Self::Ret(ReturnStatement::from_pest(&mut Pairs::single(stmt)).unwrap()),
-      Rule::declaration   => Self::Decl(Declaration::from_pest(&mut Pairs::single(stmt)).unwrap()),
-      Rule::assignment    => Self::Assignment(Assignment::from_pest(&mut Pairs::single(stmt)).unwrap()),
-      Rule::expression    => Self::Expression(Expression::from_pest(&mut Pairs::single(stmt)).unwrap()),
+      Rule::if_stmt => Self::If(Box::new(IfStatement::from_pest(&mut Pairs::single(stmt)).unwrap())),
+      Rule::while_stmt => Self::While(Box::new(WhileStatement::from_pest(&mut Pairs::single(stmt)).unwrap())),
+      Rule::ret_stmt => Self::Ret(ReturnStatement::from_pest(&mut Pairs::single(stmt)).unwrap()),
+      Rule::declaration => Self::Decl(Declaration::from_pest(&mut Pairs::single(stmt)).unwrap()),
+      Rule::assignment => Self::Assignment(Assignment::from_pest(&mut Pairs::single(stmt)).unwrap()),
+      Rule::expression => Self::Expression(Expression::from_pest(&mut Pairs::single(stmt)).unwrap()),
       Rule::compound_stmt => Self::Compound(CompoundStatement::from_pest(&mut Pairs::single(stmt)).unwrap()),
       rule => return Err(ConversionError::Malformed(format!("unknown statement: {:?}", rule))),
     })
@@ -564,11 +543,7 @@ mod tests {
 
     assert_eq!(
       Declaration::from_pest(&mut pairs).unwrap(),
-      Declaration {
-        ty: Ty::Float,
-        count: Option::None,
-        identifier: Identifier("x".to_string())
-      }
+      Declaration { ty: Ty::Float, count: Option::None, identifier: Identifier("x".to_string()) }
     )
   }
 }
