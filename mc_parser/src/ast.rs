@@ -59,12 +59,9 @@ pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Express
       let mut pairs = Pairs::single(pair);
       Expression::Variable {
         identifier: Identifier::from_pest(&mut pairs).unwrap(),
-        index_expression: match pairs.next() {
-          Some(index) => Option::Some(Box::new(Expression::from_pest(&mut Pairs::single(index)).unwrap())),
-          None => Option::None
-        }
+        index_expression: pairs.next().map(|index| Box::new(Expression::from_pest(&mut Pairs::single(index)).unwrap())),
       }
-    },
+    }
     _ => unreachable!("pair {:?}", pair),
   }
 }
@@ -574,23 +571,19 @@ mod tests {
           rhs: Box::new(Expression::Literal(Literal::Bool(true)))
         },
         block: Statement::Compound(CompoundStatement {
-          statements: vec![
-            Statement::Assignment(Assignment {
-              identifier: Identifier("i".to_string()),
-              index_expression: Option::None,
-              rvalue: Expression::Literal(Literal::Int(1))
-            })
-          ]
+          statements: vec![Statement::Assignment(Assignment {
+            identifier: Identifier("i".to_string()),
+            index_expression: Option::None,
+            rvalue: Expression::Literal(Literal::Int(1))
+          })]
         }),
-        else_block: Option::Some(Statement::Compound( CompoundStatement {
-          statements: vec![
-            Statement::Ret(ReturnStatement {
-              expression: Expression::Variable {
-                identifier: Identifier("i".to_string()),
-                index_expression: Option::None
-              }
-            })
-          ]
+        else_block: Option::Some(Statement::Compound(CompoundStatement {
+          statements: vec![Statement::Ret(ReturnStatement {
+            expression: Expression::Variable {
+              identifier: Identifier("i".to_string()),
+              index_expression: Option::None
+            }
+          })]
         }))
       }
     )
