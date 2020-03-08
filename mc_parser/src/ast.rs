@@ -55,6 +55,16 @@ pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Express
       Expression::FunctionCall { identifier, arguments }
     }
     Rule::literal => Expression::Literal(Literal::from_pest(&mut pair.into_inner()).unwrap()),
+    Rule::identifier => {
+      let mut pairs = Pairs::single(pair);
+      Expression::Variable {
+        identifier: Identifier::from_pest(&mut pairs).unwrap(),
+        index_expression: match pairs.next() {
+          Some(index) => Option::Some(Box::new(Expression::from_pest(&mut Pairs::single(index)).unwrap())),
+          None => Option::None
+        }
+      }
+    },
     _ => unreachable!("pair {:?}", pair),
   }
 }
