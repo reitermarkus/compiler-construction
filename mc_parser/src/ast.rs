@@ -457,9 +457,54 @@ pub struct FunctionDeclaration {
   pub body: CompoundStatement,
 }
 
+impl FromPest<'_> for FunctionDeclaration {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let mut inner = pairs.next().expect("no pair found").into_inner();
+
+    let (ty, identifier, parameters, body) = match (inner.next(), inner.next(), inner.next(), inner.next()) {
+      (Some(ty), Some(name), Some(params), Some(body)) => (
+        Option::Some(Ty::from_pest(&mut Pairs::single(ty)).unwrap()),
+        Identifier::from_pest(&mut Pairs::single(name)).unwrap(),
+        params.into_inner().map(|param| Parameter::from_pest(&mut Pairs::single(param)).unwrap()).collect(),
+        CompoundStatement::from_pest(&mut Pairs::single(body)).unwrap(),
+      ),
+      (Some(name), Some(params), Some(body), None) => (
+        Option::None,
+        Identifier::from_pest(&mut Pairs::single(name)).unwrap(),
+        params.into_inner().map(|param| Parameter::from_pest(&mut Pairs::single(param)).unwrap()).collect(),
+        CompoundStatement::from_pest(&mut Pairs::single(body)).unwrap(),
+      ),
+      _ => unreachable!(),
+    };
+
+    Ok(Self { ty, identifier, parameters, body })
+  }
+}
+
 #[derive(PartialEq, Debug)]
 pub struct Program {
   pub function_declarations: Vec<FunctionDeclaration>,
+}
+
+impl FromPest<'_> for Program {
+  type Rule = Rule;
+  type FatalError = String;
+
+  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let mut inner = pairs.next().expect("no pair found").into_inner();
+
+    Ok(Self {
+      function_declarations: inner
+        .next()
+        .unwrap()
+        .into_inner()
+        .map(|dec| FunctionDeclaration::from_pest(&mut Pairs::single(dec)).unwrap())
+        .collect(),
+    })
+  }
 }
 
 #[cfg(test)]
