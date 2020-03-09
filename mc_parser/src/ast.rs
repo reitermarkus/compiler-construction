@@ -24,48 +24,6 @@ pub fn climber() -> PrecClimber<Rule> {
   ])
 }
 
-pub fn consume<'i>(pair: Pair<'i, Rule>, climber: &PrecClimber<Rule>) -> Expression {
-  let primary = |pair| consume(pair, climber);
-
-  let infix = |lhs: Expression, op: Pair<'_, Rule>, rhs: Expression| Expression::Binary {
-    op: BinaryOp::from_pest(&mut Pairs::single(op)).unwrap(),
-    lhs: Box::new(lhs),
-    rhs: Box::new(rhs),
-  };
-
-  match pair.as_rule() {
-    Rule::unary_expression => {
-      let mut pairs = pair.into_inner();
-
-      Expression::Unary {
-        op: UnaryOp::from_pest(&mut pairs).unwrap(),
-        expression: Box::new(climber.climb(pairs, primary, infix)),
-      }
-    }
-    Rule::expression => climber.climb(pair.into_inner(), primary, infix),
-    Rule::call_expr => {
-      let mut pairs = pair.into_inner();
-
-      let identifier = Identifier(pairs.next().expect("no identifier in call expression").as_str().to_string());
-      let arguments = pairs
-        .next()
-        .map(|args| args.into_inner().map(|p| climber.climb(p.into_inner(), primary, infix)).collect())
-        .unwrap_or_else(Vec::new);
-
-      Expression::FunctionCall { identifier, arguments }
-    }
-    Rule::literal => Expression::Literal(Literal::from_pest(&mut pair.into_inner()).unwrap()),
-    Rule::identifier => {
-      let mut pairs = Pairs::single(pair);
-      Expression::Variable {
-        identifier: Identifier::from_pest(&mut pairs).unwrap(),
-        index_expression: pairs.next().map(|index| Box::new(Expression::from_pest(&mut Pairs::single(index)).unwrap())),
-      }
-    }
-    _ => unreachable!("pair {:?}", pair),
-  }
-}
-
 #[derive(PartialEq, Debug)]
 pub enum Ty {
   Bool,
@@ -232,6 +190,63 @@ pub enum Expression {
   Binary { op: BinaryOp, lhs: Box<Expression>, rhs: Box<Expression> },
 }
 
+impl Expression {
+  fn consume<'i>(
+    pair: Pair<'i, Rule>,
+    climber: &PrecClimber<Rule>,
+  ) -> Result<Self, ConversionError<<Self as FromPest<'i>>::FatalError>> {
+    let primary = |pair| Self::consume(pair, climber);
+
+    let infix = |lhs: Result<Expression, ConversionError<<Self as FromPest<'i>>::FatalError>>,
+                 op: Pair<'_, Rule>,
+                 rhs: Result<Expression, ConversionError<<Self as FromPest<'i>>::FatalError>>| {
+      Ok(Expression::Binary {
+        op: BinaryOp::from_pest(&mut Pairs::single(op))?,
+        lhs: Box::new(lhs?),
+        rhs: Box::new(rhs?),
+      })
+    };
+
+    Ok(match pair.as_rule() {
+      Rule::unary_expression => {
+        let mut pairs = pair.into_inner();
+
+        Expression::Unary {
+          op: UnaryOp::from_pest(&mut pairs)?,
+          expression: Box::new(climber.climb(pairs, primary, infix)?),
+        }
+      }
+      Rule::expression => climber.climb(pair.into_inner(), primary, infix)?,
+      Rule::call_expr => {
+        let mut pairs = pair.into_inner();
+
+        let identifier = Identifier::from(pairs.next().expect("no identifier in call expression").as_str());
+        let arguments = pairs
+          .next()
+          .map(|args| {
+            args.into_inner().map(|p| climber.climb(p.into_inner(), primary, infix)).collect::<Result<Vec<_>, _>>()
+          })
+          .unwrap_or_else(|| Ok(Vec::new()))?;
+
+        Expression::FunctionCall { identifier, arguments }
+      }
+      Rule::literal => Expression::Literal(Literal::from_pest(&mut pair.into_inner())?),
+      Rule::identifier => {
+        let mut pairs = Pairs::single(pair);
+        Expression::Variable {
+          identifier: Identifier::from_pest(&mut pairs)?,
+          index_expression: pairs
+            .next()
+            .map(|index| Expression::from_pest(&mut Pairs::single(index)))
+            .transpose()?
+            .map(Box::new),
+        }
+      }
+      _ => unreachable!("pair {:?}", pair),
+    })
+  }
+}
+
 impl FromPest<'_> for Expression {
   type Rule = Rule;
   type FatalError = String;
@@ -239,7 +254,7 @@ impl FromPest<'_> for Expression {
   fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let pair = pest.next().expect("no pair found");
     let climber = climber();
-    Ok(consume(pair, &climber))
+    Self::consume(pair, &climber)
   }
 }
 
@@ -284,14 +299,12 @@ impl FromPest<'_> for Parameter {
 
     let mut param_type = inner.next().expect("no declaration type").into_inner();
     let (ty, count) = match (param_type.next(), param_type.next()) {
-      (Some(ty), Some(int)) => {
-        (Ty::from_pest(&mut Pairs::single(ty)).unwrap(), Some(int.as_str().parse::<usize>().unwrap()))
-      }
-      (Some(ty), None) => (Ty::from_pest(&mut Pairs::single(ty)).unwrap(), None),
+      (Some(ty), Some(int)) => (Ty::from_pest(&mut Pairs::single(ty))?, Some(int.as_str().parse::<usize>().unwrap())),
+      (Some(ty), None) => (Ty::from_pest(&mut Pairs::single(ty))?, None),
       _ => unreachable!(),
     };
 
-    let identifier = Identifier::from_pest(&mut inner).unwrap();
+    let identifier = Identifier::from_pest(&mut inner)?;
 
     Ok(Self { ty, count, identifier })
   }
@@ -311,14 +324,13 @@ impl FromPest<'_> for Assignment {
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no pair found").into_inner();
 
-    let identifier = Identifier::from_pest(&mut inner).unwrap();
+    let identifier = Identifier::from_pest(&mut inner)?;
 
     let (index_expression, rvalue) = match (inner.next(), inner.next()) {
-      (Some(index), Some(rvalue)) => (
-        Some(Expression::from_pest(&mut Pairs::single(index)).unwrap()),
-        Expression::from_pest(&mut Pairs::single(rvalue)).unwrap(),
-      ),
-      (Some(rvalue), None) => (None, Expression::from_pest(&mut Pairs::single(rvalue)).unwrap()),
+      (Some(index), Some(rvalue)) => {
+        (Some(Expression::from_pest(&mut Pairs::single(index))?), Expression::from_pest(&mut Pairs::single(rvalue))?)
+      }
+      (Some(rvalue), None) => (None, Expression::from_pest(&mut Pairs::single(rvalue))?),
       _ => unreachable!(),
     };
 
@@ -342,14 +354,12 @@ impl FromPest<'_> for Declaration {
 
     let mut dec_type = inner.next().expect("no declaration type").into_inner();
     let (ty, count) = match (dec_type.next(), dec_type.next()) {
-      (Some(ty), Some(int)) => {
-        (Ty::from_pest(&mut Pairs::single(ty)).unwrap(), Some(int.as_str().parse::<usize>().unwrap()))
-      }
-      (Some(ty), None) => (Ty::from_pest(&mut Pairs::single(ty)).unwrap(), None),
+      (Some(ty), Some(int)) => (Ty::from_pest(&mut Pairs::single(ty))?, Some(int.as_str().parse::<usize>().unwrap())),
+      (Some(ty), None) => (Ty::from_pest(&mut Pairs::single(ty))?, None),
       _ => unreachable!(),
     };
 
-    let identifier = Identifier::from_pest(&mut inner).unwrap();
+    let identifier = Identifier::from_pest(&mut inner)?;
 
     Ok(Self { ty, count, identifier })
   }
@@ -370,10 +380,10 @@ impl FromPest<'_> for IfStatement {
     let mut inner = pairs.next().expect("no pair found").into_inner();
 
     Ok(Self {
-      condition: Expression::from_pest(&mut inner).unwrap(),
-      block: Statement::from_pest(&mut inner).unwrap(),
+      condition: Expression::from_pest(&mut inner)?,
+      block: Statement::from_pest(&mut inner)?,
       else_block: match inner.next() {
-        Some(statement) => Some(Statement::from_pest(&mut Pairs::single(statement)).unwrap()),
+        Some(statement) => Some(Statement::from_pest(&mut Pairs::single(statement))?),
         None => None,
       },
     })
@@ -393,7 +403,7 @@ impl FromPest<'_> for WhileStatement {
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no pair found").into_inner();
 
-    Ok(Self { condition: Expression::from_pest(&mut inner).unwrap(), block: Statement::from_pest(&mut inner).unwrap() })
+    Ok(Self { condition: Expression::from_pest(&mut inner)?, block: Statement::from_pest(&mut inner)? })
   }
 }
 
@@ -409,7 +419,7 @@ impl FromPest<'_> for ReturnStatement {
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no pair found").into_inner();
 
-    Ok(Self { expression: Expression::from_pest(&mut inner).unwrap() })
+    Ok(Self { expression: Expression::from_pest(&mut inner)? })
   }
 }
 
@@ -428,8 +438,8 @@ impl FromPest<'_> for CompoundStatement {
         .next()
         .expect("no pair found")
         .into_inner()
-        .map(|stmt| Statement::from_pest(&mut Pairs::single(stmt)).unwrap())
-        .collect(),
+        .map(|stmt| Statement::from_pest(&mut Pairs::single(stmt)))
+        .collect::<Result<Vec<_>, _>>()?,
     })
   }
 }
@@ -454,13 +464,13 @@ impl FromPest<'_> for Statement {
     let stmt = inner.next().unwrap();
 
     Ok(match stmt.as_rule() {
-      Rule::if_stmt => Self::If(Box::new(IfStatement::from_pest(&mut Pairs::single(stmt)).unwrap())),
-      Rule::while_stmt => Self::While(Box::new(WhileStatement::from_pest(&mut Pairs::single(stmt)).unwrap())),
-      Rule::ret_stmt => Self::Ret(ReturnStatement::from_pest(&mut Pairs::single(stmt)).unwrap()),
-      Rule::declaration => Self::Decl(Declaration::from_pest(&mut Pairs::single(stmt)).unwrap()),
-      Rule::assignment => Self::Assignment(Assignment::from_pest(&mut Pairs::single(stmt)).unwrap()),
-      Rule::expression => Self::Expression(Expression::from_pest(&mut Pairs::single(stmt)).unwrap()),
-      Rule::compound_stmt => Self::Compound(CompoundStatement::from_pest(&mut Pairs::single(stmt)).unwrap()),
+      Rule::if_stmt => Self::If(Box::new(IfStatement::from_pest(&mut Pairs::single(stmt))?)),
+      Rule::while_stmt => Self::While(Box::new(WhileStatement::from_pest(&mut Pairs::single(stmt))?)),
+      Rule::ret_stmt => Self::Ret(ReturnStatement::from_pest(&mut Pairs::single(stmt))?),
+      Rule::declaration => Self::Decl(Declaration::from_pest(&mut Pairs::single(stmt))?),
+      Rule::assignment => Self::Assignment(Assignment::from_pest(&mut Pairs::single(stmt))?),
+      Rule::expression => Self::Expression(Expression::from_pest(&mut Pairs::single(stmt))?),
+      Rule::compound_stmt => Self::Compound(CompoundStatement::from_pest(&mut Pairs::single(stmt))?),
       rule => return Err(ConversionError::Malformed(format!("unknown statement: {:?}", rule))),
     })
   }
