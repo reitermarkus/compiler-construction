@@ -264,7 +264,7 @@ impl FromPest<'_> for Identifier {
 
 #[derive(PartialEq, Debug)]
 pub struct Parameter {
-  pub ty: String,
+  pub ty: Ty,
   pub identifier: Identifier,
 }
 
@@ -274,9 +274,19 @@ impl FromPest<'_> for Parameter {
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no pair found").into_inner();
-    let typ = inner.next().unwrap().as_str();
-    assert!(!inner.next().is_none());
-    Ok(Self { ty: typ.to_owned(), identifier: Identifier::from_pest(&mut inner).unwrap() })
+
+    let mut decl_ty = inner.next().unwrap().into_inner();
+
+    let ty = Ty::from_pest(&mut Pairs::single(decl_ty.next().unwrap()))?;
+
+    let index = decl_ty.next().map(|p| Literal::from_pest(&mut Pairs::single(p))).transpose()?;
+
+    // TODO: Parse index.
+
+    let identifier = Identifier::from_pest(&mut Pairs::single(inner.next().unwrap()))?;
+
+    assert!(inner.next().is_none());
+    Ok(Self { ty, identifier })
   }
 }
 
@@ -464,21 +474,22 @@ impl FromPest<'_> for FunctionDeclaration {
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no pair found").into_inner();
 
-    let (ty, identifier, parameters, body) = match (inner.next(), inner.next(), inner.next(), inner.next()) {
-      (Some(ty), Some(name), Some(params), Some(body)) => (
-        Option::Some(Ty::from_pest(&mut Pairs::single(ty)).unwrap()),
-        Identifier::from_pest(&mut Pairs::single(name)).unwrap(),
-        params.into_inner().map(|param| Parameter::from_pest(&mut Pairs::single(param)).unwrap()).collect(),
-        CompoundStatement::from_pest(&mut Pairs::single(body)).unwrap(),
-      ),
-      (Some(name), Some(params), Some(body), None) => (
-        Option::None,
-        Identifier::from_pest(&mut Pairs::single(name)).unwrap(),
-        params.into_inner().map(|param| Parameter::from_pest(&mut Pairs::single(param)).unwrap()).collect(),
-        CompoundStatement::from_pest(&mut Pairs::single(body)).unwrap(),
-      ),
-      _ => unreachable!(),
+    let (ty, identifier) = if inner.peek().map(|p| p.as_rule()) == Some(Rule::ty) {
+      (Some(Ty::from_pest(&mut Pairs::single(inner.next().unwrap()))?), inner.next())
+    } else {
+      (None, inner.next())
     };
+
+    let identifier = Identifier::from_pest(&mut Pairs::single(identifier.unwrap()))?;
+
+    let parameters = if inner.peek().map(|p| p.as_rule()) == Some(Rule::parameters) {
+      let params = inner.next().unwrap().into_inner();
+      params.map(|p| Parameter::from_pest(&mut Pairs::single(p))).collect::<Result<Vec<_>, _>>()?
+    } else {
+      vec![]
+    };
+
+    let body = CompoundStatement::from_pest(&mut Pairs::single(inner.next().unwrap()))?;
 
     Ok(Self { ty, identifier, parameters, body })
   }
@@ -494,14 +505,14 @@ impl FromPest<'_> for Program {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no pair found").into_inner();
+    let inner = pairs.next().expect("no program found").into_inner();
 
     Ok(Self {
       function_declarations: inner
-        .next()
-        .unwrap()
-        .into_inner()
-        .map(|dec| FunctionDeclaration::from_pest(&mut Pairs::single(dec)).unwrap())
+        .take_while(|p| p.as_rule() != Rule::EOI)
+        .map(|dec| {
+          FunctionDeclaration::from_pest(&mut Pairs::single(dec)).expect("failed to parse function declaration")
+        })
         .collect(),
     })
   }

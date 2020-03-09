@@ -42,9 +42,9 @@ fn main() -> std::io::Result<()> {
     }
   }
 
-  let mut parse_tree = McParser::parse(Rule::expression, &contents).unwrap();
+  let mut parse_tree = mc_parser::parse(&contents).expect("failed to parse program");
 
-  let ast = Expression::from_pest(&mut parse_tree).unwrap();
+  let ast = Program::from_pest(&mut parse_tree).expect("failed to convert parse tree to AST");
 
   let mut graph = AstGraph::new();
   ast.add_to_graph(&mut graph);
