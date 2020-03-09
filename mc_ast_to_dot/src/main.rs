@@ -5,10 +5,9 @@ use std::io::{prelude::*, stdin, stdout};
 
 use clap::{value_t, App, Arg};
 use from_pest::FromPest;
-use pest::Parser;
 use petgraph::dot::{Config, Dot};
 
-use mc_parser::{ast::*, McParser, Rule};
+use mc_parser::ast::*;
 
 mod add_to_graph;
 use add_to_graph::{AddToGraph, *};
