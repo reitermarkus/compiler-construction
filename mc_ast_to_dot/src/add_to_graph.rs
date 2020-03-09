@@ -213,7 +213,7 @@ mod tests {
       function_declarations: vec![FunctionDeclaration {
         ty: Some(Ty::Int),
         identifier: Identifier(String::from("fib")),
-        parameters: vec![Parameter { ty: "int".into(), identifier: Identifier("n".to_string()) }],
+        parameters: vec![Parameter { ty: Ty::Int, identifier: Identifier("n".to_string()) }],
         body: CompoundStatement {
           statements: vec![
             Statement::If(Box::new(IfStatement {
