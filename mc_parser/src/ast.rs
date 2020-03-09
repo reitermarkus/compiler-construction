@@ -265,6 +265,7 @@ impl FromPest<'_> for Identifier {
 #[derive(PartialEq, Debug)]
 pub struct Parameter {
   pub ty: Ty,
+  pub count: Option<usize>,
   pub identifier: Identifier,
 }
 
@@ -275,18 +276,18 @@ impl FromPest<'_> for Parameter {
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no pair found").into_inner();
 
-    let mut decl_ty = inner.next().unwrap().into_inner();
+    let mut param_type = inner.next().expect("no declaration type").into_inner();
+    let (ty, count) = match (param_type.next(), param_type.next()) {
+      (Some(ty), Some(int)) => {
+        (Ty::from_pest(&mut Pairs::single(ty)).unwrap(), Some(int.as_str().parse::<usize>().unwrap()))
+      }
+      (Some(ty), None) => (Ty::from_pest(&mut Pairs::single(ty)).unwrap(), None),
+      _ => unreachable!(),
+    };
 
-    let ty = Ty::from_pest(&mut Pairs::single(decl_ty.next().unwrap()))?;
+    let identifier = Identifier::from_pest(&mut inner).unwrap();
 
-    let index = decl_ty.next().map(|p| Literal::from_pest(&mut Pairs::single(p))).transpose()?;
-
-    // TODO: Parse index.
-
-    let identifier = Identifier::from_pest(&mut Pairs::single(inner.next().unwrap()))?;
-
-    assert!(inner.next().is_none());
-    Ok(Self { ty, identifier })
+    Ok(Self { ty, count, identifier })
   }
 }
 
