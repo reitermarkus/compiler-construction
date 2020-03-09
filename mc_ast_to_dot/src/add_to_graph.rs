@@ -212,18 +212,18 @@ mod tests {
     let ast = Program {
       function_declarations: vec![FunctionDeclaration {
         ty: Some(Ty::Int),
-        identifier: Identifier(String::from("fib")),
-        parameters: vec![Parameter { ty: Ty::Int, count: None, identifier: Identifier("n".to_string()) }],
+        identifier: Identifier::from("fib"),
+        parameters: vec![Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("n") }],
         body: CompoundStatement {
           statements: vec![
             Statement::If(Box::new(IfStatement {
               condition: Expression::Binary {
                 op: BinaryOp::Lt,
-                lhs: Box::new(Expression::Variable { identifier: Identifier("n".to_string()), index_expression: None }),
+                lhs: Box::new(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
                 rhs: Box::new(Expression::Literal(Literal::Int(2))),
               },
               block: Statement::Ret(ReturnStatement {
-                expression: Expression::Variable { identifier: Identifier("n".to_string()), index_expression: None },
+                expression: Expression::Variable { identifier: Identifier::from("n"), index_expression: None },
               }),
               else_block: None,
             })),
@@ -231,24 +231,18 @@ mod tests {
               expression: Expression::Binary {
                 op: BinaryOp::Plus,
                 lhs: Box::new(Expression::FunctionCall {
-                  identifier: Identifier("fib".to_string()),
+                  identifier: Identifier::from("fib"),
                   arguments: vec![Expression::Binary {
                     op: BinaryOp::Minus,
-                    lhs: Box::new(Expression::Variable {
-                      identifier: Identifier("n".to_string()),
-                      index_expression: None,
-                    }),
+                    lhs: Box::new(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
                     rhs: Box::new(Expression::Literal(Literal::Int(1))),
                   }],
                 }),
                 rhs: Box::new(Expression::FunctionCall {
-                  identifier: Identifier("fib".to_string()),
+                  identifier: Identifier::from("fib"),
                   arguments: vec![Expression::Binary {
                     op: BinaryOp::Minus,
-                    lhs: Box::new(Expression::Variable {
-                      identifier: Identifier("n".to_string()),
-                      index_expression: None,
-                    }),
+                    lhs: Box::new(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
                     rhs: Box::new(Expression::Literal(Literal::Int(2))),
                   }],
                 }),

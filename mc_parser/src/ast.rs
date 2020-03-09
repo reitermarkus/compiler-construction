@@ -258,7 +258,13 @@ impl FromPest<'_> for Identifier {
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let identifier = pairs.next().unwrap().as_str();
-    Ok(Self(identifier.to_owned()))
+    Ok(Self(identifier.into()))
+  }
+}
+
+impl From<&str> for Identifier {
+  fn from(identifier: &str) -> Self {
+    Identifier(identifier.into())
   }
 }
 
@@ -549,10 +555,10 @@ mod tests {
               expression: Box::new(Expression::Literal(Literal::Float(4.9)))
             }),
             rhs: Box::new(Expression::FunctionCall {
-              identifier: Identifier("pi".to_string()),
+              identifier: Identifier::from("pi"),
               arguments: vec![
                 Expression::Literal(Literal::Bool(true)),
-                Expression::FunctionCall { identifier: Identifier("nested".to_string()), arguments: vec![] },
+                Expression::FunctionCall { identifier: Identifier::from("nested"), arguments: vec![] },
               ],
             }),
           }),
@@ -569,7 +575,7 @@ mod tests {
     assert_eq!(
       Assignment::from_pest(&mut pairs).unwrap(),
       Assignment {
-        identifier: Identifier("numbers".to_string()),
+        identifier: Identifier::from("numbers"),
         index_expression: Option::Some(Expression::Literal(Literal::Int(10))),
         rvalue: Expression::Literal(Literal::Float(12.4))
       }
@@ -581,7 +587,7 @@ mod tests {
     assert_eq!(
       Assignment::from_pest(&mut pairs).unwrap(),
       Assignment {
-        identifier: Identifier("number".to_string()),
+        identifier: Identifier::from("number"),
         index_expression: Option::None,
         rvalue: Expression::Literal(Literal::Float(12.4))
       }
@@ -598,7 +604,7 @@ mod tests {
       Declaration {
         ty: Ty::Int,
         count: Option::Some("5".to_string().parse::<usize>().unwrap()),
-        identifier: Identifier("numbers".to_string())
+        identifier: Identifier::from("numbers")
       }
     );
 
@@ -607,7 +613,7 @@ mod tests {
 
     assert_eq!(
       Declaration::from_pest(&mut pairs).unwrap(),
-      Declaration { ty: Ty::Float, count: Option::None, identifier: Identifier("x".to_string()) }
+      Declaration { ty: Ty::Float, count: Option::None, identifier: Identifier::from("x") }
     )
   }
 
@@ -621,25 +627,19 @@ mod tests {
       IfStatement {
         condition: Expression::Binary {
           op: BinaryOp::Eq,
-          lhs: Box::new(Expression::Variable {
-            identifier: Identifier("lol".to_string()),
-            index_expression: Option::None
-          }),
+          lhs: Box::new(Expression::Variable { identifier: Identifier::from("lol"), index_expression: Option::None }),
           rhs: Box::new(Expression::Literal(Literal::Bool(true)))
         },
         block: Statement::Compound(CompoundStatement {
           statements: vec![Statement::Assignment(Assignment {
-            identifier: Identifier("i".to_string()),
+            identifier: Identifier::from("i"),
             index_expression: Option::None,
             rvalue: Expression::Literal(Literal::Int(1))
           })]
         }),
         else_block: Option::Some(Statement::Compound(CompoundStatement {
           statements: vec![Statement::Ret(ReturnStatement {
-            expression: Expression::Variable {
-              identifier: Identifier("i".to_string()),
-              index_expression: Option::None
-            }
+            expression: Expression::Variable { identifier: Identifier::from("i"), index_expression: Option::None }
           })]
         }))
       }
