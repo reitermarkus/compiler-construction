@@ -665,4 +665,31 @@ mod tests {
       }
     )
   }
+
+  #[test]
+  fn dangling_else() {
+    let dangling_else = r#"
+      if (c1)
+        if (c2)
+          f2();
+        else
+          f3();
+      "#;
+
+    let dangling_else_with_parens = r#"
+      if (c1) {
+        if (c2) {
+          f2();
+        } else {
+          f3();
+        }
+      }
+      "#;
+
+    let dangling_else = IfStatement::from_pest(&mut McParser::parse(Rule::if_stmt, &dangling_else).unwrap());
+    let dangling_else_with_parens =
+      IfStatement::from_pest(&mut McParser::parse(Rule::if_stmt, &dangling_else_with_parens).unwrap());
+
+    assert_eq!(dangling_else, dangling_else_with_parens)
+  }
 }
