@@ -50,14 +50,13 @@ impl FromPest<'_> for Ty {
 
   fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let pair = pest.next().unwrap();
-    assert!(pest.next().is_none());
 
     Ok(match pair.as_str() {
       "bool" => Self::Bool,
       "int" => Self::Int,
       "float" => Self::Float,
       "string" => Self::String,
-      rule => return Err(ConversionError::Malformed(format!("unknown type: {:?}", rule))),
+      _ => return Err(ConversionError::Malformed(format!("expected type, found {:?}", pair))),
     })
   }
 }
@@ -76,7 +75,6 @@ impl FromPest<'_> for Literal {
 
   fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let pair = pest.next().unwrap();
-    assert!(pest.next().is_none());
 
     Ok(match pair.as_rule() {
       Rule::float => Self::Float(pair.as_str().parse::<f64>().unwrap()),
@@ -161,7 +159,6 @@ impl FromPest<'_> for BinaryOp {
 
   fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let op = pest.next().unwrap();
-    assert!(pest.next().is_none());
 
     Ok(match op.as_rule() {
       Rule::plus => Self::Plus,
@@ -176,7 +173,7 @@ impl FromPest<'_> for BinaryOp {
       Rule::gt => Self::Gt,
       Rule::land => Self::Land,
       Rule::lor => Self::Lor,
-      rule => return Err(ConversionError::Malformed(format!("unknown binary operation: {:?}", rule))),
+      _ => return Err(ConversionError::Malformed(format!("expected binary operation, found {:?}", op))),
     })
   }
 }
