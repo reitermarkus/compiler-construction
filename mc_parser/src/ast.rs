@@ -77,11 +77,13 @@ impl FromPest<'_> for Literal {
     let pair = pest.next().unwrap();
 
     Ok(match pair.as_rule() {
-      Rule::float => Self::Float(pair.as_str().parse::<f64>().unwrap()),
-      Rule::int => Self::Int(pair.as_str().parse::<i64>().unwrap()),
-      Rule::boolean => Self::Bool(pair.as_str().parse::<bool>().unwrap()),
-      Rule::string => Self::String(pair.as_str().to_owned()),
-      rule => return Err(ConversionError::Malformed(format!("unknown literal: {:?}", rule))),
+      Rule::float => Self::Float(pair.as_str().parse::<f64>().expect("failed to parse float")),
+      Rule::int => Self::Int(pair.as_str().parse::<i64>().expect("failed to parse int")),
+      Rule::boolean => Self::Bool(pair.as_str().parse::<bool>().expect("failed to parse bool")),
+      Rule::string => {
+        Self::String(pair.into_inner().next().expect("failed to get inner string value").as_str().to_owned())
+      }
+      _ => return Err(ConversionError::Malformed(format!("expected literal, found {:?}", pair))),
     })
   }
 }
