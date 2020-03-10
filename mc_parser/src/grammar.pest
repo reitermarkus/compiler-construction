@@ -89,9 +89,9 @@ statement = {
 }
 
 condition = _{ "(" ~ expression ~ ")" }
-if_stmt = { "if" ~ condition ~ statement ~ ("else" ~ statement)? }
-while_stmt = { "while" ~ condition ~ statement }
-ret_stmt = { "return" ~ expression? ~ ";" }
+if_stmt = { WHITESPACE* ~ "if" ~ condition ~ statement ~ ("else" ~ statement)? }
+while_stmt = { WHITESPACE* ~ "while" ~ condition ~ statement }
+ret_stmt = { WHITESPACE* ~ "return" ~ expression? ~ ";" }
 compound_stmt = { "{" ~ statement* ~ "}" }
 
 

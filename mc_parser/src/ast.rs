@@ -473,7 +473,15 @@ impl FromPest<'_> for Statement {
       Rule::declaration => Self::Decl(Declaration::from_pest(&mut inner)?),
       Rule::assignment => Self::Assignment(Assignment::from_pest(&mut inner)?),
       Rule::expression => Self::Expression(Expression::from_pest(&mut inner)?),
-      Rule::compound_stmt => Self::Compound(CompoundStatement::from_pest(&mut inner)?),
+      Rule::compound_stmt => {
+        let mut statement = CompoundStatement::from_pest(&mut inner)?;
+
+        if statement.statements.len() == 1 {
+          statement.statements.pop().unwrap()
+        } else {
+          Self::Compound(statement)
+        }
+      }
       rule => return Err(ConversionError::Malformed(format!("unknown statement: {:?}", rule))),
     })
   }
@@ -592,7 +600,7 @@ mod tests {
       Assignment::from_pest(&mut pairs).unwrap(),
       Assignment {
         identifier: Identifier::from("numbers"),
-        index_expression: Option::Some(Expression::Literal(Literal::Int(10))),
+        index_expression: Some(Expression::Literal(Literal::Int(10))),
         rvalue: Expression::Literal(Literal::Float(12.4))
       }
     );
@@ -604,7 +612,7 @@ mod tests {
       Assignment::from_pest(&mut pairs).unwrap(),
       Assignment {
         identifier: Identifier::from("number"),
-        index_expression: Option::None,
+        index_expression: None,
         rvalue: Expression::Literal(Literal::Float(12.4))
       }
     )
@@ -619,7 +627,7 @@ mod tests {
       Declaration::from_pest(&mut pairs).unwrap(),
       Declaration {
         ty: Ty::Int,
-        count: Option::Some("5".to_string().parse::<usize>().unwrap()),
+        count: Some("5".to_string().parse::<usize>().unwrap()),
         identifier: Identifier::from("numbers")
       }
     );
@@ -629,7 +637,7 @@ mod tests {
 
     assert_eq!(
       Declaration::from_pest(&mut pairs).unwrap(),
-      Declaration { ty: Ty::Float, count: Option::None, identifier: Identifier::from("x") }
+      Declaration { ty: Ty::Float, count: None, identifier: Identifier::from("x") }
     )
   }
 
@@ -646,17 +654,13 @@ mod tests {
           lhs: Box::new(Expression::Variable { identifier: Identifier::from("lol"), index_expression: None }),
           rhs: Box::new(Expression::Literal(Literal::Bool(true)))
         },
-        block: Statement::Compound(CompoundStatement {
-          statements: vec![Statement::Assignment(Assignment {
-            identifier: Identifier::from("i"),
-            index_expression: Option::None,
-            rvalue: Expression::Literal(Literal::Int(1))
-          })]
+        block: Statement::Assignment(Assignment {
+          identifier: Identifier::from("i"),
+          index_expression: None,
+          rvalue: Expression::Literal(Literal::Int(1))
         }),
-        else_block: Option::Some(Statement::Compound(CompoundStatement {
-          statements: vec![Statement::Ret(ReturnStatement {
-            expression: Some(Expression::Variable { identifier: Identifier::from("i"), index_expression: None })
-          })]
+        else_block: Some(Statement::Ret(ReturnStatement {
+          expression: Some(Expression::Variable { identifier: Identifier::from("i"), index_expression: None })
         }))
       }
     )
