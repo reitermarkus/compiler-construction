@@ -667,6 +667,22 @@ mod tests {
   }
 
   #[test]
+  fn function_declaration_from_pest() {
+    let if_stmt = "int sum(int[16] n) { }";
+    let mut pairs = McParser::parse(Rule::function_def, &if_stmt).unwrap();
+
+    assert_eq!(
+      FunctionDeclaration::from_pest(&mut pairs).unwrap(),
+      FunctionDeclaration {
+        ty: Some(Ty::Int),
+        identifier: Identifier::from("sum"),
+        parameters: vec![Parameter { ty: Ty::Int, count: Some(16), identifier: Identifier::from("n") }],
+        body: CompoundStatement { statements: vec![] },
+      }
+    )
+  }
+
+  #[test]
   fn dangling_else() {
     let dangling_else = r#"
       if (c1)
