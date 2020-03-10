@@ -29,6 +29,7 @@ pub fn mc_ast_to_dot(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> s
 
   writeln!(out_stream, "digraph {{")?;
 
+  writeln!(out_stream, r##"    graph [bgcolor="transparent", colorsheme=svg]"##)?;
   writeln!(out_stream, r##"    node [fontname="sans-serif", color="#c8e6ff", style=filled]"##)?;
   writeln!(out_stream, r##"    edge [fontname="sans-serif"]"##)?;
 

@@ -244,7 +244,7 @@ impl Expression {
             .map(Box::new),
         }
       }
-      _ => unreachable!("pair {:?}", pair),
+      _ => unreachable!(),
     })
   }
 }

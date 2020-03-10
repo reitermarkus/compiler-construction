@@ -21,7 +21,7 @@ fn main() -> std::io::Result<()> {
     ))
     .get_matches();
 
-  let out_file = value_t!(matches, "out-file", String).ok();
+  let out_file = value_t!(matches, "output", String).ok();
   let in_file = value_t!(matches, "file", String).unwrap();
 
   if let Some(out_file) = out_file.map(File::create) {
