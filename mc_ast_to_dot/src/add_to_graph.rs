@@ -105,8 +105,10 @@ impl AddToGraph for ReturnStatement {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     let r = g.add_node("return".into());
 
-    let expression = self.expression.add_to_graph(g);
-    g.add_edge(r, expression, "expr".into());
+    if let Some(expression) = &self.expression {
+      let e = expression.add_to_graph(g);
+      g.add_edge(r, e, "expr".into());
+    }
 
     r
   }
@@ -223,12 +225,12 @@ mod tests {
                 rhs: Box::new(Expression::Literal(Literal::Int(2))),
               },
               block: Statement::Ret(ReturnStatement {
-                expression: Expression::Variable { identifier: Identifier::from("n"), index_expression: None },
+                expression: Some(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
               }),
               else_block: None,
             })),
             Statement::Ret(ReturnStatement {
-              expression: Expression::Binary {
+              expression: Some(Expression::Binary {
                 op: BinaryOp::Plus,
                 lhs: Box::new(Expression::FunctionCall {
                   identifier: Identifier::from("fib"),
@@ -246,7 +248,7 @@ mod tests {
                     rhs: Box::new(Expression::Literal(Literal::Int(2))),
                   }],
                 }),
-              },
+              }),
             }),
           ],
         },

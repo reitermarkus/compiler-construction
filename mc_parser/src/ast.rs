@@ -220,7 +220,7 @@ impl Expression {
       Rule::call_expr => {
         let mut pairs = pair.into_inner();
 
-        let identifier = Identifier::from(pairs.next().expect("no identifier in call expression").as_str());
+        let identifier = Identifier::from_pest(&mut pairs)?;
         let arguments = pairs
           .next()
           .map(|args| {
@@ -233,8 +233,11 @@ impl Expression {
       Rule::literal => Expression::Literal(Literal::from_pest(&mut pair.into_inner())?),
       Rule::identifier => {
         let mut pairs = Pairs::single(pair);
+
+        let identifier = Identifier::from_pest(&mut pairs)?;
+
         Expression::Variable {
-          identifier: Identifier::from_pest(&mut pairs)?,
+          identifier,
           index_expression: pairs
             .next()
             .map(|index| Expression::from_pest(&mut Pairs::single(index)))
@@ -252,7 +255,7 @@ impl FromPest<'_> for Expression {
   type FatalError = String;
 
   fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pest.next().expect("no pair found");
+    let pair = pest.next().expect("no expression found");
     let climber = climber();
     Self::consume(pair, &climber)
   }
@@ -272,7 +275,7 @@ impl FromPest<'_> for Identifier {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let identifier = pairs.next().unwrap().as_str();
+    let identifier = pairs.next().expect("no identifier found").as_str();
     Ok(Self(identifier.into()))
   }
 }
@@ -295,7 +298,7 @@ impl FromPest<'_> for Parameter {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no pair found").into_inner();
+    let mut inner = pairs.next().expect("no parameter found").into_inner();
 
     let mut param_type = inner.next().expect("no declaration type").into_inner();
     let (ty, count) = match (param_type.next(), param_type.next()) {
@@ -322,7 +325,7 @@ impl FromPest<'_> for Assignment {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no pair found").into_inner();
+    let mut inner = pairs.next().expect("no assignment found").into_inner();
 
     let identifier = Identifier::from_pest(&mut inner)?;
 
@@ -350,7 +353,7 @@ impl FromPest<'_> for Declaration {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no pair found").into_inner();
+    let mut inner = pairs.next().expect("no declaration found").into_inner();
 
     let mut dec_type = inner.next().expect("no declaration type").into_inner();
     let (ty, count) = match (dec_type.next(), dec_type.next()) {
@@ -377,7 +380,7 @@ impl FromPest<'_> for IfStatement {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no pair found").into_inner();
+    let mut inner = pairs.next().expect("no if statement found").into_inner();
 
     Ok(Self {
       condition: Expression::from_pest(&mut inner)?,
@@ -401,7 +404,7 @@ impl FromPest<'_> for WhileStatement {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no pair found").into_inner();
+    let mut inner = pairs.next().expect("no while statement found").into_inner();
 
     Ok(Self { condition: Expression::from_pest(&mut inner)?, block: Statement::from_pest(&mut inner)? })
   }
@@ -409,7 +412,7 @@ impl FromPest<'_> for WhileStatement {
 
 #[derive(PartialEq, Debug)]
 pub struct ReturnStatement {
-  pub expression: Expression,
+  pub expression: Option<Expression>,
 }
 
 impl FromPest<'_> for ReturnStatement {
@@ -417,9 +420,11 @@ impl FromPest<'_> for ReturnStatement {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no pair found").into_inner();
+    let mut inner = pairs.next().expect("no return statement found").into_inner();
 
-    Ok(Self { expression: Expression::from_pest(&mut inner)? })
+    let expression = if inner.peek().is_some() { Some(Expression::from_pest(&mut inner)?) } else { None };
+
+    Ok(Self { expression })
   }
 }
 
@@ -436,7 +441,7 @@ impl FromPest<'_> for CompoundStatement {
     Ok(Self {
       statements: pairs
         .next()
-        .expect("no pair found")
+        .expect("no compound statement found")
         .into_inner()
         .map(|stmt| Statement::from_pest(&mut Pairs::single(stmt)))
         .collect::<Result<Vec<_>, _>>()?,
@@ -460,17 +465,16 @@ impl FromPest<'_> for Statement {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no pair found").into_inner();
-    let stmt = inner.next().unwrap();
+    let mut inner = pairs.next().expect("no statement found").into_inner();
 
-    Ok(match stmt.as_rule() {
-      Rule::if_stmt => Self::If(Box::new(IfStatement::from_pest(&mut Pairs::single(stmt))?)),
-      Rule::while_stmt => Self::While(Box::new(WhileStatement::from_pest(&mut Pairs::single(stmt))?)),
-      Rule::ret_stmt => Self::Ret(ReturnStatement::from_pest(&mut Pairs::single(stmt))?),
-      Rule::declaration => Self::Decl(Declaration::from_pest(&mut Pairs::single(stmt))?),
-      Rule::assignment => Self::Assignment(Assignment::from_pest(&mut Pairs::single(stmt))?),
-      Rule::expression => Self::Expression(Expression::from_pest(&mut Pairs::single(stmt))?),
-      Rule::compound_stmt => Self::Compound(CompoundStatement::from_pest(&mut Pairs::single(stmt))?),
+    Ok(match inner.peek().unwrap().as_rule() {
+      Rule::if_stmt => Self::If(Box::new(IfStatement::from_pest(&mut inner)?)),
+      Rule::while_stmt => Self::While(Box::new(WhileStatement::from_pest(&mut inner)?)),
+      Rule::ret_stmt => Self::Ret(ReturnStatement::from_pest(&mut inner)?),
+      Rule::declaration => Self::Decl(Declaration::from_pest(&mut inner)?),
+      Rule::assignment => Self::Assignment(Assignment::from_pest(&mut inner)?),
+      Rule::expression => Self::Expression(Expression::from_pest(&mut inner)?),
+      Rule::compound_stmt => Self::Compound(CompoundStatement::from_pest(&mut inner)?),
       rule => return Err(ConversionError::Malformed(format!("unknown statement: {:?}", rule))),
     })
   }
@@ -489,15 +493,11 @@ impl FromPest<'_> for FunctionDeclaration {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no pair found").into_inner();
+    let mut inner = pairs.next().expect("no function declaration found").into_inner();
 
-    let (ty, identifier) = if inner.peek().map(|p| p.as_rule()) == Some(Rule::ty) {
-      (Some(Ty::from_pest(&mut Pairs::single(inner.next().unwrap()))?), inner.next())
-    } else {
-      (None, inner.next())
-    };
+    let ty = if inner.peek().map(|p| p.as_rule()) == Some(Rule::ty) { Some(Ty::from_pest(&mut inner)?) } else { None };
 
-    let identifier = Identifier::from_pest(&mut Pairs::single(identifier.unwrap()))?;
+    let identifier = Identifier::from_pest(&mut inner)?;
 
     let parameters = if inner.peek().map(|p| p.as_rule()) == Some(Rule::parameters) {
       let params = inner.next().unwrap().into_inner();
@@ -506,7 +506,7 @@ impl FromPest<'_> for FunctionDeclaration {
       vec![]
     };
 
-    let body = CompoundStatement::from_pest(&mut Pairs::single(inner.next().unwrap()))?;
+    let body = CompoundStatement::from_pest(&mut inner)?;
 
     Ok(Self { ty, identifier, parameters, body })
   }
@@ -540,6 +540,13 @@ mod tests {
   use super::*;
   use crate::{McParser, Rule};
   use pest::Parser;
+
+  #[test]
+  fn return_statement_from_pest() {
+    let expr = "return;";
+    let mut pairs = McParser::parse(Rule::ret_stmt, &expr).unwrap();
+    ReturnStatement::from_pest(&mut pairs).unwrap();
+  }
 
   #[test]
   fn expression_from_pest() {
@@ -637,7 +644,7 @@ mod tests {
       IfStatement {
         condition: Expression::Binary {
           op: BinaryOp::Eq,
-          lhs: Box::new(Expression::Variable { identifier: Identifier::from("lol"), index_expression: Option::None }),
+          lhs: Box::new(Expression::Variable { identifier: Identifier::from("lol"), index_expression: None }),
           rhs: Box::new(Expression::Literal(Literal::Bool(true)))
         },
         block: Statement::Compound(CompoundStatement {
@@ -649,7 +656,7 @@ mod tests {
         }),
         else_block: Option::Some(Statement::Compound(CompoundStatement {
           statements: vec![Statement::Ret(ReturnStatement {
-            expression: Expression::Variable { identifier: Identifier::from("i"), index_expression: Option::None }
+            expression: Some(Expression::Variable { identifier: Identifier::from("i"), index_expression: None })
           })]
         }))
       }
