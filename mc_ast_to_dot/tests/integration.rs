@@ -1,7 +1,7 @@
-use std::io;
+use std::io::{self, stdout};
 use std::path::{Path, PathBuf};
 
-use assert_cmd::Command;
+use mc_ast_to_dot::mc_ast_to_dot;
 
 #[test]
 fn integration_test() -> io::Result<()> {
@@ -13,7 +13,7 @@ fn integration_test() -> io::Result<()> {
     let mc_file = example_dir.join(example_file_name);
 
     if mc_file.exists() {
-      Command::cargo_bin("mc_ast_to_dot").unwrap().arg(&mc_file).assert().success();
+      mc_ast_to_dot(mc_file, stdout())?;
     }
   }
 
