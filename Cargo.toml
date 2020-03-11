@@ -2,4 +2,5 @@
 members = [
   "mc_ast_to_dot",
   "mc_parser",
+  "mc_symbol_table",
 ]
