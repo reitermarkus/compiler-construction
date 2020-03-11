@@ -24,7 +24,7 @@ pub fn climber() -> PrecClimber<Rule> {
   ])
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Ty {
   Bool,
   Int,
@@ -260,7 +260,7 @@ impl FromPest<'_> for Expression {
   }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Identifier(pub String);
 
 impl fmt::Display for Identifier {
