@@ -4,10 +4,7 @@ use std::fs::File;
 use std::io::{prelude::*, stdin};
 use std::path::Path;
 
-use from_pest::FromPest;
 use petgraph::dot::{Config, Dot};
-
-use mc_parser::ast::*;
 
 mod add_to_graph;
 use add_to_graph::{AddToGraph, *};
@@ -21,8 +18,7 @@ pub fn mc_ast_to_dot(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> s
     File::open(in_file)?.read_to_string(&mut contents)?;
   }
 
-  let mut parse_tree = mc_parser::parse(&contents).expect("failed to parse program");
-  let ast = Program::from_pest(&mut parse_tree).expect("failed to convert parse tree to AST");
+  let ast = mc_parser::parse(&contents).expect("failed to parse program");
 
   let mut graph = AstGraph::new();
   ast.add_to_graph(&mut graph);

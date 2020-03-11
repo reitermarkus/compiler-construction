@@ -1,16 +1,20 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
-use pest::{error::Error, iterators::Pairs, Parser};
+use from_pest::{ConversionError, FromPest};
+use pest::Parser;
 use pest_derive::Parser;
 
 pub mod ast;
+use ast::Program;
 
 #[derive(Parser, Debug)]
 #[grammar = "grammar.pest"]
 pub struct McParser;
 
-pub fn parse(program: &str) -> Result<Pairs<'_, Rule>, Error<Rule>> {
-  McParser::parse(Rule::program, program)
+pub fn parse(program: &str) -> Result<Program, ConversionError<String>> {
+  let mut parse_tree =
+    McParser::parse(Rule::program, program).map_err(|err| ConversionError::Malformed(err.to_string()))?;
+  Program::from_pest(&mut parse_tree)
 }
 
 #[cfg(test)]

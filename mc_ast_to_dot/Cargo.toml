@@ -6,7 +6,6 @@ edition = "2018"
 
 [dependencies]
 clap = "2.33"
-from-pest = "0.3"
 mc_parser = { path = "../mc_parser" }
 petgraph = "0.5.0"
 

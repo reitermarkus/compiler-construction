@@ -1,4 +1,4 @@
-use std::io::{self, stdout};
+use std::io::{self, sink};
 use std::path::{Path, PathBuf};
 
 use mc_ast_to_dot::mc_ast_to_dot;
@@ -13,7 +13,7 @@ fn integration_test() -> io::Result<()> {
     let mc_file = example_dir.join(example_file_name);
 
     if mc_file.exists() {
-      mc_ast_to_dot(mc_file, stdout())?;
+      mc_ast_to_dot(mc_file, sink())?;
     }
   }
 
