@@ -732,8 +732,6 @@ mod tests {
     )
   }
 
-  //TODO: Fix test. Currently broken, since spans for expressions are not equal.
-  /*
   #[test]
   fn dangling_else() {
     let dangling_else = r#"
@@ -744,20 +742,31 @@ mod tests {
           f3();
       "#;
 
-    let dangling_else_with_parens = r#"
-      if (c1) {
-        if (c2) {
-          f2();
-        } else {
-          f3();
-        }
+    let dangling_else = IfStatement::from_pest(&mut McParser::parse(Rule::if_stmt, &dangling_else).unwrap()).unwrap();
+
+    assert_eq!(
+      dangling_else,
+      IfStatement {
+        condition: Exp {
+          expression: Expression::Variable { identifier: Identifier::from("c1"), index_expression: None },
+          span: Span::new("c1", 11, 13),
+        },
+        block: Statement::If(Box::new(IfStatement {
+          condition: Exp {
+            expression: Expression::Variable { identifier: Identifier::from("c2"), index_expression: None },
+            span: Span::new("c2", 27, 29),
+          },
+          block: Statement::Expression(Exp {
+            expression: Expression::FunctionCall { identifier: Identifier::from("f2"), arguments: vec![] },
+            span: Span::new("f2()", 41, 45),
+          }),
+          else_block: Some(Statement::Expression(Exp {
+            expression: Expression::FunctionCall { identifier: Identifier::from("f3"), arguments: vec![] },
+            span: Span::new("f3()", 70, 74),
+          }))
+        })),
+        else_block: None,
       }
-      "#;
-
-    let dangling_else = IfStatement::from_pest(&mut McParser::parse(Rule::if_stmt, &dangling_else).unwrap());
-    let dangling_else_with_parens =
-      IfStatement::from_pest(&mut McParser::parse(Rule::if_stmt, &dangling_else_with_parens).unwrap());
-
-    assert_eq!(dangling_else, dangling_else_with_parens)
-  }*/
+    )
+  }
 }
