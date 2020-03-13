@@ -72,7 +72,7 @@ impl AddToGraph for IfStatement {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     let i = g.add_node("if".into());
 
-    let cond = self.condition.add_to_graph(g);
+    let cond = self.condition.expression.add_to_graph(g);
     g.add_edge(i, cond, "cond".into());
 
     let on_true = self.block.add_to_graph(g);
@@ -91,7 +91,7 @@ impl AddToGraph for WhileStatement {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     let w = g.add_node("while".into());
 
-    let cond = self.condition.add_to_graph(g);
+    let cond = self.condition.expression.add_to_graph(g);
     g.add_edge(w, cond, "cond".into());
 
     let on_true = self.block.add_to_graph(g);
@@ -106,7 +106,7 @@ impl AddToGraph for ReturnStatement {
     let r = g.add_node("return".into());
 
     if let Some(expression) = &self.expression {
-      let e = expression.add_to_graph(g);
+      let e = expression.expression.add_to_graph(g);
       g.add_edge(r, e, "expr".into());
     }
 
@@ -126,7 +126,7 @@ impl AddToGraph for Assignment {
     let a = if let Some(index_expression) = &self.index_expression {
       let a = g.add_node(format!("{}[] =", self.identifier));
 
-      let i = index_expression.add_to_graph(g);
+      let i = index_expression.expression.add_to_graph(g);
       g.add_edge(a, i, "index".into());
 
       a
@@ -134,7 +134,7 @@ impl AddToGraph for Assignment {
       g.add_node(format!("{} =", self.identifier))
     };
 
-    let e = self.rvalue.add_to_graph(g);
+    let e = self.rvalue.expression.add_to_graph(g);
     g.add_edge(a, e, "expr".into());
 
     a
@@ -149,7 +149,7 @@ impl AddToGraph for Statement {
       Self::Ret(statement) => statement.add_to_graph(g),
       Self::Decl(statement) => statement.add_to_graph(g),
       Self::Assignment(statement) => statement.add_to_graph(g),
-      Self::Expression(statement) => statement.add_to_graph(g),
+      Self::Expression(statement) => statement.expression.add_to_graph(g),
       Self::Compound(statement) => statement.add_to_graph(g),
     }
   }
@@ -219,35 +219,44 @@ mod tests {
         body: CompoundStatement {
           statements: vec![
             Statement::If(Box::new(IfStatement {
-              condition: Expression::Binary {
-                op: BinaryOp::Lt,
-                lhs: Box::new(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
-                rhs: Box::new(Expression::Literal(Literal::Int(2))),
+              condition: Exp {
+                expression: Expression::Binary {
+                  op: BinaryOp::Lt,
+                  lhs: Box::new(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
+                  rhs: Box::new(Expression::Literal(Literal::Int(2))),
+                },
+                span: Span::new("", 0, 0),
               },
               block: Statement::Ret(ReturnStatement {
-                expression: Some(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
+                expression: Some(Exp {
+                  expression: Expression::Variable { identifier: Identifier::from("n"), index_expression: None },
+                  span: Span::new("", 0, 0),
+                }),
               }),
               else_block: None,
             })),
             Statement::Ret(ReturnStatement {
-              expression: Some(Expression::Binary {
-                op: BinaryOp::Plus,
-                lhs: Box::new(Expression::FunctionCall {
-                  identifier: Identifier::from("fib"),
-                  arguments: vec![Expression::Binary {
-                    op: BinaryOp::Minus,
-                    lhs: Box::new(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
-                    rhs: Box::new(Expression::Literal(Literal::Int(1))),
-                  }],
-                }),
-                rhs: Box::new(Expression::FunctionCall {
-                  identifier: Identifier::from("fib"),
-                  arguments: vec![Expression::Binary {
-                    op: BinaryOp::Minus,
-                    lhs: Box::new(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
-                    rhs: Box::new(Expression::Literal(Literal::Int(2))),
-                  }],
-                }),
+              expression: Some(Exp {
+                expression: Expression::Binary {
+                  op: BinaryOp::Plus,
+                  lhs: Box::new(Expression::FunctionCall {
+                    identifier: Identifier::from("fib"),
+                    arguments: vec![Expression::Binary {
+                      op: BinaryOp::Minus,
+                      lhs: Box::new(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
+                      rhs: Box::new(Expression::Literal(Literal::Int(1))),
+                    }],
+                  }),
+                  rhs: Box::new(Expression::FunctionCall {
+                    identifier: Identifier::from("fib"),
+                    arguments: vec![Expression::Binary {
+                      op: BinaryOp::Minus,
+                      lhs: Box::new(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
+                      rhs: Box::new(Expression::Literal(Literal::Int(2))),
+                    }],
+                  }),
+                },
+                span: Span::new("", 0, 0),
               }),
             }),
           ],
