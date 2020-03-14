@@ -16,7 +16,7 @@ impl AddToGraph for Literal {
       Self::Bool(value) => value.to_string(),
       Self::Int(value) => value.to_string(),
       Self::Float(value) => value.to_string(),
-      Self::String(value) => format!("{:?}", value),
+      Self::String(value) => format!(r#""{}""#, value),
     })
   }
 }
