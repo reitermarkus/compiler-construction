@@ -21,11 +21,11 @@ impl AddToGraph for Literal {
   }
 }
 
-impl AddToGraph for Expression {
+impl AddToGraph for Expression<'_> {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     match self {
-      Self::Literal(lit) => lit.add_to_graph(g),
-      Self::Variable { identifier, index_expression } => {
+      Self::Literal { literal, .. } => literal.add_to_graph(g),
+      Self::Variable { identifier, index_expression, .. } => {
         let v = g.add_node(identifier.to_string());
 
         if let Some(index_expression) = index_expression {
@@ -35,7 +35,7 @@ impl AddToGraph for Expression {
 
         v
       }
-      Self::FunctionCall { identifier, arguments } => {
+      Self::FunctionCall { identifier, arguments, .. } => {
         let f = g.add_node(format!("{}()", identifier));
 
         for (i, argument) in arguments.iter().enumerate() {
@@ -45,7 +45,7 @@ impl AddToGraph for Expression {
 
         f
       }
-      Self::Unary { op, expression } => {
+      Self::Unary { op, expression, .. } => {
         let u = g.add_node(op.to_string());
 
         let e = expression.add_to_graph(g);
@@ -53,7 +53,7 @@ impl AddToGraph for Expression {
 
         u
       }
-      Self::Binary { op, lhs, rhs } => {
+      Self::Binary { op, lhs, rhs, .. } => {
         let b = g.add_node(op.to_string());
 
         let l = lhs.add_to_graph(g);
@@ -68,11 +68,11 @@ impl AddToGraph for Expression {
   }
 }
 
-impl AddToGraph for IfStatement {
+impl AddToGraph for IfStatement<'_> {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     let i = g.add_node("if".into());
 
-    let cond = self.condition.expression.add_to_graph(g);
+    let cond = self.condition.add_to_graph(g);
     g.add_edge(i, cond, "cond".into());
 
     let on_true = self.block.add_to_graph(g);
@@ -87,11 +87,11 @@ impl AddToGraph for IfStatement {
   }
 }
 
-impl AddToGraph for WhileStatement {
+impl AddToGraph for WhileStatement<'_> {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     let w = g.add_node("while".into());
 
-    let cond = self.condition.expression.add_to_graph(g);
+    let cond = self.condition.add_to_graph(g);
     g.add_edge(w, cond, "cond".into());
 
     let on_true = self.block.add_to_graph(g);
@@ -101,12 +101,12 @@ impl AddToGraph for WhileStatement {
   }
 }
 
-impl AddToGraph for ReturnStatement {
+impl AddToGraph for ReturnStatement<'_> {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     let r = g.add_node("return".into());
 
     if let Some(expression) = &self.expression {
-      let e = expression.expression.add_to_graph(g);
+      let e = expression.add_to_graph(g);
       g.add_edge(r, e, "expr".into());
     }
 
@@ -121,12 +121,12 @@ impl AddToGraph for Declaration {
   }
 }
 
-impl AddToGraph for Assignment {
+impl AddToGraph for Assignment<'_> {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     let a = if let Some(index_expression) = &self.index_expression {
       let a = g.add_node(format!("{}[] =", self.identifier));
 
-      let i = index_expression.expression.add_to_graph(g);
+      let i = index_expression.add_to_graph(g);
       g.add_edge(a, i, "index".into());
 
       a
@@ -134,14 +134,14 @@ impl AddToGraph for Assignment {
       g.add_node(format!("{} =", self.identifier))
     };
 
-    let e = self.rvalue.expression.add_to_graph(g);
+    let e = self.rvalue.add_to_graph(g);
     g.add_edge(a, e, "expr".into());
 
     a
   }
 }
 
-impl AddToGraph for Statement {
+impl AddToGraph for Statement<'_> {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     match self {
       Self::If(statement) => statement.add_to_graph(g),
@@ -149,13 +149,13 @@ impl AddToGraph for Statement {
       Self::Ret(statement) => statement.add_to_graph(g),
       Self::Decl(statement) => statement.add_to_graph(g),
       Self::Assignment(statement) => statement.add_to_graph(g),
-      Self::Expression(statement) => statement.expression.add_to_graph(g),
+      Self::Expression(statement) => statement.add_to_graph(g),
       Self::Compound(statement) => statement.add_to_graph(g),
     }
   }
 }
 
-impl AddToGraph for CompoundStatement {
+impl AddToGraph for CompoundStatement<'_> {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     let b = g.add_node("{ }".into());
 
@@ -168,7 +168,7 @@ impl AddToGraph for CompoundStatement {
   }
 }
 
-impl AddToGraph for FunctionDeclaration {
+impl AddToGraph for FunctionDeclaration<'_> {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     let parameters =
       self.parameters.iter().map(|p| format!("{} {}", p.ty, p.identifier)).collect::<Vec<_>>().join(", ");
@@ -187,7 +187,7 @@ impl AddToGraph for FunctionDeclaration {
   }
 }
 
-impl AddToGraph for Program {
+impl AddToGraph for Program<'_> {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     let p = g.add_node("program".into());
 
@@ -203,6 +203,7 @@ impl AddToGraph for Program {
 #[cfg(test)]
 mod tests {
   use indoc::indoc;
+  use pest::Span;
   use petgraph::dot::{Config, Dot};
   use pretty_assertions::assert_eq;
   use unindent::unindent;
@@ -219,44 +220,53 @@ mod tests {
         body: CompoundStatement {
           statements: vec![
             Statement::If(Box::new(IfStatement {
-              condition: Exp {
-                expression: Expression::Binary {
-                  op: BinaryOp::Lt,
-                  lhs: Box::new(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
-                  rhs: Box::new(Expression::Literal(Literal::Int(2))),
-                },
-                span: Span::new("", 0, 0),
+              condition: Expression::Binary {
+                op: BinaryOp::Lt,
+                lhs: Box::new(Expression::Variable {
+                  identifier: Identifier::from("n"),
+                  index_expression: None,
+                  span: Span::new("", 0, 0).unwrap(),
+                }),
+                rhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new("", 0, 0).unwrap() }),
               },
               block: Statement::Ret(ReturnStatement {
-                expression: Some(Exp {
-                  expression: Expression::Variable { identifier: Identifier::from("n"), index_expression: None },
-                  span: Span::new("", 0, 0),
+                expression: Some(Expression::Variable {
+                  identifier: Identifier::from("n"),
+                  index_expression: None,
+                  span: Span::new("", 0, 0).unwrap(),
                 }),
               }),
               else_block: None,
             })),
             Statement::Ret(ReturnStatement {
-              expression: Some(Exp {
-                expression: Expression::Binary {
-                  op: BinaryOp::Plus,
-                  lhs: Box::new(Expression::FunctionCall {
-                    identifier: Identifier::from("fib"),
-                    arguments: vec![Expression::Binary {
-                      op: BinaryOp::Minus,
-                      lhs: Box::new(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
-                      rhs: Box::new(Expression::Literal(Literal::Int(1))),
-                    }],
-                  }),
-                  rhs: Box::new(Expression::FunctionCall {
-                    identifier: Identifier::from("fib"),
-                    arguments: vec![Expression::Binary {
-                      op: BinaryOp::Minus,
-                      lhs: Box::new(Expression::Variable { identifier: Identifier::from("n"), index_expression: None }),
-                      rhs: Box::new(Expression::Literal(Literal::Int(2))),
-                    }],
-                  }),
-                },
-                span: Span::new("", 0, 0),
+              expression: Some(Expression::Binary {
+                op: BinaryOp::Plus,
+                lhs: Box::new(Expression::FunctionCall {
+                  identifier: Identifier::from("fib"),
+                  arguments: vec![Expression::Binary {
+                    op: BinaryOp::Minus,
+                    lhs: Box::new(Expression::Variable {
+                      identifier: Identifier::from("n"),
+                      index_expression: None,
+                      span: Span::new("", 0, 0).unwrap(),
+                    }),
+                    rhs: Box::new(Expression::Literal { literal: Literal::Int(1), span: Span::new("", 0, 0).unwrap() }),
+                  }],
+                  span: Span::new("", 0, 0).unwrap(),
+                }),
+                rhs: Box::new(Expression::FunctionCall {
+                  identifier: Identifier::from("fib"),
+                  arguments: vec![Expression::Binary {
+                    op: BinaryOp::Minus,
+                    lhs: Box::new(Expression::Variable {
+                      identifier: Identifier::from("n"),
+                      index_expression: None,
+                      span: Span::new("", 0, 0).unwrap(),
+                    }),
+                    rhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new("", 0, 0).unwrap() }),
+                  }],
+                  span: Span::new("", 0, 0).unwrap(),
+                }),
               }),
             }),
           ],

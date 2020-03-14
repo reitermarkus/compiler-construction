@@ -11,5 +11,6 @@ petgraph = "0.5.0"
 
 [dev-dependencies]
 indoc = "0.3.4"
+pest = "2.1"
 pretty_assertions = "0.6.1"
 unindent = "0.1.5"

@@ -4,6 +4,7 @@ use from_pest::{ConversionError, FromPest};
 use pest::{
   iterators::{Pair, Pairs},
   prec_climber::{Assoc, Operator, PrecClimber},
+  Span,
 };
 
 use crate::Rule;
@@ -44,11 +45,11 @@ impl fmt::Display for Ty {
   }
 }
 
-impl FromPest<'_> for Ty {
+impl<'a> FromPest<'a> for Ty {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pest: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let pair = pest.next().unwrap();
 
     Ok(match pair.as_str() {
@@ -62,25 +63,6 @@ impl FromPest<'_> for Ty {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct Span {
-  pub string: String,
-  pub start: usize,
-  pub end: usize,
-}
-
-impl From<pest::Span<'_>> for Span {
-  fn from(pest_span: pest::Span<'_>) -> Span {
-    Self { string: pest_span.as_str().to_owned(), start: pest_span.start(), end: pest_span.end() }
-  }
-}
-
-impl Span {
-  pub fn new(string: &str, start: usize, end: usize) -> Span {
-    Self { string: string.to_owned(), start, end }
-  }
-}
-
-#[derive(PartialEq, Debug)]
 pub enum Literal {
   Bool(bool),
   Int(i64),
@@ -88,11 +70,11 @@ pub enum Literal {
   String(String),
 }
 
-impl FromPest<'_> for Literal {
+impl<'a> FromPest<'a> for Literal {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pest: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let pair = pest.next().unwrap();
 
     Ok(match pair.as_rule() {
@@ -123,11 +105,11 @@ impl fmt::Display for UnaryOp {
   }
 }
 
-impl FromPest<'_> for UnaryOp {
+impl<'a> FromPest<'a> for UnaryOp {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pest: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let op = pest.next().unwrap();
 
     Ok(match op.as_rule() {
@@ -174,11 +156,11 @@ impl fmt::Display for BinaryOp {
   }
 }
 
-impl FromPest<'_> for BinaryOp {
+impl<'a> FromPest<'a> for BinaryOp {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pest: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let op = pest.next().unwrap();
 
     Ok(match op.as_rule() {
@@ -200,24 +182,24 @@ impl FromPest<'_> for BinaryOp {
 }
 
 #[derive(PartialEq, Debug)]
-pub enum Expression {
-  Literal(Literal),
-  Variable { identifier: Identifier, index_expression: Option<Box<Expression>> },
-  FunctionCall { identifier: Identifier, arguments: Vec<Expression> },
-  Unary { op: UnaryOp, expression: Box<Expression> },
-  Binary { op: BinaryOp, lhs: Box<Expression>, rhs: Box<Expression> },
+pub enum Expression<'a> {
+  Literal { literal: Literal, span: Span<'a> },
+  Variable { identifier: Identifier, index_expression: Option<Box<Expression<'a>>>, span: Span<'a> },
+  FunctionCall { identifier: Identifier, arguments: Vec<Expression<'a>>, span: Span<'a> },
+  Unary { op: UnaryOp, expression: Box<Expression<'a>> },
+  Binary { op: BinaryOp, lhs: Box<Expression<'a>>, rhs: Box<Expression<'a>> },
 }
 
-impl Expression {
-  fn consume<'i>(
-    pair: Pair<'i, Rule>,
+impl<'a> Expression<'a> {
+  fn consume(
+    pair: Pair<'a, Rule>,
     climber: &PrecClimber<Rule>,
-  ) -> Result<Self, ConversionError<<Self as FromPest<'i>>::FatalError>> {
+  ) -> Result<Self, ConversionError<<Self as FromPest<'a>>::FatalError>> {
     let primary = |pair| Self::consume(pair, climber);
 
-    let infix = |lhs: Result<Expression, ConversionError<<Self as FromPest<'i>>::FatalError>>,
-                 op: Pair<'_, Rule>,
-                 rhs: Result<Expression, ConversionError<<Self as FromPest<'i>>::FatalError>>| {
+    let infix = |lhs: Result<Expression<'a>, ConversionError<<Self as FromPest<'a>>::FatalError>>,
+                 op: Pair<'a, Rule>,
+                 rhs: Result<Expression<'a>, ConversionError<<Self as FromPest<'a>>::FatalError>>| {
       Ok(Expression::Binary {
         op: BinaryOp::from_pest(&mut Pairs::single(op))?,
         lhs: Box::new(lhs?),
@@ -236,6 +218,7 @@ impl Expression {
       }
       Rule::expression => climber.climb(pair.into_inner(), primary, infix)?,
       Rule::call_expr => {
+        let span = pair.as_span().clone();
         let mut pairs = pair.into_inner();
 
         let identifier = Identifier::from_pest(&mut pairs)?;
@@ -246,10 +229,15 @@ impl Expression {
           })
           .unwrap_or_else(|| Ok(Vec::new()))?;
 
-        Expression::FunctionCall { identifier, arguments }
+        Expression::FunctionCall { identifier, arguments, span }
       }
-      Rule::literal => Expression::Literal(Literal::from_pest(&mut pair.into_inner())?),
+      Rule::literal => {
+        let span = pair.as_span().clone();
+
+        Expression::Literal { literal: Literal::from_pest(&mut pair.into_inner())?, span }
+      }
       Rule::identifier => {
+        let span = pair.as_span().clone();
         let mut pairs = Pairs::single(pair);
 
         let identifier = Identifier::from_pest(&mut pairs)?;
@@ -261,6 +249,7 @@ impl Expression {
             .map(|index| Expression::from_pest(&mut Pairs::single(index)))
             .transpose()?
             .map(Box::new),
+          span,
         }
       }
       _ => unreachable!(),
@@ -268,38 +257,14 @@ impl Expression {
   }
 }
 
-impl From<Exp> for Expression {
-  fn from(exp: Exp) -> Self {
-    exp.expression
-  }
-}
-
-impl FromPest<'_> for Expression {
+impl<'a> FromPest<'a> for Expression<'a> {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pest: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let pair = pest.next().expect("no expression found");
     let climber = climber();
     Self::consume(pair, &climber)
-  }
-}
-
-#[derive(PartialEq, Debug)]
-pub struct Exp {
-  pub expression: Expression,
-  pub span: Span,
-}
-
-impl FromPest<'_> for Exp {
-  type Rule = Rule;
-  type FatalError = String;
-
-  fn from_pest(pest: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pest.next().expect("no expression found");
-    let span = pair.as_span();
-
-    Ok(Self { expression: Expression::from_pest(&mut Pairs::single(pair)).unwrap(), span: Span::from(span) })
   }
 }
 
@@ -356,26 +321,26 @@ impl FromPest<'_> for Parameter {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct Assignment {
+pub struct Assignment<'a> {
   pub identifier: Identifier,
-  pub index_expression: Option<Exp>,
-  pub rvalue: Exp,
+  pub index_expression: Option<Expression<'a>>,
+  pub rvalue: Expression<'a>,
 }
 
-impl FromPest<'_> for Assignment {
+impl<'a> FromPest<'a> for Assignment<'a> {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no assignment found").into_inner();
 
     let identifier = Identifier::from_pest(&mut inner)?;
 
     let (index_expression, rvalue) = match (inner.next(), inner.next()) {
       (Some(index), Some(rvalue)) => {
-        (Some(Exp::from_pest(&mut Pairs::single(index))?), Exp::from_pest(&mut Pairs::single(rvalue))?)
+        (Some(Expression::from_pest(&mut Pairs::single(index))?), Expression::from_pest(&mut Pairs::single(rvalue))?)
       }
-      (Some(rvalue), None) => (None, Exp::from_pest(&mut Pairs::single(rvalue))?),
+      (Some(rvalue), None) => (None, Expression::from_pest(&mut Pairs::single(rvalue))?),
       _ => unreachable!(),
     };
 
@@ -411,21 +376,21 @@ impl FromPest<'_> for Declaration {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct IfStatement {
-  pub condition: Exp,
-  pub block: Statement,
-  pub else_block: Option<Statement>,
+pub struct IfStatement<'a> {
+  pub condition: Expression<'a>,
+  pub block: Statement<'a>,
+  pub else_block: Option<Statement<'a>>,
 }
 
-impl FromPest<'_> for IfStatement {
+impl<'a> FromPest<'a> for IfStatement<'a> {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no if statement found").into_inner();
 
     Ok(Self {
-      condition: Exp::from_pest(&mut inner)?,
+      condition: Expression::from_pest(&mut inner)?,
       block: Statement::from_pest(&mut inner)?,
       else_block: match inner.next() {
         Some(statement) => Some(Statement::from_pest(&mut Pairs::single(statement))?),
@@ -436,50 +401,50 @@ impl FromPest<'_> for IfStatement {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct WhileStatement {
-  pub condition: Exp,
-  pub block: Statement,
+pub struct WhileStatement<'a> {
+  pub condition: Expression<'a>,
+  pub block: Statement<'a>,
 }
 
-impl FromPest<'_> for WhileStatement {
+impl<'a> FromPest<'a> for WhileStatement<'a> {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no while statement found").into_inner();
 
-    Ok(Self { condition: Exp::from_pest(&mut inner)?, block: Statement::from_pest(&mut inner)? })
+    Ok(Self { condition: Expression::from_pest(&mut inner)?, block: Statement::from_pest(&mut inner)? })
   }
 }
 
 #[derive(PartialEq, Debug)]
-pub struct ReturnStatement {
-  pub expression: Option<Exp>,
+pub struct ReturnStatement<'a> {
+  pub expression: Option<Expression<'a>>,
 }
 
-impl FromPest<'_> for ReturnStatement {
+impl<'a> FromPest<'a> for ReturnStatement<'a> {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no return statement found").into_inner();
 
-    let expression = if inner.peek().is_some() { Some(Exp::from_pest(&mut inner)?) } else { None };
+    let expression = if inner.peek().is_some() { Some(Expression::from_pest(&mut inner)?) } else { None };
 
     Ok(Self { expression })
   }
 }
 
 #[derive(PartialEq, Debug)]
-pub struct CompoundStatement {
-  pub statements: Vec<Statement>,
+pub struct CompoundStatement<'a> {
+  pub statements: Vec<Statement<'a>>,
 }
 
-impl FromPest<'_> for CompoundStatement {
+impl<'a> FromPest<'a> for CompoundStatement<'a> {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     Ok(Self {
       statements: pairs
         .next()
@@ -492,21 +457,21 @@ impl FromPest<'_> for CompoundStatement {
 }
 
 #[derive(PartialEq, Debug)]
-pub enum Statement {
-  If(Box<IfStatement>),
-  While(Box<WhileStatement>),
-  Ret(ReturnStatement),
+pub enum Statement<'a> {
+  If(Box<IfStatement<'a>>),
+  While(Box<WhileStatement<'a>>),
+  Ret(ReturnStatement<'a>),
   Decl(Declaration),
-  Assignment(Assignment),
-  Expression(Exp),
-  Compound(CompoundStatement),
+  Assignment(Assignment<'a>),
+  Expression(Expression<'a>),
+  Compound(CompoundStatement<'a>),
 }
 
-impl FromPest<'_> for Statement {
+impl<'a> FromPest<'a> for Statement<'a> {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no statement found").into_inner();
 
     Ok(match inner.peek().unwrap().as_rule() {
@@ -515,7 +480,7 @@ impl FromPest<'_> for Statement {
       Rule::ret_stmt => Self::Ret(ReturnStatement::from_pest(&mut inner)?),
       Rule::declaration => Self::Decl(Declaration::from_pest(&mut inner)?),
       Rule::assignment => Self::Assignment(Assignment::from_pest(&mut inner)?),
-      Rule::expression => Self::Expression(Exp::from_pest(&mut inner)?),
+      Rule::expression => Self::Expression(Expression::from_pest(&mut inner)?),
       Rule::compound_stmt => {
         let mut statement = CompoundStatement::from_pest(&mut inner)?;
 
@@ -531,18 +496,18 @@ impl FromPest<'_> for Statement {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct FunctionDeclaration {
+pub struct FunctionDeclaration<'a> {
   pub ty: Option<Ty>,
   pub identifier: Identifier,
   pub parameters: Vec<Parameter>,
-  pub body: CompoundStatement,
+  pub body: CompoundStatement<'a>,
 }
 
-impl FromPest<'_> for FunctionDeclaration {
+impl<'a> FromPest<'a> for FunctionDeclaration<'a> {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().expect("no function declaration found").into_inner();
 
     let ty = if inner.peek().map(|p| p.as_rule()) == Some(Rule::ty) { Some(Ty::from_pest(&mut inner)?) } else { None };
@@ -563,15 +528,15 @@ impl FromPest<'_> for FunctionDeclaration {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct Program {
-  pub function_declarations: Vec<FunctionDeclaration>,
+pub struct Program<'a> {
+  pub function_declarations: Vec<FunctionDeclaration<'a>>,
 }
 
-impl FromPest<'_> for Program {
+impl<'a> FromPest<'a> for Program<'a> {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+  fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let inner = pairs.next().expect("no program found").into_inner();
 
     Ok(Self {
@@ -609,24 +574,32 @@ mod tests {
         op: BinaryOp::Plus,
         lhs: Box::new(Expression::Binary {
           op: BinaryOp::Times,
-          lhs: Box::new(Expression::Literal(Literal::Int(2))),
-          rhs: Box::new(Expression::Literal(Literal::Int(2)))
+          lhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new(&expr, 0, 1).unwrap() }),
+          rhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new(&expr, 4, 5).unwrap() })
         }),
         rhs: Box::new(Expression::Binary {
           op: BinaryOp::Divide,
-          lhs: Box::new(Expression::Literal(Literal::Int(4))),
+          lhs: Box::new(Expression::Literal { literal: Literal::Int(4), span: Span::new(&expr, 8, 9).unwrap() }),
           rhs: Box::new(Expression::Binary {
             op: BinaryOp::Minus,
             lhs: Box::new(Expression::Unary {
               op: UnaryOp::Minus,
-              expression: Box::new(Expression::Literal(Literal::Float(4.9)))
+              expression: Box::new(Expression::Literal {
+                literal: Literal::Float(4.9),
+                span: Span::new(&expr, 14, 17).unwrap()
+              })
             }),
             rhs: Box::new(Expression::FunctionCall {
               identifier: Identifier::from("pi"),
               arguments: vec![
-                Expression::Literal(Literal::Bool(true)),
-                Expression::FunctionCall { identifier: Identifier::from("nested"), arguments: vec![] },
+                Expression::Literal { literal: Literal::Bool(true), span: Span::new(&expr, 23, 27).unwrap() },
+                Expression::FunctionCall {
+                  identifier: Identifier::from("nested"),
+                  arguments: vec![],
+                  span: Span::new(&expr, 29, 37).unwrap()
+                },
               ],
+              span: Span::new(&expr, 20, 38).unwrap(),
             }),
           }),
         }),
@@ -643,8 +616,14 @@ mod tests {
       Assignment::from_pest(&mut pairs).unwrap(),
       Assignment {
         identifier: Identifier::from("numbers"),
-        index_expression: Some(Exp { expression: Expression::Literal(Literal::Int(10)), span: Span::new("10", 8, 10) }),
-        rvalue: Exp { expression: Expression::Literal(Literal::Float(12.4)), span: Span::new("12.4", 14, 18) }
+        index_expression: Some(Expression::Literal {
+          literal: Literal::Int(10),
+          span: Span::new(&assignment_with_index, 8, 10).unwrap()
+        }),
+        rvalue: Expression::Literal {
+          literal: Literal::Float(12.4),
+          span: Span::new(&assignment_with_index, 14, 18).unwrap()
+        },
       }
     );
 
@@ -656,7 +635,10 @@ mod tests {
       Assignment {
         identifier: Identifier::from("number"),
         index_expression: None,
-        rvalue: Exp { expression: Expression::Literal(Literal::Float(12.4)), span: Span::new("12.4", 9, 13) }
+        rvalue: Expression::Literal {
+          literal: Literal::Float(12.4),
+          span: Span::new(&assignment_no_index, 9, 13).unwrap()
+        }
       }
     )
   }
@@ -692,24 +674,29 @@ mod tests {
     assert_eq!(
       IfStatement::from_pest(&mut pairs).unwrap(),
       IfStatement {
-        condition: Exp {
-          expression: Expression::Binary {
-            op: BinaryOp::Eq,
-            lhs: Box::new(Expression::Variable { identifier: Identifier::from("lol"), index_expression: None }),
-            rhs: Box::new(Expression::Literal(Literal::Bool(true)))
-          },
-          span: Span::new("lol == true", 4, 15),
+        condition: Expression::Binary {
+          op: BinaryOp::Eq,
+          lhs: Box::new(Expression::Variable {
+            identifier: Identifier::from("lol"),
+            index_expression: None,
+            span: Span::new(&if_stmt, 4, 7).unwrap()
+          }),
+          rhs: Box::new(Expression::Literal {
+            literal: Literal::Bool(true),
+            span: Span::new(&if_stmt, 11, 15).unwrap()
+          }),
         },
         block: Statement::Assignment(Assignment {
           identifier: Identifier::from("i"),
           index_expression: None,
-          rvalue: Exp { expression: Expression::Literal(Literal::Int(1)), span: Span::new("1", 23, 24) }
+          rvalue: Expression::Literal { literal: Literal::Int(1), span: Span::new(&if_stmt, 23, 24).unwrap() },
         }),
         else_block: Some(Statement::Ret(ReturnStatement {
-          expression: Some(Exp {
-            expression: Expression::Variable { identifier: Identifier::from("i"), index_expression: None },
-            span: Span::new("i", 42, 43),
-          })
+          expression: Some(Expression::Variable {
+            identifier: Identifier::from("i"),
+            index_expression: None,
+            span: Span::new(&if_stmt, 42, 43).unwrap()
+          }),
         }))
       }
     )
@@ -740,30 +727,32 @@ mod tests {
           f2();
         else
           f3();
-      "#;
-
-    let dangling_else = IfStatement::from_pest(&mut McParser::parse(Rule::if_stmt, &dangling_else).unwrap()).unwrap();
+    "#;
 
     assert_eq!(
-      dangling_else,
+      IfStatement::from_pest(&mut McParser::parse(Rule::if_stmt, &dangling_else).unwrap()).unwrap(),
       IfStatement {
-        condition: Exp {
-          expression: Expression::Variable { identifier: Identifier::from("c1"), index_expression: None },
-          span: Span::new("c1", 11, 13),
+        condition: Expression::Variable {
+          identifier: Identifier::from("c1"),
+          index_expression: None,
+          span: Span::new(&dangling_else, 11, 13).unwrap(),
         },
         block: Statement::If(Box::new(IfStatement {
-          condition: Exp {
-            expression: Expression::Variable { identifier: Identifier::from("c2"), index_expression: None },
-            span: Span::new("c2", 27, 29),
+          condition: Expression::Variable {
+            identifier: Identifier::from("c2"),
+            index_expression: None,
+            span: Span::new(&dangling_else, 27, 29).unwrap()
           },
-          block: Statement::Expression(Exp {
-            expression: Expression::FunctionCall { identifier: Identifier::from("f2"), arguments: vec![] },
-            span: Span::new("f2()", 41, 45),
+          block: Statement::Expression(Expression::FunctionCall {
+            identifier: Identifier::from("f2"),
+            arguments: vec![],
+            span: Span::new(&dangling_else, 41, 45).unwrap()
           }),
-          else_block: Some(Statement::Expression(Exp {
-            expression: Expression::FunctionCall { identifier: Identifier::from("f3"), arguments: vec![] },
-            span: Span::new("f3()", 70, 74),
-          }))
+          else_block: Some(Statement::Expression(Expression::FunctionCall {
+            identifier: Identifier::from("f3"),
+            arguments: vec![],
+            span: Span::new(&dangling_else, 70, 74).unwrap()
+          })),
         })),
         else_block: None,
       }

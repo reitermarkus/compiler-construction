@@ -11,7 +11,7 @@ use ast::Program;
 #[grammar = "grammar.pest"]
 pub struct McParser;
 
-pub fn parse(program: &str) -> Result<Program, ConversionError<String>> {
+pub fn parse(program: &str) -> Result<Program<'_>, ConversionError<String>> {
   let mut parse_tree =
     McParser::parse(Rule::program, program).map_err(|err| ConversionError::Malformed(err.to_string()))?;
   Program::from_pest(&mut parse_tree)

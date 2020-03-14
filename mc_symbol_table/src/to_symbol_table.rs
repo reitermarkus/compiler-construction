@@ -14,7 +14,7 @@ pub trait ToSymbolTable {
   fn to_symbol_table(&self) -> SymbolTable;
 }
 
-impl ToSymbolTable for Program {
+impl ToSymbolTable for Program<'_> {
   fn to_symbol_table(&self) -> SymbolTable {
     let mut table = HashMap::new();
 
