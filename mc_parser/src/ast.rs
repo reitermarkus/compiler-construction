@@ -186,24 +186,42 @@ pub enum Expression<'a> {
   Literal { literal: Literal, span: Span<'a> },
   Variable { identifier: Identifier, index_expression: Option<Box<Expression<'a>>>, span: Span<'a> },
   FunctionCall { identifier: Identifier, arguments: Vec<Expression<'a>>, span: Span<'a> },
-  Unary { op: UnaryOp, expression: Box<Expression<'a>> },
-  Binary { op: BinaryOp, lhs: Box<Expression<'a>>, rhs: Box<Expression<'a>> },
+  Unary { op: UnaryOp, expression: Box<Expression<'a>>, span: Span<'a> },
+  Binary { op: BinaryOp, lhs: Box<Expression<'a>>, rhs: Box<Expression<'a>>, span: Span<'a> },
 }
 
 impl<'a> Expression<'a> {
+  fn as_span(&self) -> &Span<'a> {
+    match self {
+      Self::Literal { span, .. } => span,
+      Self::Variable { span, .. } => span,
+      Self::FunctionCall { span, .. } => span,
+      Self::Unary { span, .. } => span,
+      Self::Binary { span, .. } => span,
+    }
+  }
+
   fn consume(
     pair: Pair<'a, Rule>,
     climber: &PrecClimber<Rule>,
   ) -> Result<Self, ConversionError<<Self as FromPest<'a>>::FatalError>> {
+    let span = pair.as_span();
+
     let primary = |pair| Self::consume(pair, climber);
 
     let infix = |lhs: Result<Expression<'a>, ConversionError<<Self as FromPest<'a>>::FatalError>>,
                  op: Pair<'a, Rule>,
                  rhs: Result<Expression<'a>, ConversionError<<Self as FromPest<'a>>::FatalError>>| {
+      let lhs = lhs?;
+      let rhs = rhs?;
+
+      let span = Span::new(span.as_str(), lhs.as_span().start(), rhs.as_span().end()).unwrap_or_else(|| span.clone());
+
       Ok(Expression::Binary {
         op: BinaryOp::from_pest(&mut Pairs::single(op))?,
-        lhs: Box::new(lhs?),
-        rhs: Box::new(rhs?),
+        lhs: Box::new(lhs),
+        rhs: Box::new(rhs),
+        span,
       })
     };
 
@@ -214,11 +232,11 @@ impl<'a> Expression<'a> {
         Expression::Unary {
           op: UnaryOp::from_pest(&mut pairs)?,
           expression: Box::new(climber.climb(pairs, primary, infix)?),
+          span,
         }
       }
       Rule::expression => climber.climb(pair.into_inner(), primary, infix)?,
       Rule::call_expr => {
-        let span = pair.as_span().clone();
         let mut pairs = pair.into_inner();
 
         let identifier = Identifier::from_pest(&mut pairs)?;
@@ -231,13 +249,8 @@ impl<'a> Expression<'a> {
 
         Expression::FunctionCall { identifier, arguments, span }
       }
-      Rule::literal => {
-        let span = pair.as_span().clone();
-
-        Expression::Literal { literal: Literal::from_pest(&mut pair.into_inner())?, span }
-      }
+      Rule::literal => Expression::Literal { literal: Literal::from_pest(&mut pair.into_inner())?, span },
       Rule::identifier => {
-        let span = pair.as_span().clone();
         let mut pairs = Pairs::single(pair);
 
         let identifier = Identifier::from_pest(&mut pairs)?;
@@ -555,6 +568,7 @@ mod tests {
   use super::*;
   use crate::{McParser, Rule};
   use pest::Parser;
+  use pretty_assertions::assert_eq;
 
   #[test]
   fn return_statement_from_pest() {
@@ -575,7 +589,8 @@ mod tests {
         lhs: Box::new(Expression::Binary {
           op: BinaryOp::Times,
           lhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new(&expr, 0, 1).unwrap() }),
-          rhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new(&expr, 4, 5).unwrap() })
+          rhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new(&expr, 4, 5).unwrap() }),
+          span: Span::new(&expr, 0, 5).unwrap(),
         }),
         rhs: Box::new(Expression::Binary {
           op: BinaryOp::Divide,
@@ -586,8 +601,9 @@ mod tests {
               op: UnaryOp::Minus,
               expression: Box::new(Expression::Literal {
                 literal: Literal::Float(4.9),
-                span: Span::new(&expr, 14, 17).unwrap()
-              })
+                span: Span::new(&expr, 14, 17).unwrap(),
+              }),
+              span: Span::new(&expr, 13, 17).unwrap(),
             }),
             rhs: Box::new(Expression::FunctionCall {
               identifier: Identifier::from("pi"),
@@ -601,8 +617,11 @@ mod tests {
               ],
               span: Span::new(&expr, 20, 38).unwrap(),
             }),
+            span: Span::new(&expr, 13, 38).unwrap(),
           }),
+          span: Span::new(&expr, 8, 38).unwrap(), // FIXME: Should end at 39 and include closing parenthesis.
         }),
+        span: Span::new(&expr, 0, 38).unwrap(), // FIXME: Should end at 39 and include closing parenthesis.
       }
     );
   }
@@ -679,12 +698,13 @@ mod tests {
           lhs: Box::new(Expression::Variable {
             identifier: Identifier::from("lol"),
             index_expression: None,
-            span: Span::new(&if_stmt, 4, 7).unwrap()
+            span: Span::new(&if_stmt, 4, 7).unwrap(),
           }),
           rhs: Box::new(Expression::Literal {
             literal: Literal::Bool(true),
-            span: Span::new(&if_stmt, 11, 15).unwrap()
+            span: Span::new(&if_stmt, 11, 15).unwrap(),
           }),
+          span: Span::new(&if_stmt, 4, 15).unwrap(),
         },
         block: Statement::Assignment(Assignment {
           identifier: Identifier::from("i"),
@@ -707,7 +727,6 @@ mod tests {
     let if_stmt = "int sum(int[16] n) { }";
     let mut pairs = McParser::parse(Rule::function_def, &if_stmt).unwrap();
 
-    eprintln!("Pairs:\n{:#?}", pairs);
     assert_eq!(
       FunctionDeclaration::from_pest(&mut pairs).unwrap(),
       FunctionDeclaration {

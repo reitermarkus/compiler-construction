@@ -228,6 +228,7 @@ mod tests {
                   span: Span::new("", 0, 0).unwrap(),
                 }),
                 rhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new("", 0, 0).unwrap() }),
+                span: Span::new("", 0, 0).unwrap(),
               },
               block: Statement::Ret(ReturnStatement {
                 expression: Some(Expression::Variable {
@@ -251,6 +252,7 @@ mod tests {
                       span: Span::new("", 0, 0).unwrap(),
                     }),
                     rhs: Box::new(Expression::Literal { literal: Literal::Int(1), span: Span::new("", 0, 0).unwrap() }),
+                    span: Span::new("", 0, 0).unwrap(),
                   }],
                   span: Span::new("", 0, 0).unwrap(),
                 }),
@@ -264,9 +266,11 @@ mod tests {
                       span: Span::new("", 0, 0).unwrap(),
                     }),
                     rhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new("", 0, 0).unwrap() }),
+                    span: Span::new("", 0, 0).unwrap(),
                   }],
                   span: Span::new("", 0, 0).unwrap(),
                 }),
+                span: Span::new("", 0, 0).unwrap(),
               }),
             }),
           ],
