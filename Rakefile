@@ -2,6 +2,7 @@
 
 require 'pathname'
 
+desc "generate AST graphs for all examples"
 task :graphs do
   Pathname.glob("#{__dir__}/examples/*/*.mc").each do |mc|
     dot = mc.sub_ext('.dot')
