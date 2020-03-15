@@ -22,12 +22,12 @@ impl ToSymbolTable for IfStatement<'_> {
     let mut table = HashMap::new();
 
     table
-      .insert(Identifier(String::from("if")), (SymbolType::Statement(), Some(Box::new(self.block.to_symbol_table()))));
+      .insert(Identifier::from("if"), (SymbolType::Statement(), Some(Box::new(self.block.to_symbol_table()))));
 
     match &self.else_block {
       Some(statement) => {
         table.insert(
-          Identifier(String::from("else")),
+          Identifier::from("else"),
           (SymbolType::Statement(), Some(Box::new(statement.to_symbol_table()))),
         );
       }
@@ -43,7 +43,7 @@ impl ToSymbolTable for WhileStatement<'_> {
     let mut table = HashMap::new();
 
     table.insert(
-      Identifier(String::from("while")),
+      Identifier::from("while"),
       (SymbolType::Statement(), Some(Box::new(self.block.to_symbol_table()))),
     );
 
@@ -99,9 +99,7 @@ impl ToSymbolTable for CompoundStatement<'_> {
 
     for (i, statement) in self.statements.iter().enumerate() {
       let statement_table = statement.to_symbol_table();
-      let mut id = String::from("statement");
-      id.push_str(&i.to_string());
-      table.insert(Identifier(id), (SymbolType::Statement(), Some(Box::new(statement_table))));
+      table.insert(Identifier(i.to_string()), (SymbolType::Statement(), Some(Box::new(statement_table))));
     }
 
     SymbolTable(table)
@@ -118,7 +116,7 @@ impl ToSymbolTable for FunctionDeclaration<'_> {
 
     let comp_stmt_table = self.body.to_symbol_table();
     table
-      .insert(Identifier(String::from("compound")), (SymbolType::CompoundStatement(), Some(Box::new(comp_stmt_table))));
+      .insert(Identifier::from("compound"), (SymbolType::CompoundStatement(), Some(Box::new(comp_stmt_table))));
 
     SymbolTable(table)
   }
@@ -137,5 +135,85 @@ impl ToSymbolTable for Program<'_> {
     }
 
     SymbolTable(table)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use pest::Span;
+
+  use super::*;
+
+  #[test]
+  fn ast_to_symbol_table() {
+    let ast = Program {
+      function_declarations: vec![FunctionDeclaration {
+        ty: Some(Ty::Int),
+        identifier: Identifier::from("fib"),
+        parameters: vec![Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("n") }],
+        body: CompoundStatement {
+          statements: vec![
+            Statement::If(Box::new(IfStatement {
+              condition: Expression::Binary {
+                op: BinaryOp::Lt,
+                lhs: Box::new(Expression::Variable {
+                  identifier: Identifier::from("n"),
+                  index_expression: None,
+                  span: Span::new("", 0, 0).unwrap(),
+                }),
+                rhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new("", 0, 0).unwrap() }),
+                span: Span::new("", 0, 0).unwrap(),
+              },
+              block: Statement::Ret(ReturnStatement {
+                expression: Some(Expression::Variable {
+                  identifier: Identifier::from("n"),
+                  index_expression: None,
+                  span: Span::new("", 0, 0).unwrap(),
+                }),
+              }),
+              else_block: None,
+            })),
+            Statement::Ret(ReturnStatement {
+              expression: Some(Expression::Binary {
+                op: BinaryOp::Plus,
+                lhs: Box::new(Expression::FunctionCall {
+                  identifier: Identifier::from("fib"),
+                  arguments: vec![Expression::Binary {
+                    op: BinaryOp::Minus,
+                    lhs: Box::new(Expression::Variable {
+                      identifier: Identifier::from("n"),
+                      index_expression: None,
+                      span: Span::new("", 0, 0).unwrap(),
+                    }),
+                    rhs: Box::new(Expression::Literal { literal: Literal::Int(1), span: Span::new("", 0, 0).unwrap() }),
+                    span: Span::new("", 0, 0).unwrap(),
+                  }],
+                  span: Span::new("", 0, 0).unwrap(),
+                }),
+                rhs: Box::new(Expression::FunctionCall {
+                  identifier: Identifier::from("fib"),
+                  arguments: vec![Expression::Binary {
+                    op: BinaryOp::Minus,
+                    lhs: Box::new(Expression::Variable {
+                      identifier: Identifier::from("n"),
+                      index_expression: None,
+                      span: Span::new("", 0, 0).unwrap(),
+                    }),
+                    rhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new("", 0, 0).unwrap() }),
+                    span: Span::new("", 0, 0).unwrap(),
+                  }],
+                  span: Span::new("", 0, 0).unwrap(),
+                }),
+                span: Span::new("", 0, 0).unwrap(),
+              }),
+            }),
+          ],
+        },
+      }],
+    };
+
+    let symbol_table = ast.to_symbol_table();
+
+    eprintln!("Table:\n{:#?}", symbol_table);
   }
 }
