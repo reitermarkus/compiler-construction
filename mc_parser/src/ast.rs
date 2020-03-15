@@ -188,74 +188,75 @@ pub enum Expression<'a> {
   FunctionCall { identifier: Identifier, arguments: Vec<Expression<'a>>, span: Span<'a> },
   Unary { op: UnaryOp, expression: Box<Expression<'a>>, span: Span<'a> },
   Binary { op: BinaryOp, lhs: Box<Expression<'a>>, rhs: Box<Expression<'a>>, span: Span<'a> },
-  Par { expression: Box<Expression<'a>>, span: Span<'a> },
 }
 
 impl<'a> Expression<'a> {
-  fn as_span(&self) -> &Span<'a> {
-    match self {
-      Self::Literal { span, .. } => span,
-      Self::Variable { span, .. } => span,
-      Self::FunctionCall { span, .. } => span,
-      Self::Unary { span, .. } => span,
-      Self::Binary { span, .. } => span,
-      Self::Par { span, .. } => span,
-    }
-  }
-
   fn consume(
     pair: Pair<'a, Rule>,
     climber: &PrecClimber<Rule>,
-  ) -> Result<Self, ConversionError<<Self as FromPest<'a>>::FatalError>> {
+  ) -> Result<(Self, Span<'a>), ConversionError<<Self as FromPest<'a>>::FatalError>> {
     let primary = |pair| Self::consume(pair, climber);
 
-    let infix = |lhs: Result<Expression<'a>, ConversionError<<Self as FromPest<'a>>::FatalError>>,
-                 op: Pair<'a, Rule>,
-                 rhs: Result<Expression<'a>, ConversionError<<Self as FromPest<'a>>::FatalError>>| {
-      let lhs = lhs?;
-      let rhs = rhs?;
+    let infix =
+      |lhs: Result<(Expression<'a>, Span<'a>), ConversionError<<Self as FromPest<'a>>::FatalError>>,
+       op: Pair<'a, Rule>,
+       rhs: Result<(Expression<'a>, Span<'a>), ConversionError<<Self as FromPest<'a>>::FatalError>>| {
+        let lhs = lhs?;
+        let rhs = rhs?;
 
-      let span = lhs.as_span().start_pos().span(&rhs.as_span().end_pos());
+        let span = lhs.1.start_pos().span(&rhs.1.end_pos());
 
-      Ok(Expression::Binary {
-        op: BinaryOp::from_pest(&mut Pairs::single(op))?,
-        lhs: Box::new(lhs),
-        rhs: Box::new(rhs),
-        span,
-      })
-    };
+        let expr = Expression::Binary {
+          op: BinaryOp::from_pest(&mut Pairs::single(op))?,
+          lhs: Box::new(lhs.0),
+          rhs: Box::new(rhs.0),
+          span: span.clone(),
+        };
 
-    let span = pair.as_span();
+        Ok((expr, span))
+      };
 
-    Ok(match pair.as_rule() {
+    let outer_span = pair.as_span();
+
+    let expr = match pair.as_rule() {
       Rule::unary_expression => {
+        let span = pair.as_span();
+
         let mut pairs = pair.into_inner();
 
         Expression::Unary {
           op: UnaryOp::from_pest(&mut pairs)?,
-          expression: Box::new(climber.climb(pairs, primary, infix)?),
+          expression: Box::new(climber.climb(pairs, primary, infix)?.0),
           span,
         }
       }
-      Rule::par_expression => {
-        Expression::Par { expression: climber.climb(pair.into_inner(), primary, infix)?.into(), span }
-      }
-      Rule::expression => climber.climb(pair.into_inner(), primary, infix)?,
+      Rule::expression | Rule::par_expression => climber.climb(pair.into_inner(), primary, infix)?.0,
       Rule::call_expr => {
+        let span = pair.as_span();
+
         let mut pairs = pair.into_inner();
 
         let identifier = Identifier::from_pest(&mut pairs)?;
+
         let arguments = pairs
           .next()
           .map(|args| {
-            args.into_inner().map(|p| climber.climb(p.into_inner(), primary, infix)).collect::<Result<Vec<_>, _>>()
+            args
+              .into_inner()
+              .map(|p| Ok(climber.climb(p.into_inner(), primary, infix)?.0))
+              .collect::<Result<Vec<_>, _>>()
           })
           .unwrap_or_else(|| Ok(Vec::new()))?;
 
         Expression::FunctionCall { identifier, arguments, span }
       }
-      Rule::literal => Expression::Literal { literal: Literal::from_pest(&mut pair.into_inner())?, span },
+      Rule::literal => {
+        let span = pair.as_span();
+        Expression::Literal { literal: Literal::from_pest(&mut pair.into_inner())?, span }
+      }
       Rule::identifier => {
+        let span = pair.as_span();
+
         let mut pairs = Pairs::single(pair);
 
         let identifier = Identifier::from_pest(&mut pairs)?;
@@ -271,7 +272,9 @@ impl<'a> Expression<'a> {
         }
       }
       _ => unreachable!(),
-    })
+    };
+
+    Ok((expr, outer_span))
   }
 }
 
@@ -282,7 +285,7 @@ impl<'a> FromPest<'a> for Expression<'a> {
   fn from_pest(pest: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let pair = pest.next().expect("no expression found");
     let climber = climber();
-    Self::consume(pair, &climber)
+    Self::consume(pair, &climber).map(|r| r.0)
   }
 }
 
@@ -600,32 +603,29 @@ mod tests {
         rhs: Box::new(Expression::Binary {
           op: BinaryOp::Divide,
           lhs: Box::new(Expression::Literal { literal: Literal::Int(4), span: Span::new(&expr, 8, 9).unwrap() }),
-          rhs: Box::new(Expression::Par {
-            expression: Box::new(Expression::Binary {
-              op: BinaryOp::Minus,
-              lhs: Box::new(Expression::Unary {
-                op: UnaryOp::Minus,
-                expression: Box::new(Expression::Literal {
-                  literal: Literal::Float(4.9),
-                  span: Span::new(&expr, 14, 17).unwrap(),
-                }),
-                span: Span::new(&expr, 13, 17).unwrap(),
+          rhs: Box::new(Expression::Binary {
+            op: BinaryOp::Minus,
+            lhs: Box::new(Expression::Unary {
+              op: UnaryOp::Minus,
+              expression: Box::new(Expression::Literal {
+                literal: Literal::Float(4.9),
+                span: Span::new(&expr, 14, 17).unwrap(),
               }),
-              rhs: Box::new(Expression::FunctionCall {
-                identifier: Identifier::from("pi"),
-                arguments: vec![
-                  Expression::Literal { literal: Literal::Bool(true), span: Span::new(&expr, 23, 27).unwrap() },
-                  Expression::FunctionCall {
-                    identifier: Identifier::from("nested"),
-                    arguments: vec![],
-                    span: Span::new(&expr, 29, 37).unwrap()
-                  },
-                ],
-                span: Span::new(&expr, 20, 38).unwrap(),
-              }),
-              span: Span::new(&expr, 13, 38).unwrap(),
+              span: Span::new(&expr, 13, 17).unwrap(),
             }),
-            span: Span::new(&expr, 12, 39).unwrap()
+            rhs: Box::new(Expression::FunctionCall {
+              identifier: Identifier::from("pi"),
+              arguments: vec![
+                Expression::Literal { literal: Literal::Bool(true), span: Span::new(&expr, 23, 27).unwrap() },
+                Expression::FunctionCall {
+                  identifier: Identifier::from("nested"),
+                  arguments: vec![],
+                  span: Span::new(&expr, 29, 37).unwrap()
+                },
+              ],
+              span: Span::new(&expr, 20, 38).unwrap(),
+            }),
+            span: Span::new(&expr, 13, 38).unwrap(),
           }),
           span: Span::new(&expr, 8, 39).unwrap(),
         }),
