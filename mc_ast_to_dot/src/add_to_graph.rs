@@ -64,6 +64,14 @@ impl AddToGraph for Expression<'_> {
 
         b
       }
+      Self::Par { expression, .. } => {
+        let p = g.add_node("()".into());
+
+        let e = expression.add_to_graph(g);
+        g.add_edge(p, e, "expr".into());
+
+        p
+      }
     }
   }
 }

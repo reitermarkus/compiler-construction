@@ -63,14 +63,15 @@ assignment = { identifier ~ ("[" ~ expression ~ "]")? ~ "=" ~ expression }
 
 // Expressions
 
-unary_expression = ${unary_operator ~ term}
+unary_expression = ${ unary_operator ~ term }
+par_expression = { "(" ~ expression ~ ")" }
 
 term = _{
     literal
   | call_expr
   | identifier ~ ("[" ~ expression ~ "]")?
   | unary_expression
-  | "(" ~ expression ~ ")"
+  | par_expression
 }
 
 expression = { term ~ (binary_operator ~ term)* }

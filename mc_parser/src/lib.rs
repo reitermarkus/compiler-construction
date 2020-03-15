@@ -159,16 +159,18 @@ mod tests {
                     int(0, 2)
                   ]),
                   times(3, 4),
-                  expression(6, 16, [
-                    literal(6, 9, [
-                      int(6, 9)
+                  par_expression(5, 17, [
+                    expression(6, 16, [
+                      literal(6, 9, [
+                        int(6, 9)
+                      ]),
+                      plus(10, 11),
+                      literal(12, 16, [
+                        float(12, 16)
+                      ]),
                     ]),
-                    plus(10, 11),
-                    literal(12, 16, [
-                      float(12, 16)
-                    ])
-                  ])
-                ])
+                  ]),
+                ]),
               ]
     }
 
@@ -208,10 +210,12 @@ mod tests {
       rule:   Rule::expression,
       tokens: [
                 expression(0, 4, [
-                  expression(1, 3, [
-                    literal(1, 3, [
-                      string(1, 3, [
-                        inner(2, 2)
+                  par_expression(0, 4, [
+                    expression(1, 3, [
+                      literal(1, 3, [
+                        string(1, 3, [
+                          inner(2, 2)
+                        ]),
                       ]),
                     ]),
                   ]),
