@@ -9,6 +9,7 @@ task :graphs do
     svg = mc.sub_ext('.svg')
     sh 'cargo', 'run', '--bin', 'mc_ast_to_dot', '--', '-o', dot.to_s, mc.to_s
     sh 'dot', '-T', 'svg', '-o', svg.to_s, dot.to_s
+    sh 'sed', '-i', '', '-E', 's/\s*(height|width)="[^"]+"\s*/ /g', svg.to_s
     sh 'svgcleaner', svg.to_s, svg.to_s
     sh 'xmllint', '--format', svg.to_s, '-o', svg.to_s
   end
