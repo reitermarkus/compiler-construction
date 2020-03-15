@@ -97,9 +97,9 @@ impl ToSymbolTable for CompoundStatement<'_> {
   fn to_symbol_table(&self) -> SymbolTable {
     let mut table = HashMap::new();
 
-    for (i, statement) in self.statements.iter().enumerate() {
-      let statement_table = statement.to_symbol_table();
-      table.insert(Identifier(i.to_string()), (SymbolType::Statement(), Some(Box::new(statement_table))));
+    for statement in &self.statements {
+      let statement_map = statement.to_symbol_table().0;
+      table.extend(statement_map);
     }
 
     SymbolTable(table)
