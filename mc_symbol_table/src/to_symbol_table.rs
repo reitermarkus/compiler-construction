@@ -21,15 +21,11 @@ impl ToSymbolTable for IfStatement<'_> {
   fn to_symbol_table(&self) -> SymbolTable {
     let mut table = HashMap::new();
 
-    table
-      .insert(Identifier::from("if"), (SymbolType::Statement(), Some(Box::new(self.block.to_symbol_table()))));
+    table.insert(Identifier::from("if"), (SymbolType::Statement(), Some(Box::new(self.block.to_symbol_table()))));
 
     match &self.else_block {
       Some(statement) => {
-        table.insert(
-          Identifier::from("else"),
-          (SymbolType::Statement(), Some(Box::new(statement.to_symbol_table()))),
-        );
+        table.insert(Identifier::from("else"), (SymbolType::Statement(), Some(Box::new(statement.to_symbol_table()))));
       }
       None => {}
     }
@@ -42,10 +38,7 @@ impl ToSymbolTable for WhileStatement<'_> {
   fn to_symbol_table(&self) -> SymbolTable {
     let mut table = HashMap::new();
 
-    table.insert(
-      Identifier::from("while"),
-      (SymbolType::Statement(), Some(Box::new(self.block.to_symbol_table()))),
-    );
+    table.insert(Identifier::from("while"), (SymbolType::Statement(), Some(Box::new(self.block.to_symbol_table()))));
 
     SymbolTable(table)
   }
@@ -115,8 +108,7 @@ impl ToSymbolTable for FunctionDeclaration<'_> {
     }
 
     let comp_stmt_table = self.body.to_symbol_table();
-    table
-      .insert(Identifier::from("compound"), (SymbolType::CompoundStatement(), Some(Box::new(comp_stmt_table))));
+    table.insert(Identifier::from("compound"), (SymbolType::CompoundStatement(), Some(Box::new(comp_stmt_table))));
 
     SymbolTable(table)
   }

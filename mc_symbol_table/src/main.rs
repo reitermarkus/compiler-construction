@@ -6,6 +6,8 @@ use std::path::Path;
 
 use clap::{value_t, App, Arg};
 
+mod symbol_table;
+
 mod to_symbol_table;
 use to_symbol_table::ToSymbolTable;
 
