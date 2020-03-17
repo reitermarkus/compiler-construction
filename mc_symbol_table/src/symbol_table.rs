@@ -30,7 +30,9 @@ impl Scope {
       Some(s) => {
         path.push(s.add(suffix));
       }
-      None => {}
+      None => {
+        path.push(suffix.to_owned());
+      }
     }
     Self { path }
   }
