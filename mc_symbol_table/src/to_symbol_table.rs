@@ -1,132 +1,102 @@
-use std::collections::HashMap;
-
 use mc_parser::ast::*;
 
-#[derive(Debug)]
-pub enum SymbolType {
-  Function(Option<Ty>),
-  Variable(Ty, Option<usize>),
-  CompoundStatement(),
-  Statement(),
-}
-
-#[derive(Debug)]
-pub struct SymbolTable(HashMap<Identifier, (SymbolType, Option<Box<SymbolTable>>)>);
+use crate::symbol_table::*;
 
 pub trait ToSymbolTable {
-  fn to_symbol_table(&self) -> SymbolTable;
+  fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope);
 }
 
 impl ToSymbolTable for IfStatement<'_> {
-  fn to_symbol_table(&self) -> SymbolTable {
-    let mut table = HashMap::new();
-
-    table.insert(Identifier::from("if"), (SymbolType::Statement(), Some(Box::new(self.block.to_symbol_table()))));
+  fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {
+    self.block.to_symbol_table(table, scope.child("if".to_owned()));
 
     match &self.else_block {
       Some(statement) => {
-        table.insert(Identifier::from("else"), (SymbolType::Statement(), Some(Box::new(statement.to_symbol_table()))));
+        statement.to_symbol_table(table, scope.child("else".to_owned()));
       }
       None => {}
     }
-
-    SymbolTable(table)
   }
 }
 
 impl ToSymbolTable for WhileStatement<'_> {
-  fn to_symbol_table(&self) -> SymbolTable {
-    let mut table = HashMap::new();
-
-    table.insert(Identifier::from("while"), (SymbolType::Statement(), Some(Box::new(self.block.to_symbol_table()))));
-
-    SymbolTable(table)
+  fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {
+    self.block.to_symbol_table(table, scope);
   }
 }
 
+#[allow(unused_variables)]
 impl ToSymbolTable for ReturnStatement<'_> {
-  fn to_symbol_table(&self) -> SymbolTable {
-    SymbolTable(HashMap::new())
-  }
+  fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {}
 }
 
 impl ToSymbolTable for Declaration {
-  fn to_symbol_table(&self) -> SymbolTable {
-    let mut table = HashMap::new();
-
-    table.insert(self.identifier.clone(), (SymbolType::Variable(self.ty.clone(), self.count.clone()), None));
-
-    SymbolTable(table)
+  fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {
+    table.insert(scope.parent().unwrap(), self.identifier.clone(), Symbol::Variable(self.ty.clone(), None));
   }
 }
 
+#[allow(unused_variables)]
 impl ToSymbolTable for Assignment<'_> {
-  fn to_symbol_table(&self) -> SymbolTable {
-    SymbolTable(HashMap::new())
-  }
+  fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {}
 }
 
+#[allow(unused_variables)]
 impl ToSymbolTable for Expression<'_> {
-  fn to_symbol_table(&self) -> SymbolTable {
-    SymbolTable(HashMap::new())
-  }
+  fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {}
 }
 
 impl ToSymbolTable for Statement<'_> {
-  fn to_symbol_table(&self) -> SymbolTable {
+  fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {
     match self {
-      Self::If(statement) => statement.to_symbol_table(),
-      Self::While(statement) => statement.to_symbol_table(),
-      Self::Ret(statement) => statement.to_symbol_table(),
-      Self::Decl(statement) => statement.to_symbol_table(),
-      Self::Assignment(statement) => statement.to_symbol_table(),
-      Self::Expression(statement) => statement.to_symbol_table(),
-      Self::Compound(statement) => statement.to_symbol_table(),
+      Self::If(statement) => {
+        statement.to_symbol_table(table, scope);
+      }
+      Self::While(statement) => {
+        statement.to_symbol_table(table, scope);
+      }
+      Self::Ret(statement) => {
+        statement.to_symbol_table(table, scope);
+      }
+      Self::Decl(statement) => {
+        statement.to_symbol_table(table, scope);
+      }
+      Self::Assignment(statement) => {
+        statement.to_symbol_table(table, scope);
+      }
+      Self::Expression(statement) => {
+        statement.to_symbol_table(table, scope);
+      }
+      Self::Compound(statement) => {
+        statement.to_symbol_table(table, scope);
+      }
     }
   }
 }
 
 impl ToSymbolTable for CompoundStatement<'_> {
-  fn to_symbol_table(&self) -> SymbolTable {
-    let mut table = HashMap::new();
-
-    for statement in &self.statements {
-      let statement_map = statement.to_symbol_table().0;
-      table.extend(statement_map);
+  fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {
+    for (i, statement) in self.statements.iter().enumerate() {
+      statement.to_symbol_table(table, scope.child(i.to_string()));
     }
-
-    SymbolTable(table)
   }
 }
 
 impl ToSymbolTable for FunctionDeclaration<'_> {
-  fn to_symbol_table(&self) -> SymbolTable {
-    let mut table = HashMap::new();
-
+  fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {
     for param in &self.parameters {
-      table.insert(param.identifier.clone(), (SymbolType::Variable(param.ty.clone(), param.count.clone()), None));
+      table.insert(scope.clone(), param.identifier.clone(), Symbol::Variable(param.ty.clone(), param.count));
     }
-
-    let comp_stmt_table = self.body.to_symbol_table();
-    table.insert(Identifier::from("compound"), (SymbolType::CompoundStatement(), Some(Box::new(comp_stmt_table))));
-
-    SymbolTable(table)
+    self.body.to_symbol_table(table, scope);
   }
 }
 
 impl ToSymbolTable for Program<'_> {
-  fn to_symbol_table(&self) -> SymbolTable {
-    let mut table = HashMap::new();
-
+  fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {
     for function in &self.function_declarations {
-      let function_table = function.to_symbol_table();
-      table.insert(
-        function.identifier.clone(),
-        (SymbolType::Function(function.ty.clone()), Some(Box::new(function_table))),
-      );
+      table.insert(scope.clone(), function.identifier.clone(), Symbol::Function(function.ty.clone()));
+      function.to_symbol_table(table, scope.child(function.identifier.0.clone()));
     }
-
-    SymbolTable(table)
   }
 }
 
@@ -204,8 +174,11 @@ mod tests {
       }],
     };
 
-    let symbol_table = ast.to_symbol_table();
+    let mut table = ScopeTable::default();
+    let root = Scope::default().child("root".to_owned());
 
-    eprintln!("Table:\n{:#?}", symbol_table);
+    ast.to_symbol_table(&mut table, root);
+
+    eprintln!("Table:\n{:#?}", table);
   }
 }

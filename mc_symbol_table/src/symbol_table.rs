@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 
 use mc_parser::ast::*;
 
-#[derive(Default, PartialEq, Eq, Hash, Clone)]
+#[derive(Default, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Scope {
   path: Vec<String>,
 }
@@ -42,7 +42,7 @@ pub enum Symbol {
   Variable(Ty, Option<usize>),
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct SymbolTable {
   table: HashMap<Identifier, Symbol>,
 }
@@ -61,11 +61,12 @@ impl DerefMut for SymbolTable {
   }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ScopeTable {
   table: HashMap<Scope, SymbolTable>,
 }
 
+#[allow(dead_code)]
 impl ScopeTable {
   pub fn insert(&mut self, scope: Scope, identifier: Identifier, symbol: Symbol) {
     match self.table.get_mut(&scope) {

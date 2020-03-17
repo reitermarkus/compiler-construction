@@ -7,6 +7,7 @@ use std::path::Path;
 use clap::{value_t, App, Arg};
 
 mod symbol_table;
+use symbol_table::{Scope, ScopeTable};
 
 mod to_symbol_table;
 use to_symbol_table::ToSymbolTable;
@@ -33,7 +34,10 @@ fn main() -> std::io::Result<()> {
 
   let ast = mc_parser::parse(&contents).expect("failed to parse program");
 
-  let symbol_table = ast.to_symbol_table();
+  let mut table = ScopeTable::default();
+  let root = Scope::default().child("root".to_owned());
+
+  let symbol_table = ast.to_symbol_table(&mut table, root);
 
   if let Some(out_file) = out_file.map(File::create) {
     writeln!(out_file?, "{:#?}", symbol_table)?;
