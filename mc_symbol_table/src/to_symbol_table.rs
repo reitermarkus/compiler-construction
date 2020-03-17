@@ -10,11 +10,8 @@ impl ToSymbolTable for IfStatement<'_> {
   fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {
     self.block.to_symbol_table(table, scope.append_to_scope("if"));
 
-    match &self.else_block {
-      Some(statement) => {
-        statement.to_symbol_table(table, scope.append_to_scope("else"));
-      }
-      None => {}
+    if let Some(statement) = &self.else_block {
+      statement.to_symbol_table(table, scope.append_to_scope("else"));
     }
   }
 }
@@ -49,27 +46,13 @@ impl ToSymbolTable for Expression<'_> {
 impl ToSymbolTable for Statement<'_> {
   fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {
     match self {
-      Self::If(statement) => {
-        statement.to_symbol_table(table, scope);
-      }
-      Self::While(statement) => {
-        statement.to_symbol_table(table, scope);
-      }
-      Self::Ret(statement) => {
-        statement.to_symbol_table(table, scope);
-      }
-      Self::Decl(statement) => {
-        statement.to_symbol_table(table, scope);
-      }
-      Self::Assignment(statement) => {
-        statement.to_symbol_table(table, scope);
-      }
-      Self::Expression(statement) => {
-        statement.to_symbol_table(table, scope);
-      }
-      Self::Compound(statement) => {
-        statement.to_symbol_table(table, scope);
-      }
+      Self::If(statement) => statement.to_symbol_table(table, scope),
+      Self::While(statement) => statement.to_symbol_table(table, scope),
+      Self::Ret(statement) => statement.to_symbol_table(table, scope),
+      Self::Decl(statement) => statement.to_symbol_table(table, scope),
+      Self::Assignment(statement) => statement.to_symbol_table(table, scope),
+      Self::Expression(statement) => statement.to_symbol_table(table, scope),
+      Self::Compound(statement) => statement.to_symbol_table(table, scope),
     }
   }
 }
