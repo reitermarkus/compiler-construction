@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Add, Deref, DerefMut};
 
 use mc_parser::ast::*;
 
@@ -21,6 +21,18 @@ impl Scope {
     } else {
       Some(Self { path: self.path.iter().take(self.path.len() - 1).map(Clone::clone).collect::<Vec<String>>() })
     }
+  }
+
+  pub fn append_to_scope(&self, suffix: &str) -> Scope {
+    let mut path = self.path.clone();
+    let current = path.pop();
+    match current {
+      Some(s) => {
+        path.push(s.add(suffix));
+      }
+      None => {}
+    }
+    Self { path }
   }
 }
 

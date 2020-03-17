@@ -8,11 +8,11 @@ pub trait ToSymbolTable {
 
 impl ToSymbolTable for IfStatement<'_> {
   fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {
-    self.block.to_symbol_table(table, scope.child("if".to_owned()));
+    self.block.to_symbol_table(table, scope.append_to_scope("if"));
 
     match &self.else_block {
       Some(statement) => {
-        statement.to_symbol_table(table, scope.child("else".to_owned()));
+        statement.to_symbol_table(table, scope.append_to_scope("else"));
       }
       None => {}
     }
@@ -21,7 +21,7 @@ impl ToSymbolTable for IfStatement<'_> {
 
 impl ToSymbolTable for WhileStatement<'_> {
   fn to_symbol_table(&self, table: &mut ScopeTable, scope: Scope) {
-    self.block.to_symbol_table(table, scope);
+    self.block.to_symbol_table(table, scope.append_to_scope("while"));
   }
 }
 
@@ -112,7 +112,10 @@ mod tests {
       function_declarations: vec![FunctionDeclaration {
         ty: Some(Ty::Int),
         identifier: Identifier::from("fib"),
-        parameters: vec![Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("n") }],
+        parameters: vec![
+          Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("n") },
+          Parameter { ty: Ty::Bool, count: None, identifier: Identifier::from("debug") },
+        ],
         body: CompoundStatement {
           statements: vec![
             Statement::If(Box::new(IfStatement {
@@ -126,49 +129,22 @@ mod tests {
                 rhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new("", 0, 0).unwrap() }),
                 span: Span::new("", 0, 0).unwrap(),
               },
-              block: Statement::Ret(ReturnStatement {
-                expression: Some(Expression::Variable {
-                  identifier: Identifier::from("n"),
-                  index_expression: None,
-                  span: Span::new("", 0, 0).unwrap(),
-                }),
+              block: Statement::Compound(CompoundStatement {
+                statements: vec![Statement::Decl(Declaration {
+                  identifier: Identifier::from("x"),
+                  count: None,
+                  ty: Ty::Float,
+                })],
               }),
-              else_block: None,
+              else_block: Some(Statement::Compound(CompoundStatement {
+                statements: vec![Statement::Decl(Declaration {
+                  identifier: Identifier::from("x"),
+                  count: None,
+                  ty: Ty::Int,
+                })],
+              })),
             })),
-            Statement::Ret(ReturnStatement {
-              expression: Some(Expression::Binary {
-                op: BinaryOp::Plus,
-                lhs: Box::new(Expression::FunctionCall {
-                  identifier: Identifier::from("fib"),
-                  arguments: vec![Expression::Binary {
-                    op: BinaryOp::Minus,
-                    lhs: Box::new(Expression::Variable {
-                      identifier: Identifier::from("n"),
-                      index_expression: None,
-                      span: Span::new("", 0, 0).unwrap(),
-                    }),
-                    rhs: Box::new(Expression::Literal { literal: Literal::Int(1), span: Span::new("", 0, 0).unwrap() }),
-                    span: Span::new("", 0, 0).unwrap(),
-                  }],
-                  span: Span::new("", 0, 0).unwrap(),
-                }),
-                rhs: Box::new(Expression::FunctionCall {
-                  identifier: Identifier::from("fib"),
-                  arguments: vec![Expression::Binary {
-                    op: BinaryOp::Minus,
-                    lhs: Box::new(Expression::Variable {
-                      identifier: Identifier::from("n"),
-                      index_expression: None,
-                      span: Span::new("", 0, 0).unwrap(),
-                    }),
-                    rhs: Box::new(Expression::Literal { literal: Literal::Int(2), span: Span::new("", 0, 0).unwrap() }),
-                    span: Span::new("", 0, 0).unwrap(),
-                  }],
-                  span: Span::new("", 0, 0).unwrap(),
-                }),
-                span: Span::new("", 0, 0).unwrap(),
-              }),
-            }),
+            Statement::Decl(Declaration { identifier: Identifier::from("y"), count: None, ty: Ty::String }),
           ],
         },
       }],
@@ -177,8 +153,25 @@ mod tests {
     let mut table = ScopeTable::default();
     let root = Scope::default().child("root".to_owned());
 
-    ast.to_symbol_table(&mut table, root);
+    ast.to_symbol_table(&mut table, root.clone());
 
-    eprintln!("Table:\n{:#?}", table);
+    assert_eq!(
+      table.lookup(root.clone().child("fib".to_owned()).child("0if".to_owned()), &Identifier::from("x")),
+      Some(&Symbol::Variable(Ty::Float, None))
+    );
+    assert_eq!(
+      table.lookup(root.clone().child("fib".to_owned()).child("0else".to_owned()), &Identifier::from("x")),
+      Some(&Symbol::Variable(Ty::Int, None))
+    );
+    assert_eq!(
+      table.lookup(root.clone().child("fib".to_owned()).child("0else".to_owned()), &Identifier::from("n")),
+      Some(&Symbol::Variable(Ty::Int, None))
+    );
+
+    assert_eq!(
+      table.lookup(root.clone().child("fib".to_owned()), &Identifier::from("y")),
+      Some(&Symbol::Variable(Ty::String, None))
+    );
+    assert_eq!(table.lookup(root.clone().child("fib".to_owned()), &Identifier::from("x")), None);
   }
 }
