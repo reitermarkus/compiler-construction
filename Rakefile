@@ -2,7 +2,7 @@
 
 require 'pathname'
 
-desc "generate AST graphs for all examples"
+desc 'generate AST graphs for all examples'
 task :graphs do
   Pathname.glob("#{__dir__}/examples/*/*.mc").each do |mc|
     dot = mc.sub_ext('.dot')
@@ -15,6 +15,7 @@ task :graphs do
   end
 end
 
+desc 'generate Symbol Tables for all examples'
 task :symbol_tables do
   Pathname.glob("#{__dir__}/examples/*/*.mc").each do |mc|
     txt = mc.sub_ext('.txt')
