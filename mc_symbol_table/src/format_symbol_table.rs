@@ -2,16 +2,8 @@ use prettytable::{format, Cell, Row, Table};
 
 use crate::symbol_table::*;
 
-pub trait ToPrettyTables {
-  fn to_pretty_tables(&self) -> Vec<Table>;
-}
-
-trait ToPrettyTable {
-  fn to_pretty_table(&self, scope: Scope) -> Table;
-}
-
-impl ToPrettyTables for ScopeTable {
-  fn to_pretty_tables(&self) -> Vec<Table> {
+impl ScopeTable {
+  pub fn to_pretty_tables(&self) -> Vec<Table> {
     let mut tables = Vec::new();
 
     for (scope, sym_table) in self.table.iter() {
@@ -22,8 +14,8 @@ impl ToPrettyTables for ScopeTable {
   }
 }
 
-impl ToPrettyTable for SymbolTable {
-  fn to_pretty_table(&self, scope: Scope) -> Table {
+impl SymbolTable {
+  pub fn to_pretty_table(&self, scope: Scope) -> Table {
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
 
@@ -92,7 +84,7 @@ mod tests {
     let mut table = ScopeTable::default();
     let root = Scope::default().child("root".to_owned());
 
-    ast.to_symbol_table(&mut table, root.clone());
+    ast.to_symbol_table(&mut table, root);
 
     let formatted_tables = table.to_pretty_tables();
     for t in formatted_tables {
