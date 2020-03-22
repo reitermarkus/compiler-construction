@@ -38,6 +38,12 @@ impl Scope {
   }
 }
 
+impl ToString for Scope {
+  fn to_string(&self) -> String {
+    self.path.join(".")
+  }
+}
+
 struct ScopeIterator {
   scope: Option<Scope>,
 }
@@ -56,9 +62,20 @@ pub enum Symbol {
   Variable(Ty, Option<usize>),
 }
 
+impl ToString for Symbol {
+  fn to_string(&self) -> String {
+    use Symbol::*;
+
+    match *self {
+      Function(ref _ty) => "function".to_owned(),
+      Variable(ref _ty, ref _size) => "variable".to_owned(),
+    }
+  }
+}
+
 #[derive(Default, Debug)]
 pub struct SymbolTable {
-  table: HashMap<Identifier, Symbol>,
+  pub table: HashMap<Identifier, Symbol>,
 }
 
 impl Deref for SymbolTable {
@@ -77,7 +94,7 @@ impl DerefMut for SymbolTable {
 
 #[derive(Default, Debug)]
 pub struct ScopeTable {
-  table: HashMap<Scope, SymbolTable>,
+  pub table: HashMap<Scope, SymbolTable>,
 }
 
 #[allow(dead_code)]

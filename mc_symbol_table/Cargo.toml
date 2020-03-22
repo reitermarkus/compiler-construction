@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 clap = "2.33"
+prettytable-rs = "0.8.0"
 mc_parser = { path = "../mc_parser" }
 
 [dev-dependencies]

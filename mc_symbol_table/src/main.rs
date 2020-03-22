@@ -1,4 +1,6 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
+#[macro_use]
+extern crate prettytable;
 
 use std::fs::File;
 use std::io::{prelude::*, stdin, stdout};
@@ -11,6 +13,8 @@ use symbol_table::{Scope, ScopeTable};
 
 mod to_symbol_table;
 use to_symbol_table::ToSymbolTable;
+
+mod format_symbol_table;
 
 fn main() -> std::io::Result<()> {
   let matches = App::new("mC Symbol Table Viewer")
