@@ -16,7 +16,7 @@ impl Scope {
   }
 
   pub fn parent(&self) -> Option<Scope> {
-    if self.path.len() == 0 {
+    if self.path.is_empty() {
       None
     } else {
       Some(Self { path: self.path.iter().take(self.path.len() - 1).map(Clone::clone).collect::<Vec<String>>() })
@@ -113,9 +113,9 @@ impl ScopeTable {
   }
 
   pub fn lookup(&self, scope: Scope, identifier: &Identifier) -> Option<&Symbol> {
-    let mut it = ScopeIterator { scope: Some(scope) };
+    let it = ScopeIterator { scope: Some(scope) };
 
-    while let Some(scope) = it.next() {
+    for scope in it {
       let symbol_table = match self.table.get(&scope) {
         Some(st) => st,
         None => continue,
