@@ -1,23 +1,18 @@
 use prettytable::{format, Cell, Row, Table};
+use format::consts::FORMAT_NO_LINESEP_WITH_TITLE;
 
 use crate::symbol_table::*;
 
 impl ScopeTable {
   pub fn to_pretty_tables(&self) -> Vec<Table> {
-    let mut tables = Vec::new();
-
-    for (scope, sym_table) in self.table.iter() {
-      tables.push(sym_table.to_pretty_table(scope.clone()));
-    }
-
-    tables
+    self.table.iter().map(|(scope, sym_table)| sym_table.to_pretty_table(scope.clone())).collect()
   }
 }
 
 impl SymbolTable {
   pub fn to_pretty_table(&self, scope: Scope) -> Table {
     let mut table = Table::new();
-    table.set_format(*format::consts::FORMAT_NO_LINESEP_WITH_TITLE);
+    table.set_format(*FORMAT_NO_LINESEP_WITH_TITLE);
 
     table.set_titles(Row::new(vec![Cell::new(&scope.to_string()), Cell::new(" ")]));
 
