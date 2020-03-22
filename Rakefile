@@ -14,3 +14,10 @@ task :graphs do
     sh 'xmllint', '--format', svg.to_s, '-o', svg.to_s
   end
 end
+
+task :symbol_tables do
+  Pathname.glob("#{__dir__}/examples/*/*.mc").each do |mc|
+    txt = mc.sub_ext('.txt')
+    sh 'cargo', 'run', '--bin', 'mc_symbol_table', '--', '-o', txt.to_s, mc.to_s
+  end
+end
