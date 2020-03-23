@@ -5,12 +5,12 @@ use crate::symbol_table::{Scope, ScopeTable, SymbolTable};
 
 impl ScopeTable {
   pub fn to_pretty_tables(&self) -> Vec<Table> {
-    self.table.iter().map(|(scope, sym_table)| sym_table.to_pretty_table(scope.clone())).collect()
+    self.table.iter().map(|(scope, sym_table)| sym_table.to_pretty_table(&scope)).collect()
   }
 }
 
 impl SymbolTable {
-  pub fn to_pretty_table(&self, scope: Scope) -> Table {
+  pub fn to_pretty_table(&self, scope: &Scope) -> Table {
     let mut table = Table::new();
     table.set_format(*FORMAT_NO_LINESEP_WITH_TITLE);
 

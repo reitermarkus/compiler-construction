@@ -26,14 +26,12 @@ impl Scope {
   pub fn append_to_scope(&self, suffix: &str) -> Scope {
     let mut path = self.path.clone();
     let current = path.pop();
+
     match current {
-      Some(s) => {
-        path.push(s.add(suffix));
-      }
-      None => {
-        path.push(suffix.to_owned());
-      }
+      Some(s) => path.push(s.add(suffix)),
+      None => path.push(suffix.to_owned()),
     }
+
     Self { path }
   }
 }
@@ -116,13 +114,10 @@ impl ScopeTable {
     let it = ScopeIterator { scope: Some(scope) };
 
     for scope in it {
-      let symbol_table = match self.table.get(&scope) {
-        Some(st) => st,
-        None => continue,
-      };
-
-      if let Some(symbol) = symbol_table.get(identifier) {
-        return Some(symbol);
+      if let Some(symbol_table) = self.table.get(&scope) {
+        if let Some(symbol) = symbol_table.get(identifier) {
+          return Some(symbol);
+        }
       }
     }
 
