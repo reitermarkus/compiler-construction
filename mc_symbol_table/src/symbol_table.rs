@@ -123,6 +123,20 @@ impl ScopeTable {
 
     None
   }
+
+  pub fn children_of(&self, parent: Scope) -> Vec<Scope> {
+    let mut children = Vec::new();
+
+    for scope in self.table.keys() {
+      if let Some(current_parent) = scope.parent() {
+        if current_parent == parent {
+          children.push(scope.clone());
+        }
+      }
+    }
+
+    children
+  }
 }
 
 #[cfg(test)]
@@ -155,7 +169,7 @@ mod tests {
     let var_symbol = Symbol::Variable(Ty::String, None);
     scope_table.insert(var_scope.clone(), var_id.clone(), var_symbol);
 
-    let looked_up_fib = scope_table.lookup(fib_scope, &fib_id);
+    let looked_up_fib = scope_table.lookup(fib_scope.clone(), &fib_id);
     let looked_up_main = scope_table.lookup(main_scope, &main_id);
     let looked_up_x = scope_table.lookup(param_scope.clone(), &param_id);
     let looked_up_y = scope_table.lookup(var_scope, &var_id);
@@ -167,5 +181,14 @@ mod tests {
 
     let wrong_looked_up_x = scope_table.lookup(param_scope, &var_id);
     assert_eq!(wrong_looked_up_x, None);
+
+    let children_of_root = scope_table.children_of(fib_scope);
+    assert_eq!(children_of_root.len(), 2);
+    for scope in vec![
+      Scope { path: vec!["root".to_owned(), "main".to_owned()] },
+      Scope { path: vec!["root".to_owned(), "fib".to_owned()] },
+    ] {
+      assert!(children_of_root.contains(&scope));
+    }
   }
 }
