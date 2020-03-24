@@ -502,15 +502,7 @@ impl<'a> FromPest<'a> for Statement<'a> {
       Rule::declaration => Self::Decl(Declaration::from_pest(&mut inner)?),
       Rule::assignment => Self::Assignment(Assignment::from_pest(&mut inner)?),
       Rule::expression => Self::Expression(Expression::from_pest(&mut inner)?),
-      Rule::compound_stmt => {
-        let mut statement = CompoundStatement::from_pest(&mut inner)?;
-
-        if statement.statements.len() == 1 {
-          statement.statements.pop().unwrap()
-        } else {
-          Self::Compound(statement)
-        }
-      }
+      Rule::compound_stmt => Self::Compound(CompoundStatement::from_pest(&mut inner)?),
       rule => return Err(ConversionError::Malformed(format!("unknown statement: {:?}", rule))),
     })
   }
@@ -714,17 +706,21 @@ mod tests {
           }),
           span: Span::new(&if_stmt, 4, 15).unwrap(),
         },
-        block: Statement::Assignment(Assignment {
-          identifier: Identifier::from("i"),
-          index_expression: None,
-          rvalue: Expression::Literal { literal: Literal::Int(1), span: Span::new(&if_stmt, 23, 24).unwrap() },
-        }),
-        else_block: Some(Statement::Ret(ReturnStatement {
-          expression: Some(Expression::Variable {
+        block: Statement::Compound(CompoundStatement {
+          statements: vec![Statement::Assignment(Assignment {
             identifier: Identifier::from("i"),
             index_expression: None,
-            span: Span::new(&if_stmt, 42, 43).unwrap()
-          }),
+            rvalue: Expression::Literal { literal: Literal::Int(1), span: Span::new(&if_stmt, 23, 24).unwrap() },
+          })]
+        }),
+        else_block: Some(Statement::Compound(CompoundStatement {
+          statements: vec![Statement::Ret(ReturnStatement {
+            expression: Some(Expression::Variable {
+              identifier: Identifier::from("i"),
+              index_expression: None,
+              span: Span::new(&if_stmt, 42, 43).unwrap()
+            }),
+          })]
         }))
       }
     )
