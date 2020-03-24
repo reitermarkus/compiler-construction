@@ -1,33 +1,56 @@
 use format::consts::FORMAT_NO_LINESEP_WITH_TITLE;
 use prettytable::{format, Cell, Row, Table};
 
-use crate::symbol_table::{Scope, ScopeTable, SymbolTable};
+use crate::symbol_table::ScopeTable;
 
 impl ScopeTable {
-  pub fn to_pretty_tables(&self) -> Vec<Table> {
-    self.table.iter().map(|(scope, sym_table)| sym_table.to_pretty_table(&scope)).collect()
-  }
-}
+  pub fn to_pretty_tables(&self) -> Vec<Option<Table>> {
+    let root = self.table.iter().find(|(sc, _)| sc.to_string() == "root").unwrap();
 
-impl SymbolTable {
-  pub fn to_pretty_table(&self, scope: &Scope) -> Table {
+    let mut tables = Vec::new();
+
     let mut table = Table::new();
     table.set_format(*FORMAT_NO_LINESEP_WITH_TITLE);
+    table.set_titles(Row::new(vec![Cell::new("root"), Cell::new(" ")]));
 
-    table.set_titles(Row::new(vec![Cell::new(&scope.to_string()), Cell::new(" ")]));
-
-    for (identifier, symbol) in self.table.iter() {
+    for (identifier, symbol) in root.1.iter() {
       table.add_row(row![identifier, symbol]);
     }
 
-    table
+    tables.push(Some(table));
+
+    tables.extend(
+      root
+        .1
+        .iter()
+        .map(|(identifier, _)| {
+          if let Some(entry) = self.table.iter().find(|(sc, _)| sc.to_string().contains(&identifier.to_string())) {
+            let mut table = Table::new();
+            table.set_format(*FORMAT_NO_LINESEP_WITH_TITLE);
+            table.set_titles(Row::new(vec![Cell::new(&entry.0.to_string()), Cell::new(" ")]));
+
+            for (identifier, symbol) in entry.1.iter() {
+              table.add_row(row![identifier, symbol]);
+            }
+
+            Some(table)
+          } else {
+            None
+          }
+        })
+        .collect::<Vec<_>>(),
+    );
+
+    tables
   }
 }
 
 #[cfg(test)]
 mod tests {
-  use crate::to_symbol_table::*;
   use mc_parser::ast::*;
+
+  use crate::symbol_table::Scope;
+  use crate::to_symbol_table::*;
 
   use super::*;
 
@@ -57,8 +80,10 @@ mod tests {
     ast.to_symbol_table(&mut table, root);
 
     let formatted_tables = table.to_pretty_tables();
-    for t in formatted_tables {
-      t.printstd();
+    for tbl in formatted_tables {
+      if let Some(t) = tbl {
+        t.printstd();
+      }
     }
   }
 }

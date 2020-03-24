@@ -29,12 +29,12 @@ pub fn mc_view_symbol_table(in_file: impl AsRef<Path>, mut out_stream: impl Writ
   let root = Scope::default().child("root".to_owned());
   ast.to_symbol_table(&mut table, root);
 
-  let formatted_tables = table.to_pretty_tables();
-
   writeln!(out_stream, "Symbol Tables:")?;
 
-  for formatted_table in formatted_tables {
-    formatted_table.print(&mut out_stream)?;
+  for formatted_table in table.to_pretty_tables() {
+    if let Some(tbl) = formatted_table {
+      tbl.print(&mut out_stream)?;
+    }
   }
 
   writeln!(out_stream, " ")
