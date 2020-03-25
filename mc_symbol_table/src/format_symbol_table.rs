@@ -4,7 +4,7 @@ use prettytable::{format, Cell, Row, Table};
 use crate::symbol_table::ScopeTable;
 
 impl ScopeTable {
-  pub fn to_pretty_tables(&self) -> Vec<Option<Table>> {
+  pub fn to_pretty_tables(&self) -> Vec<Table> {
     let root = self.table.iter().find(|(sc, _)| sc.to_string() == "root").unwrap();
 
     let mut tables = Vec::new();
@@ -17,26 +17,31 @@ impl ScopeTable {
       table.add_row(row![identifier, symbol]);
     }
 
-    tables.push(Some(table));
+    tables.push(table);
 
     tables.extend(
       root
         .1
         .iter()
-        .map(|(identifier, _)| {
-          if let Some(entry) = self.table.iter().find(|(sc, _)| sc.to_string().contains(&identifier.to_string())) {
-            let mut table = Table::new();
-            table.set_format(*FORMAT_NO_LINESEP_WITH_TITLE);
-            table.set_titles(Row::new(vec![Cell::new(&entry.0.to_string()), Cell::new(" ")]));
+        .flat_map(|(identifier, _)| {
+          let mut childs = self
+            .table
+            .iter()
+            .filter(move |(sc, _)| sc.to_string().contains(&["root", &identifier.to_string()].join(".")))
+            .collect::<Vec<_>>();
+          childs.sort_by(|(sc_a, _), (sc_b, _)| sc_a.to_string().partial_cmp(&sc_b.to_string()).unwrap());
 
-            for (identifier, symbol) in entry.1.iter() {
+          childs.into_iter().map(|(scope, sym_table)| {
+            let mut table = Table::new();
+            table.set_format(*FORMAT_BOX_CHARS);
+            table.set_titles(Row::new(vec![Cell::new(&scope.to_string()), Cell::new(" ")]));
+
+            for (identifier, symbol) in sym_table.iter() {
               table.add_row(row![identifier, symbol]);
             }
 
-            Some(table)
-          } else {
-            None
-          }
+            table
+          })
         })
         .collect::<Vec<_>>(),
     );
@@ -80,10 +85,8 @@ mod tests {
     ast.to_symbol_table(&mut table, root);
 
     let formatted_tables = table.to_pretty_tables();
-    for tbl in formatted_tables {
-      if let Some(t) = tbl {
-        t.printstd();
-      }
+    for t in formatted_tables {
+      t.printstd();
     }
   }
 }

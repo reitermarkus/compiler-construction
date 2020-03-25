@@ -32,9 +32,7 @@ pub fn mc_view_symbol_table(in_file: impl AsRef<Path>, mut out_stream: impl Writ
   writeln!(out_stream, "Symbol Tables:")?;
 
   for formatted_table in table.to_pretty_tables() {
-    if let Some(tbl) = formatted_table {
-      tbl.print(&mut out_stream)?;
-    }
+    formatted_table.print(&mut out_stream)?;
   }
 
   Ok(())
