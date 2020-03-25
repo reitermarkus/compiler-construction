@@ -1,4 +1,4 @@
-use format::consts::FORMAT_NO_LINESEP_WITH_TITLE;
+use format::consts::FORMAT_BOX_CHARS;
 use prettytable::{format, Cell, Row, Table};
 
 use crate::symbol_table::ScopeTable;
@@ -10,7 +10,7 @@ impl ScopeTable {
     let mut tables = Vec::new();
 
     let mut table = Table::new();
-    table.set_format(*FORMAT_NO_LINESEP_WITH_TITLE);
+    table.set_format(*FORMAT_BOX_CHARS);
     table.set_titles(Row::new(vec![Cell::new("root"), Cell::new(" ")]));
 
     for (identifier, symbol) in root.1.iter() {

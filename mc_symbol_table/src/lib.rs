@@ -37,5 +37,5 @@ pub fn mc_view_symbol_table(in_file: impl AsRef<Path>, mut out_stream: impl Writ
     }
   }
 
-  writeln!(out_stream, " ")
+  Ok(())
 }
