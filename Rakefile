@@ -3,8 +3,8 @@
 require 'pathname'
 
 desc 'generate AST graphs for all examples'
-task :graphs do
-  Pathname.glob("#{__dir__}/examples/*/*.mc").each do |mc|
+task :graphs, [:example] do |example: '*'|
+  Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
     dot = mc.sub_ext('.dot')
     svg = mc.sub_ext('.svg')
     sh 'cargo', 'run', '--bin', 'mc_ast_to_dot', '--', '-o', dot.to_s, mc.to_s
@@ -21,18 +21,9 @@ task :graphs do
 end
 
 desc 'generate Symbol Tables for all examples'
-task :symbol_tables do
-  Pathname.glob("#{__dir__}/examples/*/*.mc").each do |mc|
+task :symbol_tables, [:example] do |example: '*'|
+  Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
     txt = mc.sub_ext('.txt')
     sh 'cargo', 'run', '--bin', 'mc_symbol_table', '--', '-o', txt.to_s, mc.to_s
   end
-end
-
-desc 'generate Symbol Table for specific example'
-task :symbol_table, [:example] do |t, args|
-  path = "#{__dir__}/examples/#{args.example}/#{args.example}"
-  unless File.file?("#{path}.mc")
-    raise "Example does not exist!"
-  end
-  sh 'cargo', 'run', '--bin', 'mc_symbol_table', '--', '-o', "#{path}.txt", "#{path}.mc"
 end
