@@ -27,3 +27,12 @@ task :symbol_tables do
     sh 'cargo', 'run', '--bin', 'mc_symbol_table', '--', '-o', txt.to_s, mc.to_s
   end
 end
+
+desc 'generate Symbol Table for specific example'
+task :symbol_table, [:example] do |t, args|
+  path = "#{__dir__}/examples/#{args.example}/#{args.example}"
+  unless File.file?("#{path}.mc")
+    raise "Example does not exist!"
+  end
+  sh 'cargo', 'run', '--bin', 'mc_symbol_table', '--', '-o', "#{path}.txt", "#{path}.mc"
+end
