@@ -1,6 +1,7 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 #[macro_use]
 extern crate prettytable;
+use prettytable::Table;
 
 use std::fs::File;
 use std::io::{prelude::*, stdin};
@@ -9,10 +10,10 @@ use std::path::Path;
 mod format_symbol_table;
 
 mod symbol_table;
-use symbol_table::{Scope, ScopeTable};
+use symbol_table::Scope;
 
-mod to_symbol_table;
-use to_symbol_table::ToSymbolTable;
+mod add_to_scope;
+use add_to_scope::AddToScope;
 
 pub fn mc_view_symbol_table(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::Result<()> {
   let mut contents = String::new();
@@ -25,15 +26,12 @@ pub fn mc_view_symbol_table(in_file: impl AsRef<Path>, mut out_stream: impl Writ
 
   let ast = mc_parser::parse(&contents).expect("failed to parse program");
 
-  let mut table = ScopeTable::default();
-  let root = Scope::default().child("root".to_owned());
-  ast.to_symbol_table(&mut table, root);
+  let scope = Scope::new();
+  ast.add_to_scope(&scope);
 
-  writeln!(out_stream, "Symbol Tables:")?;
-
-  for formatted_table in table.to_pretty_tables() {
-    formatted_table.print(&mut out_stream)?;
-  }
+  let mut table = Table::new();
+  scope.borrow().to_pretty_table(&mut table);
+  table.print(&mut out_stream)?;
 
   Ok(())
 }

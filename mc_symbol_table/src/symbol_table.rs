@@ -1,73 +1,114 @@
+use std::cell::RefCell;
+use std::fmt;
+use std::rc::Rc;
+
 use std::collections::HashMap;
-use std::ops::{Add, Deref, DerefMut};
+use std::ops::{Deref, DerefMut};
 
 use mc_parser::ast::*;
 
-#[derive(Default, Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Default)]
 pub struct Scope {
-  path: Vec<String>,
+  pub name: Option<String>,
+  pub parent: Option<Rc<RefCell<Scope>>>,
+  pub symbols: SymbolTable,
+  pub children: Vec<Rc<RefCell<Scope>>>,
+}
+
+impl fmt::Debug for Scope {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("Scope")
+      .field("name", &self.name)
+      .field("has_parent", &self.parent.is_some())
+      .field("symbols", &self.symbols)
+      .field("children", &self.children)
+      .finish()
+  }
+}
+
+impl fmt::Display for Scope {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    if let Some(parent) = &self.parent {
+      let parent = parent.borrow();
+
+      if let Some(name) = &self.name {
+        write!(f, "{}.{}", parent, name)
+      } else {
+        parent.fmt(f)
+      }
+    } else if let Some(name) = &self.name {
+      name.fmt(f)
+    } else {
+      "root".fmt(f)
+    }
+  }
 }
 
 impl Scope {
-  pub fn child(&self, child: String) -> Scope {
-    let mut path = self.path.clone();
-    path.push(child);
-    Self { path }
+  pub fn new() -> Rc<RefCell<Self>> {
+    Rc::new(RefCell::new(Scope::default()))
   }
 
-  pub fn parent(&self) -> Option<Scope> {
-    if self.path.is_empty() {
-      None
+  pub fn new_child(parent: &Rc<RefCell<Self>>, name: &str) -> Rc<RefCell<Self>> {
+    let mut child = Self::default();
+    child.parent = Some(Rc::clone(&parent));
+
+    let mut parent = parent.borrow_mut();
+    let id = parent.children.len();
+    child.name = Some(format!("{}[{}]", name, id));
+    parent.children.push(Rc::new(RefCell::new(child)));
+
+    Rc::clone(parent.children.last().unwrap())
+  }
+
+  pub fn insert(&mut self, identifier: Identifier, symbol: Symbol) {
+    self.symbols.insert(identifier, symbol);
+  }
+
+  #[allow(dead_code)]
+  pub fn lookup(scope: &Rc<RefCell<Self>>, identifier: &Identifier) -> Option<Symbol> {
+    let scope = scope.borrow();
+
+    if let Some(symbol) = scope.symbols.get(identifier) {
+      return Some(symbol.clone());
+    }
+
+    if let Some(parent) = &scope.parent {
+      Self::lookup(parent, identifier)
     } else {
-      Some(Self { path: self.path.iter().take(self.path.len() - 1).map(Clone::clone).collect::<Vec<String>>() })
+      None
     }
   }
-
-  pub fn append_to_scope(&self, suffix: &str) -> Scope {
-    let mut path = self.path.clone();
-    let current = path.pop();
-
-    match current {
-      Some(s) => path.push(s.add(suffix)),
-      None => path.push(suffix.to_owned()),
-    }
-
-    Self { path }
-  }
 }
 
-impl ToString for Scope {
-  fn to_string(&self) -> String {
-    self.path.join(".")
-  }
-}
-
-struct ScopeIterator {
-  scope: Option<Scope>,
-}
-
-impl Iterator for ScopeIterator {
-  type Item = Scope;
-
-  fn next(&mut self) -> Option<Self::Item> {
-    self.scope.replace(self.scope.as_ref()?.parent()?)
-  }
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Symbol {
   Function(Option<Ty>),
   Variable(Ty, Option<usize>),
 }
 
-impl ToString for Symbol {
-  fn to_string(&self) -> String {
+impl fmt::Display for Symbol {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     use Symbol::*;
 
-    match *self {
-      Function(ref _ty) => "function".to_owned(),
-      Variable(ref _ty, ref _size) => "variable".to_owned(),
+    match self {
+      Function(ty) => {
+        write!(f, "function")?;
+
+        if let Some(ty) = ty {
+          write!(f, " -> {}", ty)?;
+        }
+      }
+      Variable(ty, size) => {
+        write!(f, "variable = {}", ty)?;
+
+        if let Some(size) = size {
+          write!(f, "[{}]", size)?;
+        }
+      }
     }
+
+    Ok(())
   }
 }
 
@@ -90,105 +131,46 @@ impl DerefMut for SymbolTable {
   }
 }
 
-#[derive(Default, Debug)]
-pub struct ScopeTable {
-  pub table: HashMap<Scope, SymbolTable>,
-}
-
-#[allow(dead_code)]
-impl ScopeTable {
-  pub fn insert(&mut self, scope: Scope, identifier: Identifier, symbol: Symbol) {
-    match self.table.get_mut(&scope) {
-      Some(ref mut symbol_table) => {
-        symbol_table.insert(identifier, symbol);
-      }
-      None => {
-        let mut symbol_table = SymbolTable::default();
-        symbol_table.insert(identifier, symbol);
-        self.table.insert(scope.clone(), symbol_table);
-      }
-    };
-  }
-
-  pub fn lookup(&self, scope: Scope, identifier: &Identifier) -> Option<&Symbol> {
-    let it = ScopeIterator { scope: Some(scope) };
-
-    for scope in it {
-      if let Some(symbol_table) = self.table.get(&scope) {
-        if let Some(symbol) = symbol_table.get(identifier) {
-          return Some(symbol);
-        }
-      }
-    }
-
-    None
-  }
-
-  pub fn children_of(&self, parent: Scope) -> Vec<Scope> {
-    let mut children = Vec::new();
-
-    for scope in self.table.keys() {
-      if let Some(current_parent) = scope.parent() {
-        if current_parent == parent {
-          children.push(scope.clone());
-        }
-      }
-    }
-
-    children
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
 
   #[test]
   fn insert_and_lookup() {
-    let root = Scope::default();
+    let root_scope = Scope::new();
 
-    let mut scope_table = ScopeTable::default();
-
-    let fib_scope = root.child("root".into());
     let fib_id = Identifier::from("fib");
     let fib_symbol = Symbol::Function(Some(Ty::Int));
-    scope_table.insert(fib_scope.clone(), fib_id.clone(), fib_symbol);
+    Scope::insert(&mut root_scope.borrow_mut(), fib_id.clone(), fib_symbol.clone());
 
-    let main_scope = root.child("root".into());
     let main_id = Identifier::from("main");
     let main_symbol = Symbol::Function(None);
-    scope_table.insert(main_scope.clone(), main_id.clone(), main_symbol);
+    Scope::insert(&mut root_scope.borrow_mut(), main_id.clone(), main_symbol.clone());
 
-    let param_scope = fib_scope.child("fib".to_owned());
+    let function_scope = Scope::new_child(&root_scope, "function");
     let param_id = Identifier::from("x");
     let param_symbol = Symbol::Variable(Ty::Float, None);
-    scope_table.insert(param_scope.clone(), param_id.clone(), param_symbol);
+    Scope::insert(&mut function_scope.borrow_mut(), param_id.clone(), param_symbol.clone());
 
-    let var_scope = fib_scope.child("main".to_owned());
+    let block_scope = Scope::new_child(&function_scope, "block");
     let var_id = Identifier::from("y");
     let var_symbol = Symbol::Variable(Ty::String, None);
-    scope_table.insert(var_scope.clone(), var_id.clone(), var_symbol);
+    Scope::insert(&mut block_scope.borrow_mut(), var_id.clone(), var_symbol.clone());
 
-    let looked_up_fib = scope_table.lookup(fib_scope.clone(), &fib_id);
-    let looked_up_main = scope_table.lookup(main_scope, &main_id);
-    let looked_up_x = scope_table.lookup(param_scope.clone(), &param_id);
-    let looked_up_y = scope_table.lookup(var_scope, &var_id);
+    assert_eq!(Scope::lookup(&root_scope, &fib_id), Some(fib_symbol.clone()));
+    assert_eq!(Scope::lookup(&function_scope, &fib_id), Some(fib_symbol.clone()));
+    assert_eq!(Scope::lookup(&block_scope, &fib_id), Some(fib_symbol.clone()));
 
-    assert_eq!(looked_up_fib, Some(&Symbol::Function(Some(Ty::Int))));
-    assert_eq!(looked_up_main, Some(&Symbol::Function(None)));
-    assert_eq!(looked_up_x, Some(&Symbol::Variable(Ty::Float, None)));
-    assert_eq!(looked_up_y, Some(&Symbol::Variable(Ty::String, None)));
+    assert_eq!(Scope::lookup(&root_scope, &main_id), Some(main_symbol.clone()));
+    assert_eq!(Scope::lookup(&function_scope, &main_id), Some(main_symbol.clone()));
+    assert_eq!(Scope::lookup(&block_scope, &main_id), Some(main_symbol.clone()));
 
-    let wrong_looked_up_x = scope_table.lookup(param_scope, &var_id);
-    assert_eq!(wrong_looked_up_x, None);
+    assert_eq!(Scope::lookup(&root_scope, &param_id), None);
+    assert_eq!(Scope::lookup(&function_scope, &param_id), Some(param_symbol.clone()));
+    assert_eq!(Scope::lookup(&block_scope, &param_id), Some(param_symbol.clone()));
 
-    let children_of_root = scope_table.children_of(fib_scope);
-    assert_eq!(children_of_root.len(), 2);
-    for scope in vec![
-      Scope { path: vec!["root".to_owned(), "main".to_owned()] },
-      Scope { path: vec!["root".to_owned(), "fib".to_owned()] },
-    ] {
-      assert!(children_of_root.contains(&scope));
-    }
+    assert_eq!(Scope::lookup(&root_scope, &var_id), None);
+    assert_eq!(Scope::lookup(&function_scope, &var_id), None);
+    assert_eq!(Scope::lookup(&block_scope, &var_id), Some(var_symbol.clone()));
   }
 }
