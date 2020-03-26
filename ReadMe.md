@@ -29,3 +29,9 @@ cargo test
 ```
 rake graphs
 ```
+
+## Generation of Symbol Tables
+
+```
+rake symbol_tables
+```
