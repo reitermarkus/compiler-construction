@@ -8,6 +8,4 @@ edition = "2018"
 clap = "2.33"
 prettytable-rs = "0.8.0"
 mc_parser = { path = "../mc_parser" }
-
-[dev-dependencies]
-pest = "2.1.3"
+pest = "2.1"
