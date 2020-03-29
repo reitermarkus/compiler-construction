@@ -49,7 +49,7 @@ impl AddToScope for ReturnStatement<'_> {
 
 impl AddToScope for Declaration<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    (*scope.borrow_mut()).insert(self.identifier.clone(), Symbol::Variable(self.ty.clone(), None));
+    (*scope.borrow_mut()).insert(self.identifier.clone(), Symbol::Variable(self.ty.clone(), self.count));
 
     Ok(())
   }
