@@ -62,6 +62,17 @@ impl<'a> FromPest<'a> for Ty {
   }
 }
 
+impl From<&Literal> for Ty {
+  fn from(literal: &Literal) -> Ty {
+    match literal {
+      Literal::Bool(_) => Self::Bool,
+      Literal::Int(_) => Self::Int,
+      Literal::Float(_) => Self::Float,
+      Literal::String(_) => Self::String,
+    }
+  }
+}
+
 #[derive(PartialEq, Debug)]
 pub enum Literal {
   Bool(bool),

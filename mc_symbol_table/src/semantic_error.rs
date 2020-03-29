@@ -34,6 +34,11 @@ pub enum SemanticError<'a> {
     span: Span<'a>,
     identifier: Identifier,
   },
+  UnaryOperatorTypeError {
+    span: Span<'a>,
+    op: &'a UnaryOp,
+    ty: Ty,
+  },
 }
 
 macro_rules! write_err {
@@ -57,6 +62,9 @@ impl fmt::Display for SemanticError<'_> {
         write_err!(f, span, "index {} out of bound for '{}' with size {}", actual, identifier, size)
       }
       Self::WrongUseOfFunction { span, identifier } => write_err!(f, span, "wrong use of function '{}'", identifier),
+      Self::UnaryOperatorTypeError { span, op, ty } => {
+        write_err!(f, span, "operator '{}' cannot be used with type '{}'", op, ty)
+      }
     }
   }
 }
@@ -67,14 +75,14 @@ pub trait CheckSemantics {
 
 impl CheckSemantics for Expression<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    match self {
-      Self::Literal { .. } => Ok(()),
-      Self::Variable { identifier, span, index_expression } => {
-        let mut errors = Vec::new();
+    let mut errors = Vec::new();
 
+    match self {
+      Self::Literal { .. } => {}
+      Self::Variable { identifier, span, index_expression } => {
         if let Some(var) = Scope::lookup(scope, identifier) {
           if let Symbol::Function(..) = var {
-            errors.push(SemanticError::WrongUseOfFunction { span: span.clone(), identifier: identifier.clone() })
+            errors.push(SemanticError::WrongUseOfFunction { span: span.clone(), identifier: identifier.clone() });
           } else {
             if let Some(index) = index_expression {
               match index.check_index_semantics(&var, identifier).err() {
@@ -82,7 +90,7 @@ impl CheckSemantics for Expression<'_> {
                   errors.push(e);
                 }
                 Some(None) => {
-                  errors.push(SemanticError::IndexError { span: span.clone(), identifier: identifier.clone() })
+                  errors.push(SemanticError::IndexError { span: span.clone(), identifier: identifier.clone() });
                 }
                 None => {}
               }
@@ -91,14 +99,69 @@ impl CheckSemantics for Expression<'_> {
         } else {
           errors.push(SemanticError::NotDeclared { span: span.clone(), identifier: identifier.clone() });
         }
+      }
+      Self::Unary { op, expression, span } => {
+        // check semantics of expression
+        let res = expression.check_semantics(scope);
+        if let Err(err) = res {
+          errors.extend(err);
+        }
 
-        if errors.is_empty() {
-          Ok(())
-        } else {
-          Err(errors)
+        match &**expression {
+          Self::Literal { literal, .. } => match literal {
+            Literal::Bool(_) => {
+              if *op == UnaryOp::Minus {
+                errors.push(SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty: Ty::from(literal) });
+              }
+            }
+            Literal::Int(_) | Literal::Float(_) => {
+              if *op == UnaryOp::Not {
+                errors.push(SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty: Ty::from(literal) });
+              }
+            }
+            Literal::String(_) => {
+              errors.push(SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty: Ty::from(literal) });
+            }
+          },
+          Self::Variable { identifier, index_expression, .. } => {
+            if let Some(symbol) = Scope::lookup(scope, identifier) {
+              if let Symbol::Variable(ty, size) = symbol {
+                if size.is_some() != index_expression.is_some() {
+                  // yield error
+                }
+
+                match ty {
+                  Ty::Bool => {
+                    if *op == UnaryOp::Minus {
+                      errors.push(SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty });
+                    }
+                  }
+                  Ty::Int | Ty::Float => {
+                    if *op == UnaryOp::Not {
+                      errors.push(SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty });
+                    }
+                  }
+                  Ty::String => {
+                    errors.push(SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty });
+                  }
+                }
+              } else {
+                errors.push(SemanticError::WrongUseOfFunction { span: span.clone(), identifier: identifier.clone() })
+              }
+            } else {
+              errors.push(SemanticError::NotDeclared { span: span.clone(), identifier: identifier.clone() });
+            }
+          }
+          _ => todo!(),
         }
       }
-      _unreachable => Ok(()),
+      _ => todo!(),
+    };
+
+    if errors.is_empty() {
+      Ok(())
+    } else {
+      Err(errors)
     }
   }
 }
@@ -127,7 +190,7 @@ impl CheckIndexSemantics for Expression<'_> {
             Err(Some(SemanticError::IndexError { span: span.clone(), identifier: identifier.clone() }))
           }
         }
-        _unreachable => Err(None),
+        _ => Err(None),
       }
     } else {
       Err(None)
