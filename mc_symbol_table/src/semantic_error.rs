@@ -85,12 +85,8 @@ impl CheckSemantics for Expression<'_> {
             errors.push(SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() });
           } else if let Some(index) = index_expression {
             match index.check_index_semantics(&var, identifier).err() {
-              Some(Some(e)) => {
-                errors.push(e);
-              }
-              Some(None) => {
-                errors.push(SemanticError::IndexError { span, identifier: identifier.clone() });
-              }
+              Some(Some(e)) => errors.push(e),
+              Some(None) => errors.push(SemanticError::IndexError { span, identifier: identifier.clone() }),
               None => {}
             }
           }
@@ -107,19 +103,16 @@ impl CheckSemantics for Expression<'_> {
 
         match &**expression {
           Self::Literal { literal, .. } => match literal {
-            Literal::Bool(_) => {
-              if *op == UnaryOp::Minus {
-                errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty: Ty::from(literal) });
-              }
+            Literal::Bool(_) if *op == UnaryOp::Minus => {
+              errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty: Ty::from(literal) })
             }
-            Literal::Int(_) | Literal::Float(_) => {
-              if *op == UnaryOp::Not {
-                errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty: Ty::from(literal) });
-              }
+            Literal::Int(_) | Literal::Float(_) if *op == UnaryOp::Not => {
+              errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty: Ty::from(literal) })
             }
             Literal::String(_) => {
-              errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty: Ty::from(literal) });
+              errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty: Ty::from(literal) })
             }
+            _ => (),
           },
           Self::Variable { identifier, index_expression, .. } => {
             if let Some(symbol) = Scope::lookup(scope, identifier) {
@@ -129,19 +122,14 @@ impl CheckSemantics for Expression<'_> {
                 }
 
                 match ty {
-                  Ty::Bool => {
-                    if *op == UnaryOp::Minus {
-                      errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty });
-                    }
+                  Ty::Bool if *op == UnaryOp::Minus => {
+                    errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty })
                   }
-                  Ty::Int | Ty::Float => {
-                    if *op == UnaryOp::Not {
-                      errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty });
-                    }
+                  Ty::Int | Ty::Float if *op == UnaryOp::Not => {
+                    errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty })
                   }
-                  Ty::String => {
-                    errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty });
-                  }
+                  Ty::String => errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty }),
+                  _ => (),
                 }
               } else {
                 errors.push(SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() })
