@@ -20,6 +20,8 @@ impl Scope {
 
 #[cfg(test)]
 mod tests {
+  use pest::Span;
+
   use mc_parser::ast::*;
 
   use crate::add_to_scope::*;
@@ -42,8 +44,11 @@ mod tests {
             identifier: Identifier::from("y"),
             count: None,
             ty: Ty::String,
+            span: Span::new("", 0, 0).unwrap(),
           })],
+          span: Span::new("", 0, 0).unwrap(),
         },
+        span: Span::new("", 0, 0).unwrap(),
       }],
     };
 

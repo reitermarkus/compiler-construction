@@ -39,7 +39,7 @@ impl AddToScope for ReturnStatement<'_> {
   }
 }
 
-impl AddToScope for Declaration {
+impl AddToScope for Declaration<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     (*scope.borrow_mut()).insert(self.identifier.clone(), Symbol::Variable(self.ty.clone(), None));
 
@@ -145,19 +145,26 @@ mod tests {
                   identifier: Identifier::from("x"),
                   count: None,
                   ty: Ty::Float,
+                  span: Span::new("", 0, 0).unwrap(),
                 })],
+                span: Span::new("", 0, 0).unwrap(),
               }),
               else_block: Some(Statement::Compound(CompoundStatement {
                 statements: vec![Statement::Decl(Declaration {
                   identifier: Identifier::from("x"),
                   count: None,
                   ty: Ty::Int,
+                  span: Span::new("", 0, 0).unwrap(),
                 })],
+                span: Span::new("", 0, 0).unwrap(),
               })),
+              span: Span::new("", 0, 0).unwrap(),
             })),
-            Statement::Decl(Declaration { identifier: Identifier::from("y"), count: None, ty: Ty::String }),
+            Statement::Decl(Declaration { identifier: Identifier::from("y"), count: None, ty: Ty::String, span: Span::new("", 0, 0).unwrap() }),
           ],
+          span: Span::new("", 0, 0).unwrap(),
         },
+        span: Span::new("", 0, 0).unwrap(),
       }],
     };
 

@@ -114,7 +114,7 @@ impl AddToGraph for ReturnStatement<'_> {
   }
 }
 
-impl AddToGraph for Declaration {
+impl AddToGraph for Declaration<'_> {
   fn add_to_graph(&self, g: &mut AstGraph) -> NodeIndex {
     let index = self.count.map(|c| format!("[{}]", c)).unwrap_or_else(|| "".into());
     g.add_node(format!("{}{} {}", self.ty, index, self.identifier))
@@ -236,8 +236,10 @@ mod tests {
                   index_expression: None,
                   span: Span::new("", 0, 0).unwrap(),
                 }),
+                span: Span::new("", 0, 0).unwrap(),
               }),
               else_block: None,
+              span: Span::new("", 0, 0).unwrap(),
             })),
             Statement::Ret(ReturnStatement {
               expression: Some(Expression::Binary {
@@ -272,9 +274,12 @@ mod tests {
                 }),
                 span: Span::new("", 0, 0).unwrap(),
               }),
+              span: Span::new("", 0, 0).unwrap(),
             }),
           ],
+          span: Span::new("", 0, 0).unwrap(),
         },
+        span: Span::new("", 0, 0).unwrap(),
       }],
     };
 

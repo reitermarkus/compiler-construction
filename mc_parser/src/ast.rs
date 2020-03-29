@@ -346,6 +346,7 @@ pub struct Assignment<'a> {
   pub identifier: Identifier,
   pub index_expression: Option<Expression<'a>>,
   pub rvalue: Expression<'a>,
+  pub span: Span<'a>,
 }
 
 impl<'a> FromPest<'a> for Assignment<'a> {
@@ -353,7 +354,9 @@ impl<'a> FromPest<'a> for Assignment<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no assignment found").into_inner();
+    let pair = pairs.next().expect("no assignment found");
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
 
     let identifier = Identifier::from_pest(&mut inner)?;
 
@@ -365,25 +368,28 @@ impl<'a> FromPest<'a> for Assignment<'a> {
       _ => unreachable!(),
     };
 
-    Ok(Self { identifier, index_expression, rvalue })
+    Ok(Self { identifier, index_expression, rvalue, span })
   }
 }
 
 #[derive(PartialEq, Debug)]
-pub struct Declaration {
+pub struct Declaration<'a> {
   pub ty: Ty,
   pub count: Option<usize>,
   pub identifier: Identifier,
+  pub span: Span<'a>,
 }
 
-impl FromPest<'_> for Declaration {
+impl<'a> FromPest<'a> for Declaration<'a> {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no declaration found").into_inner();
+  fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let pair = pairs.next().expect("no declaration found");
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
 
-    let mut dec_type = inner.next().expect("no declaration type").into_inner();
+    let mut dec_type = inner.next().expect("no declaration type found").into_inner();
     let (ty, count) = match (dec_type.next(), dec_type.next()) {
       (Some(ty), Some(int)) => (Ty::from_pest(&mut Pairs::single(ty))?, Some(int.as_str().parse::<usize>().unwrap())),
       (Some(ty), None) => (Ty::from_pest(&mut Pairs::single(ty))?, None),
@@ -392,7 +398,7 @@ impl FromPest<'_> for Declaration {
 
     let identifier = Identifier::from_pest(&mut inner)?;
 
-    Ok(Self { ty, count, identifier })
+    Ok(Self { ty, count, identifier, span })
   }
 }
 
@@ -401,6 +407,7 @@ pub struct IfStatement<'a> {
   pub condition: Expression<'a>,
   pub block: Statement<'a>,
   pub else_block: Option<Statement<'a>>,
+  pub span: Span<'a>,
 }
 
 impl<'a> FromPest<'a> for IfStatement<'a> {
@@ -408,7 +415,9 @@ impl<'a> FromPest<'a> for IfStatement<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no if statement found").into_inner();
+    let pair = pairs.next().expect("no if statement found");
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
 
     Ok(Self {
       condition: Expression::from_pest(&mut inner)?,
@@ -417,6 +426,7 @@ impl<'a> FromPest<'a> for IfStatement<'a> {
         Some(statement) => Some(Statement::from_pest(&mut Pairs::single(statement))?),
         None => None,
       },
+      span
     })
   }
 }
@@ -425,6 +435,7 @@ impl<'a> FromPest<'a> for IfStatement<'a> {
 pub struct WhileStatement<'a> {
   pub condition: Expression<'a>,
   pub block: Statement<'a>,
+  pub span: Span<'a>,
 }
 
 impl<'a> FromPest<'a> for WhileStatement<'a> {
@@ -432,15 +443,18 @@ impl<'a> FromPest<'a> for WhileStatement<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no while statement found").into_inner();
+    let pair = pairs.next().expect("no while statement found");
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
 
-    Ok(Self { condition: Expression::from_pest(&mut inner)?, block: Statement::from_pest(&mut inner)? })
+    Ok(Self { condition: Expression::from_pest(&mut inner)?, block: Statement::from_pest(&mut inner)?, span })
   }
 }
 
 #[derive(PartialEq, Debug)]
 pub struct ReturnStatement<'a> {
   pub expression: Option<Expression<'a>>,
+  pub span: Span<'a>,
 }
 
 impl<'a> FromPest<'a> for ReturnStatement<'a> {
@@ -448,17 +462,20 @@ impl<'a> FromPest<'a> for ReturnStatement<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no return statement found").into_inner();
+    let pair = pairs.next().expect("no return statement found");
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
 
     let expression = if inner.peek().is_some() { Some(Expression::from_pest(&mut inner)?) } else { None };
 
-    Ok(Self { expression })
+    Ok(Self { expression, span })
   }
 }
 
 #[derive(PartialEq, Debug)]
 pub struct CompoundStatement<'a> {
   pub statements: Vec<Statement<'a>>,
+  pub span: Span<'a>,
 }
 
 impl<'a> FromPest<'a> for CompoundStatement<'a> {
@@ -466,13 +483,15 @@ impl<'a> FromPest<'a> for CompoundStatement<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let pair = pairs.next().expect("no compound statement found");
+    let span = pair.as_span();
+    
     Ok(Self {
-      statements: pairs
-        .next()
-        .expect("no compound statement found")
+      statements: pair
         .into_inner()
         .map(|stmt| Statement::from_pest(&mut Pairs::single(stmt)))
         .collect::<Result<Vec<_>, _>>()?,
+      span,
     })
   }
 }
@@ -482,7 +501,7 @@ pub enum Statement<'a> {
   If(Box<IfStatement<'a>>),
   While(Box<WhileStatement<'a>>),
   Ret(ReturnStatement<'a>),
-  Decl(Declaration),
+  Decl(Declaration<'a>),
   Assignment(Assignment<'a>),
   Expression(Expression<'a>),
   Compound(CompoundStatement<'a>),
@@ -514,6 +533,7 @@ pub struct FunctionDeclaration<'a> {
   pub identifier: Identifier,
   pub parameters: Vec<Parameter>,
   pub body: CompoundStatement<'a>,
+  pub span: Span<'a>
 }
 
 impl<'a> FromPest<'a> for FunctionDeclaration<'a> {
@@ -521,7 +541,9 @@ impl<'a> FromPest<'a> for FunctionDeclaration<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no function declaration found").into_inner();
+    let pair = pairs.next().expect("no function declaration found");
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
 
     let ty = if inner.peek().map(|p| p.as_rule()) == Some(Rule::ty) { Some(Ty::from_pest(&mut inner)?) } else { None };
 
@@ -536,7 +558,7 @@ impl<'a> FromPest<'a> for FunctionDeclaration<'a> {
 
     let body = CompoundStatement::from_pest(&mut inner)?;
 
-    Ok(Self { ty, identifier, parameters, body })
+    Ok(Self { ty, identifier, parameters, body, span })
   }
 }
 
@@ -643,6 +665,7 @@ mod tests {
           literal: Literal::Float(12.4),
           span: Span::new(&assignment_with_index, 14, 18).unwrap()
         },
+        span: Span::new(&assignment_with_index, 0, 18).unwrap(),
       }
     );
 
@@ -657,7 +680,8 @@ mod tests {
         rvalue: Expression::Literal {
           literal: Literal::Float(12.4),
           span: Span::new(&assignment_no_index, 9, 13).unwrap()
-        }
+        },
+        span: Span::new(&assignment_no_index, 0, 13).unwrap(),
       }
     )
   }
@@ -672,7 +696,8 @@ mod tests {
       Declaration {
         ty: Ty::Int,
         count: Some("5".to_string().parse::<usize>().unwrap()),
-        identifier: Identifier::from("numbers")
+        identifier: Identifier::from("numbers"),
+        span: Span::new(&declaration_with_index, 0, 14).unwrap(),
       }
     );
 
@@ -681,7 +706,7 @@ mod tests {
 
     assert_eq!(
       Declaration::from_pest(&mut pairs).unwrap(),
-      Declaration { ty: Ty::Float, count: None, identifier: Identifier::from("x") }
+      Declaration { ty: Ty::Float, count: None, identifier: Identifier::from("x"), span: Span::new(&declaration_no_index, 0, 7).unwrap() }
     )
   }
 
@@ -711,17 +736,22 @@ mod tests {
             identifier: Identifier::from("i"),
             index_expression: None,
             rvalue: Expression::Literal { literal: Literal::Int(1), span: Span::new(&if_stmt, 23, 24).unwrap() },
-          })]
+            span: Span::new(&if_stmt, 19, 24).unwrap(),
+          })],
+          span: Span::new(&if_stmt, 17, 27).unwrap(),
         }),
         else_block: Some(Statement::Compound(CompoundStatement {
           statements: vec![Statement::Ret(ReturnStatement {
             expression: Some(Expression::Variable {
               identifier: Identifier::from("i"),
               index_expression: None,
-              span: Span::new(&if_stmt, 42, 43).unwrap()
+              span: Span::new(&if_stmt, 42, 43).unwrap(),
             }),
-          })]
-        }))
+            span: Span::new(&if_stmt, 35, 44).unwrap(),
+          })],
+          span: Span::new(&if_stmt, 33, 46).unwrap(),
+        })),
+        span: Span::new(&if_stmt, 0, 46).unwrap(),
       }
     )
   }
@@ -737,7 +767,8 @@ mod tests {
         ty: Some(Ty::Int),
         identifier: Identifier::from("sum"),
         parameters: vec![Parameter { ty: Ty::Int, count: Some(16), identifier: Identifier::from("n") }],
-        body: CompoundStatement { statements: vec![] },
+        body: CompoundStatement { statements: vec![], span: Span::new(&if_stmt, 19, 22).unwrap() },
+        span: Span::new(&if_stmt, 0, 22).unwrap(),
       }
     )
   }
@@ -764,20 +795,22 @@ mod tests {
           condition: Expression::Variable {
             identifier: Identifier::from("c2"),
             index_expression: None,
-            span: Span::new(&dangling_else, 27, 29).unwrap()
+            span: Span::new(&dangling_else, 27, 29).unwrap(),
           },
           block: Statement::Expression(Expression::FunctionCall {
             identifier: Identifier::from("f2"),
             arguments: vec![],
-            span: Span::new(&dangling_else, 41, 45).unwrap()
+            span: Span::new(&dangling_else, 41, 45).unwrap(),
           }),
           else_block: Some(Statement::Expression(Expression::FunctionCall {
             identifier: Identifier::from("f3"),
             arguments: vec![],
-            span: Span::new(&dangling_else, 70, 74).unwrap()
+            span: Span::new(&dangling_else, 70, 74).unwrap(),
           })),
+          span: Span::new(&dangling_else, 23, 75).unwrap(),
         })),
         else_block: None,
+        span: Span::new(&dangling_else, 0, 80).unwrap(),
       }
     )
   }
