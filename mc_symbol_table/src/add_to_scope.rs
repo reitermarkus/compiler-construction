@@ -12,23 +12,31 @@ pub trait AddToScope {
 impl AddToScope for IfStatement<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let then_scope = Scope::new_child(scope, "if_then");
-    self.block.add_to_scope(&then_scope);
+    let mut res = self.block.add_to_scope(&then_scope);
 
     if let Some(statement) = &self.else_block {
       let else_scope = Scope::new_child(scope, "if_else");
-      statement.add_to_scope(&else_scope);
+
+      if let Err(err) = statement.add_to_scope(&else_scope) {
+        match res {
+          Ok(_) => {
+            res = Err(err);
+          }
+          Err(ref mut errors) => {
+            errors.extend(err);
+          }
+        }
+      }
     }
 
-    Ok(())
+    res
   }
 }
 
 impl AddToScope for WhileStatement<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let child_scope = Scope::new_child(scope, "while");
-    self.block.add_to_scope(&child_scope);
-
-    Ok(())
+    self.block.add_to_scope(&child_scope)
   }
 }
 
@@ -79,11 +87,22 @@ impl AddToScope for CompoundStatement<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let child_scope = Scope::new_child(scope, "block");
 
+    let mut res: Result<(), Vec<SemanticError<'_>>> = Ok(());
+
     for statement in self.statements.iter() {
-      statement.add_to_scope(&child_scope);
+      if let Err(err) = statement.add_to_scope(&child_scope) {
+        match res {
+          Ok(_) => {
+            res = Err(err);
+          }
+          Err(ref mut errors) => {
+            errors.extend(err);
+          }
+        }
+      }
     }
 
-    Ok(())
+    res
   }
 }
 
@@ -93,21 +112,31 @@ impl AddToScope for FunctionDeclaration<'_> {
       (*scope.borrow_mut()).insert(param.identifier.clone(), Symbol::Variable(param.ty.clone(), param.count));
     }
 
-    self.body.add_to_scope(scope);
-
-    Ok(())
+    self.body.add_to_scope(scope)
   }
 }
 
 impl AddToScope for Program<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    let mut res = Ok(());
+
     for function in &self.function_declarations {
       (*scope.borrow_mut()).insert(function.identifier.clone(), Symbol::Function(function.ty.clone()));
       let child_scope = Scope::new_child(scope, "function");
-      function.add_to_scope(&child_scope);
+
+      if let Err(err) = function.add_to_scope(&child_scope) {
+        match res {
+          Ok(_) => {
+            res = Err(err);
+          }
+          Err(ref mut errors) => {
+            errors.extend(err);
+          }
+        }
+      }
     }
 
-    Ok(())
+    res
   }
 }
 
@@ -160,7 +189,12 @@ mod tests {
               })),
               span: Span::new("", 0, 0).unwrap(),
             })),
-            Statement::Decl(Declaration { identifier: Identifier::from("y"), count: None, ty: Ty::String, span: Span::new("", 0, 0).unwrap() }),
+            Statement::Decl(Declaration {
+              identifier: Identifier::from("y"),
+              count: None,
+              ty: Ty::String,
+              span: Span::new("", 0, 0).unwrap(),
+            }),
           ],
           span: Span::new("", 0, 0).unwrap(),
         },
@@ -169,7 +203,7 @@ mod tests {
     };
 
     let scope = Scope::new();
-    ast.add_to_scope(&scope);
+    let _ = ast.add_to_scope(&scope);
 
     assert_eq!(
       Scope::lookup(&scope.borrow().children[0], &Identifier::from("n")),

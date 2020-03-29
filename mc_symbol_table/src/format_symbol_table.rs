@@ -53,7 +53,7 @@ mod tests {
     };
 
     let scope = Scope::new();
-    ast.add_to_scope(&scope);
+    let _ = ast.add_to_scope(&scope);
 
     let mut table = Table::new();
     scope.borrow().to_pretty_table(&mut table);

@@ -426,7 +426,7 @@ impl<'a> FromPest<'a> for IfStatement<'a> {
         Some(statement) => Some(Statement::from_pest(&mut Pairs::single(statement))?),
         None => None,
       },
-      span
+      span,
     })
   }
 }
@@ -485,7 +485,7 @@ impl<'a> FromPest<'a> for CompoundStatement<'a> {
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let pair = pairs.next().expect("no compound statement found");
     let span = pair.as_span();
-    
+
     Ok(Self {
       statements: pair
         .into_inner()
@@ -502,7 +502,7 @@ pub enum Statement<'a> {
   While(Box<WhileStatement<'a>>),
   Ret(ReturnStatement<'a>),
   Decl(Declaration<'a>),
-  Assignment(Assignment<'a>),
+  Assignment(Box<Assignment<'a>>),
   Expression(Expression<'a>),
   Compound(CompoundStatement<'a>),
 }
@@ -519,7 +519,7 @@ impl<'a> FromPest<'a> for Statement<'a> {
       Rule::while_stmt => Self::While(Box::new(WhileStatement::from_pest(&mut inner)?)),
       Rule::ret_stmt => Self::Ret(ReturnStatement::from_pest(&mut inner)?),
       Rule::declaration => Self::Decl(Declaration::from_pest(&mut inner)?),
-      Rule::assignment => Self::Assignment(Assignment::from_pest(&mut inner)?),
+      Rule::assignment => Self::Assignment(Box::new(Assignment::from_pest(&mut inner)?)),
       Rule::expression => Self::Expression(Expression::from_pest(&mut inner)?),
       Rule::compound_stmt => Self::Compound(CompoundStatement::from_pest(&mut inner)?),
       rule => return Err(ConversionError::Malformed(format!("unknown statement: {:?}", rule))),
@@ -533,7 +533,7 @@ pub struct FunctionDeclaration<'a> {
   pub identifier: Identifier,
   pub parameters: Vec<Parameter>,
   pub body: CompoundStatement<'a>,
-  pub span: Span<'a>
+  pub span: Span<'a>,
 }
 
 impl<'a> FromPest<'a> for FunctionDeclaration<'a> {
@@ -706,7 +706,12 @@ mod tests {
 
     assert_eq!(
       Declaration::from_pest(&mut pairs).unwrap(),
-      Declaration { ty: Ty::Float, count: None, identifier: Identifier::from("x"), span: Span::new(&declaration_no_index, 0, 7).unwrap() }
+      Declaration {
+        ty: Ty::Float,
+        count: None,
+        identifier: Identifier::from("x"),
+        span: Span::new(&declaration_no_index, 0, 7).unwrap()
+      }
     )
   }
 
@@ -732,12 +737,12 @@ mod tests {
           span: Span::new(&if_stmt, 4, 15).unwrap(),
         },
         block: Statement::Compound(CompoundStatement {
-          statements: vec![Statement::Assignment(Assignment {
+          statements: vec![Statement::Assignment(Box::new(Assignment {
             identifier: Identifier::from("i"),
             index_expression: None,
             rvalue: Expression::Literal { literal: Literal::Int(1), span: Span::new(&if_stmt, 23, 24).unwrap() },
             span: Span::new(&if_stmt, 19, 24).unwrap(),
-          })],
+          }))],
           span: Span::new(&if_stmt, 17, 27).unwrap(),
         }),
         else_block: Some(Statement::Compound(CompoundStatement {

@@ -30,7 +30,12 @@ pub fn mc_view_symbol_table(in_file: impl AsRef<Path>, mut out_stream: impl Writ
   let ast = mc_parser::parse(&contents).expect("failed to parse program");
 
   let scope = Scope::new();
-  ast.add_to_scope(&scope);
+
+  if let Err(errors) = ast.add_to_scope(&scope) {
+    for error in errors {
+      eprintln!("{}", error);
+    }
+  }
 
   let mut table = Table::new();
   scope.borrow().to_pretty_table(&mut table);
