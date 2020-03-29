@@ -12,30 +12,30 @@ use crate::*;
 pub enum SemanticError<'a> {
   #[allow(dead_code)]
   Type {
-    span: Span<'a>,
+    span: &'a Span<'a>,
     expected: Ty,
     actual: Ty,
   },
   NotDeclared {
-    span: Span<'a>,
+    span: &'a Span<'a>,
     identifier: Identifier,
   },
   IndexError {
-    span: Span<'a>,
+    span: &'a Span<'a>,
     identifier: Identifier,
   },
   IndexOutOfBound {
-    span: Span<'a>,
+    span: &'a Span<'a>,
     identifier: Identifier,
     size: usize,
     actual: usize,
   },
   WrongUseOfFunction {
-    span: Span<'a>,
+    span: &'a Span<'a>,
     identifier: Identifier,
   },
   UnaryOperatorTypeError {
-    span: Span<'a>,
+    span: &'a Span<'a>,
     op: &'a UnaryOp,
     ty: Ty,
   },
@@ -82,22 +82,20 @@ impl CheckSemantics for Expression<'_> {
       Self::Variable { identifier, span, index_expression } => {
         if let Some(var) = Scope::lookup(scope, identifier) {
           if let Symbol::Function(..) = var {
-            errors.push(SemanticError::WrongUseOfFunction { span: span.clone(), identifier: identifier.clone() });
-          } else {
-            if let Some(index) = index_expression {
-              match index.check_index_semantics(&var, identifier).err() {
-                Some(Some(e)) => {
-                  errors.push(e);
-                }
-                Some(None) => {
-                  errors.push(SemanticError::IndexError { span: span.clone(), identifier: identifier.clone() });
-                }
-                None => {}
+            errors.push(SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() });
+          } else if let Some(index) = index_expression {
+            match index.check_index_semantics(&var, identifier).err() {
+              Some(Some(e)) => {
+                errors.push(e);
               }
+              Some(None) => {
+                errors.push(SemanticError::IndexError { span, identifier: identifier.clone() });
+              }
+              None => {}
             }
           }
         } else {
-          errors.push(SemanticError::NotDeclared { span: span.clone(), identifier: identifier.clone() });
+          errors.push(SemanticError::NotDeclared { span, identifier: identifier.clone() });
         }
       }
       Self::Unary { op, expression, span } => {
@@ -111,16 +109,16 @@ impl CheckSemantics for Expression<'_> {
           Self::Literal { literal, .. } => match literal {
             Literal::Bool(_) => {
               if *op == UnaryOp::Minus {
-                errors.push(SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty: Ty::from(literal) });
+                errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty: Ty::from(literal) });
               }
             }
             Literal::Int(_) | Literal::Float(_) => {
               if *op == UnaryOp::Not {
-                errors.push(SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty: Ty::from(literal) });
+                errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty: Ty::from(literal) });
               }
             }
             Literal::String(_) => {
-              errors.push(SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty: Ty::from(literal) });
+              errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty: Ty::from(literal) });
             }
           },
           Self::Variable { identifier, index_expression, .. } => {
@@ -133,23 +131,23 @@ impl CheckSemantics for Expression<'_> {
                 match ty {
                   Ty::Bool => {
                     if *op == UnaryOp::Minus {
-                      errors.push(SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty });
+                      errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty });
                     }
                   }
                   Ty::Int | Ty::Float => {
                     if *op == UnaryOp::Not {
-                      errors.push(SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty });
+                      errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty });
                     }
                   }
                   Ty::String => {
-                    errors.push(SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty });
+                    errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty });
                   }
                 }
               } else {
-                errors.push(SemanticError::WrongUseOfFunction { span: span.clone(), identifier: identifier.clone() })
+                errors.push(SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() })
               }
             } else {
-              errors.push(SemanticError::NotDeclared { span: span.clone(), identifier: identifier.clone() });
+              errors.push(SemanticError::NotDeclared { span, identifier: identifier.clone() });
             }
           }
           _ => todo!(),
@@ -180,14 +178,14 @@ impl CheckIndexSemantics for Expression<'_> {
               Ok(())
             } else {
               Err(Some(SemanticError::IndexOutOfBound {
-                span: span.clone(),
+                span,
                 identifier: identifier.clone(),
-                size: size.clone(),
-                actual: index.clone() as usize,
+                size: *size,
+                actual: *index as usize,
               }))
             }
           } else {
-            Err(Some(SemanticError::IndexError { span: span.clone(), identifier: identifier.clone() }))
+            Err(Some(SemanticError::IndexError { span, identifier: identifier.clone() }))
           }
         }
         _ => Err(None),
@@ -226,7 +224,7 @@ mod test {
     let mut result = variable_without_index.check_semantics(&scope);
     let mut errors = result.expect_err("no errors found");
     assert!(errors.contains(&SemanticError::NotDeclared {
-      span: Span::new("x", 0, 1).unwrap(),
+      span: &Span::new("x", 0, 1).unwrap(),
       identifier: Identifier::from("x")
     }));
     assert_eq!(errors.len(), 1);
@@ -240,7 +238,7 @@ mod test {
     result = variable_with_index.check_semantics(&scope);
     errors = result.expect_err("no errors found");
     assert!(errors.contains(&SemanticError::IndexOutOfBound {
-      span: Span::new("x[10]", 2, 4).unwrap(),
+      span: &Span::new("x[10]", 2, 4).unwrap(),
       identifier: Identifier::from("x"),
       actual: 10,
       size: 5
@@ -252,7 +250,7 @@ mod test {
     result = variable_with_index.check_semantics(&scope);
     errors = result.expect_err("no errors found");
     assert!(errors.contains(&SemanticError::WrongUseOfFunction {
-      span: Span::new("x[10]", 0, 5).unwrap(),
+      span: &Span::new("x[10]", 0, 5).unwrap(),
       identifier: Identifier::from("x")
     }));
     assert_eq!(errors.len(), 1);
