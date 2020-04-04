@@ -80,18 +80,16 @@ impl CheckSemantics for Expression<'_> {
     match self {
       Self::Literal { .. } => {}
       Self::Variable { identifier, span, index_expression } => {
+        check_variable_declared(&mut errors, scope, identifier, span);
+
         if let Some(var) = Scope::lookup(scope, identifier) {
-          if let Symbol::Function(..) = var {
-            errors.push(SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() });
-          } else if let Some(index) = index_expression {
+          if let Some(index) = index_expression {
             match index.check_index_semantics(&var, identifier).err() {
               Some(Some(e)) => errors.push(e),
               Some(None) => errors.push(SemanticError::IndexError { span, identifier: identifier.clone() }),
               None => {}
             }
           }
-        } else {
-          errors.push(SemanticError::NotDeclared { span, identifier: identifier.clone() });
         }
       }
       Self::Unary { op, expression, span } => {
@@ -241,6 +239,5 @@ mod test {
       span: &Span::new("x[10]", 0, 5).unwrap(),
       identifier: Identifier::from("x")
     }));
-    assert_eq!(errors.len(), 1);
   }
 }

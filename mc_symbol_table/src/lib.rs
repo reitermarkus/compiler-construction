@@ -18,6 +18,9 @@ use add_to_scope::AddToScope;
 mod semantic_error;
 use semantic_error::SemanticError;
 
+mod semantic_checks;
+use semantic_checks::*;
+
 pub fn mc_view_symbol_table(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::Result<()> {
   let mut contents = String::new();
 
