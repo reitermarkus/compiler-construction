@@ -20,11 +20,11 @@ pub enum SemanticError<'a> {
     span: &'a Span<'a>,
     identifier: Identifier,
   },
-  IndexError {
+  ArrayError {
     span: &'a Span<'a>,
     identifier: Identifier,
   },
-  IndexOutOfBound {
+  IndexOutOfBounds {
     span: &'a Span<'a>,
     identifier: Identifier,
     size: usize,
@@ -57,8 +57,8 @@ impl fmt::Display for SemanticError<'_> {
       Self::NotDeclared { span, identifier } => {
         write_err!(f, span, "variable '{}' not declared in this scope", identifier)
       }
-      Self::IndexError { span, identifier } => write_err!(f, span, "wrong index expression for '{}'", identifier),
-      Self::IndexOutOfBound { span, identifier, size, actual } => {
+      Self::ArrayError { span, identifier } => write_err!(f, span, "variable '{}' is not an array", identifier),
+      Self::IndexOutOfBounds { span, identifier, size, actual } => {
         write_err!(f, span, "index {} out of bound for '{}' with size {}", actual, identifier, size)
       }
       Self::WrongUseOfFunction { span, identifier } => write_err!(f, span, "wrong use of function '{}'", identifier),
@@ -80,16 +80,8 @@ impl CheckSemantics for Expression<'_> {
     match self {
       Self::Literal { .. } => {}
       Self::Variable { identifier, span, index_expression } => {
-        check_variable_declared(&mut errors, scope, identifier, span);
-
-        if let Some(var) = Scope::lookup(scope, identifier) {
-          if let Some(index) = index_expression {
-            match index.check_index_semantics(&var, identifier).err() {
-              Some(Some(e)) => errors.push(e),
-              Some(None) => errors.push(SemanticError::IndexError { span, identifier: identifier.clone() }),
-              None => {}
-            }
-          }
+        if let Some(error) = check_variable(scope, identifier, span, index_expression) {
+          errors.push(error);
         }
       }
       Self::Unary { op, expression, span } => {
@@ -150,38 +142,6 @@ impl CheckSemantics for Expression<'_> {
   }
 }
 
-trait CheckIndexSemantics {
-  fn check_index_semantics(&self, symbol: &Symbol, identifier: &Identifier) -> Result<(), Option<SemanticError<'_>>>;
-}
-
-impl CheckIndexSemantics for Expression<'_> {
-  fn check_index_semantics(&self, symbol: &Symbol, identifier: &Identifier) -> Result<(), Option<SemanticError<'_>>> {
-    if let Symbol::Variable(.., Some(size)) = symbol {
-      match self {
-        Self::Literal { literal, span } => {
-          if let Literal::Int(index) = literal {
-            if *index < *size as i64 {
-              Ok(())
-            } else {
-              Err(Some(SemanticError::IndexOutOfBound {
-                span,
-                identifier: identifier.clone(),
-                size: *size,
-                actual: *index as usize,
-              }))
-            }
-          } else {
-            Err(Some(SemanticError::IndexError { span, identifier: identifier.clone() }))
-          }
-        }
-        _ => Err(None),
-      }
-    } else {
-      Err(None)
-    }
-  }
-}
-
 #[cfg(test)]
 mod test {
   use pest::Span;
@@ -223,7 +183,7 @@ mod test {
     scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Variable(Ty::Int, Some(5)));
     result = variable_with_index.check_semantics(&scope);
     errors = result.expect_err("no errors found");
-    assert!(errors.contains(&SemanticError::IndexOutOfBound {
+    assert!(errors.contains(&SemanticError::IndexOutOfBounds {
       span: &Span::new("x[10]", 2, 4).unwrap(),
       identifier: Identifier::from("x"),
       actual: 10,
@@ -239,5 +199,6 @@ mod test {
       span: &Span::new("x[10]", 0, 5).unwrap(),
       identifier: Identifier::from("x")
     }));
+    assert_eq!(errors.len(), 1);
   }
 }
