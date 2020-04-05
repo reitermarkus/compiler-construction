@@ -43,6 +43,11 @@ pub enum SemanticError<'a> {
     op: &'a UnaryOp,
     ty: Ty,
   },
+  UnaryOperatorCombinationError {
+    span: &'a Span<'a>,
+    outer: &'a UnaryOp,
+    inner: &'a UnaryOp,
+  },
   ReturnTypeExpectet {
     span: &'a Span<'a>,
     identifier: Identifier,
@@ -74,6 +79,9 @@ impl fmt::Display for SemanticError<'_> {
       Self::UnaryOperatorTypeError { span, op, ty } => {
         write_err!(f, span, "operator '{}' cannot be used with type '{}'", op, ty)
       }
+      Self::UnaryOperatorCombinationError { span, outer, inner } => {
+        write_err!(f, span, "operator '{}' cannot be combined with operator '{}'", inner, outer)
+      }
       Self::ReturnTypeExpectet { span, identifier } => {
         write_err!(f, span, "expected return type for function '{}'", identifier)
       }
@@ -96,11 +104,7 @@ impl CheckSemantics for Expression<'_> {
           errors.push(error);
         }
       }
-      Self::Unary { op, expression, span } => {
-        if let Some(error) = check_unary_expression(scope, op, expression, span) {
-          errors.push(error)
-        }
-      }
+      Self::Unary { op, expression, span } => errors.extend(check_unary_expression(scope, op, expression, span)),
       _ => todo!(),
     };
 

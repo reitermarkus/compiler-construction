@@ -102,17 +102,37 @@ pub fn check_unary_expression<'a>(
   op: &'a UnaryOp,
   expression: &'a Box<Expression<'a>>,
   span: &'a Span<'_>,
-) -> Option<SemanticError<'a>> {
+) -> Vec<SemanticError<'a>> {
+  let mut errors = Vec::new();
+
   match &**expression {
-    Expression::Literal { literal, .. } => check_unary_operator_compatability(op, Ty::from(literal), span),
+    Expression::Literal { literal, .. } => {
+      if let Some(error) = check_unary_operator_compatability(op, Ty::from(literal), span) {
+        errors.push(error)
+      }
+    }
     Expression::Variable { identifier, index_expression, .. } => {
-      check_variable_for_unary_operator(scope, identifier, span, index_expression, op)
+      if let Some(error) = check_variable_for_unary_operator(scope, identifier, span, index_expression, op) {
+        errors.push(error)
+      }
     }
     Expression::FunctionCall { identifier, arguments, .. } => {
-      check_function_call_for_unary_operator(scope, identifier, span, arguments, op)
+      if let Some(error) = check_function_call_for_unary_operator(scope, identifier, span, arguments, op) {
+        errors.push(error)
+      }
     }
-    _ => None,
+    Expression::Unary { op: inner_op, .. } => {
+      if let Err(exp_errors) = expression.check_semantics(scope) {
+        errors.extend(exp_errors)
+      }
+      if let Some(error) = check_unary_operator_combination(inner_op, op, span) {
+        errors.push(error)
+      }
+    }
+    _ => {}
   }
+
+  errors
 }
 
 pub fn check_unary_operator_compatability<'a>(
@@ -124,6 +144,22 @@ pub fn check_unary_operator_compatability<'a>(
     Ty::Bool if *op == UnaryOp::Minus => Some(SemanticError::UnaryOperatorTypeError { span, op, ty }),
     Ty::Int | Ty::Float if *op == UnaryOp::Not => Some(SemanticError::UnaryOperatorTypeError { span, op, ty }),
     Ty::String => Some(SemanticError::UnaryOperatorTypeError { span, op, ty }),
+    _ => None,
+  }
+}
+
+pub fn check_unary_operator_combination<'a>(
+  inner: &'a UnaryOp,
+  outer: &'a UnaryOp,
+  span: &'a Span<'_>,
+) -> Option<SemanticError<'a>> {
+  match outer {
+    UnaryOp::Not if *inner == UnaryOp::Minus => {
+      Some(SemanticError::UnaryOperatorCombinationError { span, inner, outer })
+    }
+    UnaryOp::Minus if *inner == UnaryOp::Not => {
+      Some(SemanticError::UnaryOperatorCombinationError { span, inner, outer })
+    }
     _ => None,
   }
 }

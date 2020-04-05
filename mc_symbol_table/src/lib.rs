@@ -16,7 +16,7 @@ mod add_to_scope;
 use add_to_scope::AddToScope;
 
 mod semantic_error;
-use semantic_error::SemanticError;
+use semantic_error::{CheckSemantics, SemanticError};
 
 mod semantic_checks;
 use semantic_checks::*;
