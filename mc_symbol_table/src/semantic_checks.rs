@@ -20,6 +20,26 @@ pub fn check_variable<'a>(
   }
 }
 
+pub fn check_variable_for_unary_operator<'a>(
+  scope: &Rc<RefCell<Scope>>,
+  identifier: &Identifier,
+  span: &'a Span<'_>,
+  index_expression: &'a Option<Box<Expression<'a>>>,
+  op: &'a UnaryOp,
+) -> Option<SemanticError<'a>> {
+  match Scope::lookup(scope, identifier) {
+    Some(Symbol::Function(..)) => Some(SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() }),
+    Some(Symbol::Variable(ty, size)) => {
+      if let Some(error) = check_variable_index(identifier, span, size, index_expression) {
+        Some(error)
+      } else {
+        check_unary_operator_compatability(op, ty, span)
+      }
+    }
+    None => Some(SemanticError::NotDeclared { span, identifier: identifier.clone() }),
+  }
+}
+
 pub fn check_variable_index<'a>(
   identifier: &Identifier,
   span: &'a Span<'_>,
@@ -42,6 +62,68 @@ pub fn check_variable_index<'a>(
       None
     }
     (None, Some(_)) => Some(SemanticError::ArrayError { span, identifier: identifier.clone() }),
+    _ => None,
+  }
+}
+
+pub fn check_function_call_for_unary_operator<'a>(
+  scope: &Rc<RefCell<Scope>>,
+  identifier: &Identifier,
+  span: &'a Span<'_>,
+  arguments: &'a Vec<Expression<'a>>,
+  op: &'a UnaryOp,
+) -> Option<SemanticError<'a>> {
+  match Scope::lookup(scope, identifier) {
+    Some(Symbol::Function(Some(ty))) => {
+      if let Some(error) = check_function_call_arguments(scope, identifier, span, arguments) {
+        Some(error)
+      } else {
+        check_unary_operator_compatability(op, ty, span)
+      }
+    }
+    Some(Symbol::Function(None)) => Some(SemanticError::ReturnTypeExpectet { span, identifier: identifier.clone() }),
+    Some(Symbol::Variable(..)) => Some(SemanticError::NotAFunction { span, identifier: identifier.clone() }),
+    None => Some(SemanticError::NotDeclared { span, identifier: identifier.clone() }),
+  }
+}
+
+#[allow(unused_variables)]
+pub fn check_function_call_arguments<'a>(
+  scope: &Rc<RefCell<Scope>>,
+  identifier: &Identifier,
+  span: &'a Span<'_>,
+  arguments: &'a Vec<Expression<'a>>,
+) -> Option<SemanticError<'a>> {
+  todo!()
+}
+
+pub fn check_unary_expression<'a>(
+  scope: &Rc<RefCell<Scope>>,
+  op: &'a UnaryOp,
+  expression: &'a Box<Expression<'a>>,
+  span: &'a Span<'_>,
+) -> Option<SemanticError<'a>> {
+  match &**expression {
+    Expression::Literal { literal, .. } => check_unary_operator_compatability(op, Ty::from(literal), span),
+    Expression::Variable { identifier, index_expression, .. } => {
+      check_variable_for_unary_operator(scope, identifier, span, index_expression, op)
+    }
+    Expression::FunctionCall { identifier, arguments, .. } => {
+      check_function_call_for_unary_operator(scope, identifier, span, arguments, op)
+    }
+    _ => None,
+  }
+}
+
+pub fn check_unary_operator_compatability<'a>(
+  op: &'a UnaryOp,
+  ty: Ty,
+  span: &'a Span<'_>,
+) -> Option<SemanticError<'a>> {
+  match ty {
+    Ty::Bool if *op == UnaryOp::Minus => Some(SemanticError::UnaryOperatorTypeError { span, op, ty }),
+    Ty::Int | Ty::Float if *op == UnaryOp::Not => Some(SemanticError::UnaryOperatorTypeError { span, op, ty }),
+    Ty::String => Some(SemanticError::UnaryOperatorTypeError { span, op, ty }),
     _ => None,
   }
 }

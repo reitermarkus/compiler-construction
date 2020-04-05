@@ -34,10 +34,18 @@ pub enum SemanticError<'a> {
     span: &'a Span<'a>,
     identifier: Identifier,
   },
+  NotAFunction {
+    span: &'a Span<'a>,
+    identifier: Identifier,
+  },
   UnaryOperatorTypeError {
     span: &'a Span<'a>,
     op: &'a UnaryOp,
     ty: Ty,
+  },
+  ReturnTypeExpectet {
+    span: &'a Span<'a>,
+    identifier: Identifier,
   },
 }
 
@@ -62,8 +70,12 @@ impl fmt::Display for SemanticError<'_> {
         write_err!(f, span, "index {} out of bound for '{}' with size {}", actual, identifier, size)
       }
       Self::WrongUseOfFunction { span, identifier } => write_err!(f, span, "wrong use of function '{}'", identifier),
+      Self::NotAFunction { span, identifier } => write_err!(f, span, "'{}' is not a function", identifier),
       Self::UnaryOperatorTypeError { span, op, ty } => {
         write_err!(f, span, "operator '{}' cannot be used with type '{}'", op, ty)
+      }
+      Self::ReturnTypeExpectet { span, identifier } => {
+        write_err!(f, span, "expected return type for function '{}'", identifier)
       }
     }
   }
@@ -85,50 +97,8 @@ impl CheckSemantics for Expression<'_> {
         }
       }
       Self::Unary { op, expression, span } => {
-        // check semantics of expression
-        let res = expression.check_semantics(scope);
-        if let Err(err) = res {
-          errors.extend(err);
-        }
-
-        match &**expression {
-          Self::Literal { literal, .. } => match literal {
-            Literal::Bool(_) if *op == UnaryOp::Minus => {
-              errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty: Ty::from(literal) })
-            }
-            Literal::Int(_) | Literal::Float(_) if *op == UnaryOp::Not => {
-              errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty: Ty::from(literal) })
-            }
-            Literal::String(_) => {
-              errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty: Ty::from(literal) })
-            }
-            _ => (),
-          },
-          Self::Variable { identifier, index_expression, .. } => {
-            if let Some(symbol) = Scope::lookup(scope, identifier) {
-              if let Symbol::Variable(ty, size) = symbol {
-                if size.is_some() != index_expression.is_some() {
-                  // yield error
-                }
-
-                match ty {
-                  Ty::Bool if *op == UnaryOp::Minus => {
-                    errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty })
-                  }
-                  Ty::Int | Ty::Float if *op == UnaryOp::Not => {
-                    errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty })
-                  }
-                  Ty::String => errors.push(SemanticError::UnaryOperatorTypeError { span, op, ty }),
-                  _ => (),
-                }
-              } else {
-                errors.push(SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() })
-              }
-            } else {
-              errors.push(SemanticError::NotDeclared { span, identifier: identifier.clone() });
-            }
-          }
-          _ => todo!(),
+        if let Some(error) = check_unary_expression(scope, op, expression, span) {
+          errors.push(error)
         }
       }
       _ => todo!(),
