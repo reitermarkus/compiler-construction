@@ -83,7 +83,7 @@ impl Scope {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Symbol {
-  Function(Option<Ty>),
+  Function(Option<Ty>, Vec<(Ty, Option<usize>)>),
   Variable(Ty, Option<usize>),
 }
 
@@ -92,8 +92,16 @@ impl fmt::Display for Symbol {
     use Symbol::*;
 
     match self {
-      Function(ty) => {
-        write!(f, "function")?;
+      Function(ty, args) => {
+        write!(f, "function (")?;
+
+        for (ty, index) in args {
+          write!(f, " {}", ty)?;
+          if let Some(i) = index {
+            write!(f, "[{}]", i)?;
+          }
+        }
+        write!(f, " )")?;
 
         if let Some(ty) = ty {
           write!(f, " -> {}", ty)?;
@@ -140,11 +148,11 @@ mod tests {
     let root_scope = Scope::new();
 
     let fib_id = Identifier::from("fib");
-    let fib_symbol = Symbol::Function(Some(Ty::Int));
+    let fib_symbol = Symbol::Function(Some(Ty::Int), Vec::new());
     Scope::insert(&mut root_scope.borrow_mut(), fib_id.clone(), fib_symbol.clone());
 
     let main_id = Identifier::from("main");
-    let main_symbol = Symbol::Function(None);
+    let main_symbol = Symbol::Function(None, Vec::new());
     Scope::insert(&mut root_scope.borrow_mut(), main_id.clone(), main_symbol.clone());
 
     let function_scope = Scope::new_child(&root_scope, "function");

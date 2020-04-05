@@ -121,7 +121,13 @@ impl AddToScope for Program<'_> {
     let mut res = Ok(());
 
     for function in &self.function_declarations {
-      (*scope.borrow_mut()).insert(function.identifier.clone(), Symbol::Function(function.ty.clone()));
+      (*scope.borrow_mut()).insert(
+        function.identifier.clone(),
+        Symbol::Function(
+          function.ty.clone(),
+          function.parameters.iter().map(|p| (p.ty.clone(), p.count.clone())).collect::<Vec<(Ty, Option<usize>)>>(),
+        ),
+      );
       let child_scope = Scope::new_child(scope, "function");
 
       if let Err(err) = function.add_to_scope(&child_scope) {

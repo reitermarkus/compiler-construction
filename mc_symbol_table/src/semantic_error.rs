@@ -166,7 +166,7 @@ mod test {
     assert_eq!(errors.len(), 1);
 
     scope = Scope::new();
-    scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Function(Some(Ty::Int)));
+    scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Function(Some(Ty::Int), Vec::new()));
     result = variable_with_index.check_semantics(&scope);
     errors = result.expect_err("no errors found");
     assert!(errors.contains(&SemanticError::WrongUseOfFunction {

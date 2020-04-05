@@ -74,14 +74,16 @@ pub fn check_function_call_for_unary_operator<'a>(
   op: &'a UnaryOp,
 ) -> Option<SemanticError<'a>> {
   match Scope::lookup(scope, identifier) {
-    Some(Symbol::Function(Some(ty))) => {
+    Some(Symbol::Function(Some(ty), ..)) => {
       if let Some(error) = check_function_call_arguments(scope, identifier, span, arguments) {
         Some(error)
       } else {
         check_unary_operator_compatability(op, ty, span)
       }
     }
-    Some(Symbol::Function(None)) => Some(SemanticError::ReturnTypeExpectet { span, identifier: identifier.clone() }),
+    Some(Symbol::Function(None, ..)) => {
+      Some(SemanticError::ReturnTypeExpectet { span, identifier: identifier.clone() })
+    }
     Some(Symbol::Variable(..)) => Some(SemanticError::NotAFunction { span, identifier: identifier.clone() }),
     None => Some(SemanticError::NotDeclared { span, identifier: identifier.clone() }),
   }
