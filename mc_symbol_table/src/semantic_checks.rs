@@ -70,7 +70,7 @@ pub fn check_function_call_for_unary_operator<'a>(
   scope: &Rc<RefCell<Scope>>,
   identifier: &Identifier,
   span: &'a Span<'_>,
-  arguments: &'a Vec<Expression<'a>>,
+  arguments: &[Expression<'a>],
   op: &'a UnaryOp,
 ) -> Option<SemanticError<'a>> {
   match Scope::lookup(scope, identifier) {
@@ -94,12 +94,12 @@ pub fn check_function_call_arguments<'a>(
   scope: &Rc<RefCell<Scope>>,
   identifier: &Identifier,
   span: &'a Span<'_>,
-  arguments: &'a Vec<Expression<'a>>,
+  arguments: &[Expression<'a>],
 ) -> Option<SemanticError<'a>> {
   if let Some(Symbol::Function(_, args)) = Scope::lookup(scope, identifier) {
     if args.len() != arguments.len() {
       return Some(SemanticError::InvalidAmountOfArguemnts {
-        span: span,
+        span,
         identifier: identifier.clone(),
         expected: args.len(),
         actual: arguments.len(),
@@ -113,12 +113,12 @@ pub fn check_function_call_arguments<'a>(
 pub fn check_unary_expression<'a>(
   scope: &Rc<RefCell<Scope>>,
   op: &'a UnaryOp,
-  expression: &'a Box<Expression<'a>>,
+  expression: &'a Expression<'a>,
   span: &'a Span<'_>,
 ) -> Vec<SemanticError<'a>> {
   let mut errors = Vec::new();
 
-  match &**expression {
+  match expression {
     Expression::Literal { literal, .. } => {
       if let Some(error) = check_unary_operator_compatability(op, Ty::from(literal), span) {
         errors.push(error)

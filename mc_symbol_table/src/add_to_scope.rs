@@ -125,7 +125,7 @@ impl AddToScope for Program<'_> {
         function.identifier.clone(),
         Symbol::Function(
           function.ty.clone(),
-          function.parameters.iter().map(|p| (p.ty.clone(), p.count.clone())).collect::<Vec<(Ty, Option<usize>)>>(),
+          function.parameters.iter().map(|p| (p.ty.clone(), p.count)).collect::<Vec<(Ty, Option<usize>)>>(),
         ),
       );
       let child_scope = Scope::new_child(scope, "function");
