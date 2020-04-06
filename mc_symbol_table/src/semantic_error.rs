@@ -52,7 +52,7 @@ pub enum SemanticError<'a> {
     span: &'a Span<'a>,
     identifier: Identifier,
   },
-  InvalidAmountOfArguemnts {
+  InvalidAmountOfArguments {
     span: &'a Span<'a>,
     identifier: Identifier,
     expected: usize,
@@ -88,7 +88,7 @@ impl fmt::Display for SemanticError<'_> {
       }
       Self::WrongUseOfFunction { span, identifier } => write_err!(f, span, "wrong use of function '{}'", identifier),
       Self::NotAFunction { span, identifier } => write_err!(f, span, "'{}' is not a function", identifier),
-      Self::InvalidAmountOfArguemnts { span, identifier, expected, actual } => write_err!(
+      Self::InvalidAmountOfArguments { span, identifier, expected, actual } => write_err!(
         f,
         span,
         "Invalid amount of arguemnts in fucntion '{}': expected '{}' arguments, found '{}' arguments",
@@ -171,7 +171,7 @@ mod test {
     let result = function_call.check_semantics(&scope);
     let errors = result.expect_err("no errors found");
 
-    assert!(errors.contains(&SemanticError::InvalidAmountOfArguemnts {
+    assert!(errors.contains(&SemanticError::InvalidAmountOfArguments {
       span: &Span::new(&expr, 0, 11).unwrap(),
       identifier: Identifier::from("pi"),
       expected: 3,

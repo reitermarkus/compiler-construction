@@ -111,7 +111,7 @@ pub fn check_function_call_arguments<'a>(
 ) -> Option<SemanticError<'a>> {
   if let Some(Symbol::Function(_, args)) = Scope::lookup(scope, identifier) {
     if args.len() != arguments.len() {
-      return Some(SemanticError::InvalidAmountOfArguemnts {
+      return Some(SemanticError::InvalidAmountOfArguments {
         span,
         identifier: identifier.clone(),
         expected: args.len(),
