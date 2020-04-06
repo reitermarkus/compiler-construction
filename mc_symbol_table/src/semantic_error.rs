@@ -48,7 +48,7 @@ pub enum SemanticError<'a> {
     outer: &'a UnaryOp,
     inner: &'a UnaryOp,
   },
-  ReturnTypeExpectet {
+  ReturnTypeExpected {
     span: &'a Span<'a>,
     identifier: Identifier,
   },
@@ -82,7 +82,7 @@ impl fmt::Display for SemanticError<'_> {
       Self::UnaryOperatorCombinationError { span, outer, inner } => {
         write_err!(f, span, "operator '{}' cannot be combined with operator '{}'", inner, outer)
       }
-      Self::ReturnTypeExpectet { span, identifier } => {
+      Self::ReturnTypeExpected { span, identifier } => {
         write_err!(f, span, "expected return type for function '{}'", identifier)
       }
     }

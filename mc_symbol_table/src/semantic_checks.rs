@@ -82,7 +82,7 @@ pub fn check_function_call_for_unary_operator<'a>(
       }
     }
     Some(Symbol::Function(None, ..)) => {
-      Some(SemanticError::ReturnTypeExpectet { span, identifier: identifier.clone() })
+      Some(SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
     }
     Some(Symbol::Variable(..)) => Some(SemanticError::NotAFunction { span, identifier: identifier.clone() }),
     None => Some(SemanticError::NotDeclared { span, identifier: identifier.clone() }),
