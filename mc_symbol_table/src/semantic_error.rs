@@ -52,6 +52,12 @@ pub enum SemanticError<'a> {
     span: &'a Span<'a>,
     identifier: Identifier,
   },
+  InvalidAmountOfArguemnts {
+    span: &'a Span<'a>,
+    identifier: Identifier,
+    expected: usize,
+    actual: usize,
+  },
 }
 
 macro_rules! write_err {
@@ -76,6 +82,14 @@ impl fmt::Display for SemanticError<'_> {
       }
       Self::WrongUseOfFunction { span, identifier } => write_err!(f, span, "wrong use of function '{}'", identifier),
       Self::NotAFunction { span, identifier } => write_err!(f, span, "'{}' is not a function", identifier),
+      Self::InvalidAmountOfArguemnts { span, identifier, expected, actual } => write_err!(
+        f,
+        span,
+        "Invalid amount of arguemnts in fucntion '{}': expected '{}' arguments, found '{}' arguments",
+        identifier,
+        expected,
+        actual
+      ),
       Self::UnaryOperatorTypeError { span, op, ty } => {
         write_err!(f, span, "operator '{}' cannot be used with type '{}'", op, ty)
       }
@@ -105,6 +119,11 @@ impl CheckSemantics for Expression<'_> {
         }
       }
       Self::Unary { op, expression, span } => errors.extend(check_unary_expression(scope, op, expression, span)),
+      Self::FunctionCall { identifier, arguments, span } => {
+        if let Some(error) = check_function_call_arguments(scope, identifier, span, arguments) {
+          errors.push(error);
+        }
+      }
       _ => todo!(),
     };
 
@@ -121,6 +140,37 @@ mod test {
   use pest::Span;
 
   use super::*;
+  #[test]
+  fn semantic_expression_funcion_call_check() {
+    let expr = "pi(true, 5)";
+    let function_call = Expression::FunctionCall {
+      identifier: Identifier::from("pi"),
+      arguments: vec![
+        Expression::Literal { literal: Literal::Bool(true), span: Span::new(&expr, 3, 7).unwrap() },
+        Expression::Literal { literal: Literal::Int(5), span: Span::new(&expr, 9, 10).unwrap() },
+      ],
+      span: Span::new(&expr, 0, 11).unwrap(),
+    };
+
+    let scope = Scope::new();
+
+    scope.borrow_mut().symbols.insert(
+      Identifier::from("pi"),
+      Symbol::Function(Some(Ty::Int), vec![(Ty::Bool, None), (Ty::Int, None), (Ty::Int, None)]),
+    );
+
+    let result = function_call.check_semantics(&scope);
+    let errors = result.expect_err("no errors found");
+
+    assert!(errors.contains(&SemanticError::InvalidAmountOfArguemnts {
+      span: &Span::new(&expr, 0, 11).unwrap(),
+      identifier: Identifier::from("pi"),
+      expected: 3,
+      actual: 2
+    }));
+
+    assert_eq!(errors.len(), 1);
+  }
 
   #[test]
   fn semantic_expression_variable_check() {

@@ -96,7 +96,18 @@ pub fn check_function_call_arguments<'a>(
   span: &'a Span<'_>,
   arguments: &'a Vec<Expression<'a>>,
 ) -> Option<SemanticError<'a>> {
-  todo!()
+  if let Some(Symbol::Function(_, args)) = Scope::lookup(scope, identifier) {
+    if args.len() != arguments.len() {
+      return Some(SemanticError::InvalidAmountOfArguemnts {
+        span: span,
+        identifier: identifier.clone(),
+        expected: args.len(),
+        actual: arguments.len(),
+      });
+    }
+  }
+
+  None
 }
 
 pub fn check_unary_expression<'a>(
