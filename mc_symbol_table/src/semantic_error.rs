@@ -58,6 +58,12 @@ pub enum SemanticError<'a> {
     expected: usize,
     actual: usize,
   },
+  InvalidArgumentType {
+    span: &'a Span<'a>,
+    identifier: Identifier,
+    expected: Ty,
+    actual: Ty,
+  },
 }
 
 macro_rules! write_err {
@@ -90,6 +96,9 @@ impl fmt::Display for SemanticError<'_> {
         expected,
         actual
       ),
+      Self::InvalidArgumentType { span, identifier, expected, actual } => {
+        write_err!(f, span, "function '{}' expected argument of type {}, found {}", identifier, expected, actual)
+      }
       Self::UnaryOperatorTypeError { span, op, ty } => {
         write_err!(f, span, "operator '{}' cannot be used with type '{}'", op, ty)
       }

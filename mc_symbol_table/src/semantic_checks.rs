@@ -66,11 +66,24 @@ pub fn check_variable_index<'a>(
   }
 }
 
+pub fn check_function_call<'a>(
+  scope: &Rc<RefCell<Scope>>,
+  identifier: &Identifier,
+  span: &'a Span<'_>,
+  arguments: &'a [Expression<'a>],
+) -> Option<SemanticError<'a>> {
+  match Scope::lookup(scope, identifier) {
+    Some(Symbol::Function(..)) => check_function_call_arguments(scope, identifier, span, arguments),
+    Some(Symbol::Variable(..)) => Some(SemanticError::NotAFunction { span, identifier: identifier.clone() }),
+    None => Some(SemanticError::NotDeclared { span, identifier: identifier.clone() }),
+  }
+}
+
 pub fn check_function_call_for_unary_operator<'a>(
   scope: &Rc<RefCell<Scope>>,
   identifier: &Identifier,
   span: &'a Span<'_>,
-  arguments: &[Expression<'a>],
+  arguments: &'a [Expression<'a>],
   op: &'a UnaryOp,
 ) -> Option<SemanticError<'a>> {
   match Scope::lookup(scope, identifier) {
@@ -94,7 +107,7 @@ pub fn check_function_call_arguments<'a>(
   scope: &Rc<RefCell<Scope>>,
   identifier: &Identifier,
   span: &'a Span<'_>,
-  arguments: &[Expression<'a>],
+  arguments: &'a [Expression<'a>],
 ) -> Option<SemanticError<'a>> {
   if let Some(Symbol::Function(_, args)) = Scope::lookup(scope, identifier) {
     if args.len() != arguments.len() {
@@ -105,9 +118,80 @@ pub fn check_function_call_arguments<'a>(
         actual: arguments.len(),
       });
     }
+
+    return args
+      .iter()
+      .enumerate()
+      .map(|(i, arg)| {
+        if let Some(argument) = arguments.get(i) {
+          check_function_call_argument_type(scope, arg, &argument, identifier, span)
+        } else {
+          None
+        }
+      })
+      .filter(|err| err.is_some())
+      .collect::<Vec<Option<SemanticError<'a>>>>()
+      .remove(0);
   }
 
   None
+}
+
+pub fn check_function_call_argument_type<'a>(
+  scope: &Rc<RefCell<Scope>>,
+  symbol_arg: &(Ty, Option<usize>),
+  arg_expression: &'a Expression<'a>,
+  identifier: &Identifier,
+  span: &'a Span<'_>,
+) -> Option<SemanticError<'a>> {
+  match arg_expression {
+    Expression::Literal { literal, .. } => {
+      if symbol_arg.0 != Ty::from(literal) {
+        Some(SemanticError::InvalidArgumentType {
+          span,
+          identifier: identifier.clone(),
+          expected: symbol_arg.0.clone(),
+          actual: Ty::from(literal),
+        })
+      } else {
+        None
+      }
+    }
+    Expression::Variable { identifier, index_expression, .. } => {
+      if let Some(error) = check_variable(scope, identifier, span, index_expression) {
+        return Some(error);
+      } else if let Some(Symbol::Variable(ty, ..)) = Scope::lookup(scope, identifier) {
+        if ty != symbol_arg.0 {
+          return Some(SemanticError::InvalidArgumentType {
+            span,
+            identifier: identifier.clone(),
+            expected: symbol_arg.0.clone(),
+            actual: ty,
+          });
+        }
+      }
+      None
+    }
+    Expression::FunctionCall { identifier, arguments, .. } => {
+      if let Some(error) = check_function_call(scope, identifier, span, arguments) {
+        Some(error)
+      } else if let Some(Symbol::Function(Some(ty), ..)) = Scope::lookup(scope, identifier) {
+        if ty != symbol_arg.0 {
+          Some(SemanticError::InvalidArgumentType {
+            span,
+            identifier: identifier.clone(),
+            expected: symbol_arg.0.clone(),
+            actual: ty,
+          })
+        } else {
+          None
+        }
+      } else {
+        Some(SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
+      }
+    }
+    _ => todo!(),
+  }
 }
 
 pub fn check_unary_expression<'a>(
