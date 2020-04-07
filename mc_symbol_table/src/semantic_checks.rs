@@ -166,22 +166,20 @@ pub fn check_function_call_argument_type<'a>(
   identifier: &Identifier,
   span: &'a Span<'_>,
 ) -> Option<SemanticError<'a>> {
-  if let Err(_) = arg_expression.check_semantics(scope) {
+  if arg_expression.check_semantics(scope).is_err() {
     Some(SemanticError::InvalidArgument { span, identifier: identifier.clone() })
-  } else {
-    if let Some(ty) = get_expression_type(scope, arg_expression) {
-      if ty != symbol_arg.0 {
-        return Some(SemanticError::InvalidArgumentType {
-          span,
-          identifier: identifier.clone(),
-          expected: symbol_arg.0.clone(),
-          actual: ty,
-        });
-      }
-      None
-    } else {
-      Some(SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
+  } else if let Some(ty) = get_expression_type(scope, arg_expression) {
+    if ty != symbol_arg.0 {
+      return Some(SemanticError::InvalidArgumentType {
+        span,
+        identifier: identifier.clone(),
+        expected: symbol_arg.0.clone(),
+        actual: ty,
+      });
     }
+    None
+  } else {
+    Some(SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
   }
 }
 
