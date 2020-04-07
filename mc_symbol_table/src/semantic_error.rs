@@ -64,6 +64,15 @@ pub enum SemanticError<'a> {
     expected: Ty,
     actual: Ty,
   },
+  InvalidArgument {
+    span: &'a Span<'a>,
+    identifier: Identifier,
+  },
+  OperatorCombinationError {
+    span: &'a Span<'a>,
+    unary_op: &'a UnaryOp,
+    binary_op: &'a BinaryOp,
+  },
 }
 
 macro_rules! write_err {
@@ -99,11 +108,17 @@ impl fmt::Display for SemanticError<'_> {
       Self::InvalidArgumentType { span, identifier, expected, actual } => {
         write_err!(f, span, "function '{}' expected argument of type {}, found {}", identifier, expected, actual)
       }
+      Self::InvalidArgument { span, identifier } => {
+        write_err!(f, span, "invalid argument supplied to function '{}'", identifier)
+      }
       Self::UnaryOperatorTypeError { span, op, ty } => {
         write_err!(f, span, "operator '{}' cannot be used with type '{}'", op, ty)
       }
       Self::UnaryOperatorCombinationError { span, outer, inner } => {
         write_err!(f, span, "operator '{}' cannot be combined with operator '{}'", inner, outer)
+      }
+      Self::OperatorCombinationError { span, unary_op, binary_op } => {
+        write_err!(f, span, "unary operator '{}' cannot be combined with binary operator '{}'", unary_op, binary_op)
       }
       Self::ReturnTypeExpected { span, identifier } => {
         write_err!(f, span, "expected return type for function '{}'", identifier)
@@ -129,7 +144,7 @@ impl CheckSemantics for Expression<'_> {
       }
       Self::Unary { op, expression, span } => errors.extend(check_unary_expression(scope, op, expression, span)),
       Self::FunctionCall { identifier, arguments, span } => {
-        if let Some(error) = check_function_call_arguments(scope, identifier, span, arguments) {
+        if let Some(error) = check_function_call(scope, identifier, span, arguments) {
           errors.push(error);
         }
       }

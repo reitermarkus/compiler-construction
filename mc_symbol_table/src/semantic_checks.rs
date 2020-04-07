@@ -7,6 +7,29 @@ use mc_parser::ast::*;
 
 use crate::*;
 
+// Only used to get the return type of an expression.
+// Does not perform semantic checks on the expression.
+pub fn get_expression_type<'a>(scope: &Rc<RefCell<Scope>>, expression: &'a Expression<'a>) -> Option<Ty> {
+  match expression {
+    Expression::Literal { literal, .. } => Some(Ty::from(literal)),
+    Expression::Variable { identifier, .. } | Expression::FunctionCall { identifier, .. } => {
+      match Scope::lookup(scope, identifier) {
+        Some(Symbol::Variable(ty, ..)) => Some(ty),
+        Some(Symbol::Function(Some(ty), ..)) => Some(ty),
+        _ => None,
+      }
+    }
+    Expression::Unary { op, expression: inner_exp, .. } => match op {
+      UnaryOp::Minus => get_expression_type(scope, &inner_exp),
+      UnaryOp::Not => Some(Ty::Bool),
+    },
+    Expression::Binary { op, lhs, .. } => match op {
+      BinaryOp::Times | BinaryOp::Divide | BinaryOp::Plus | BinaryOp::Minus => get_expression_type(scope, lhs),
+      _ => Some(Ty::Bool),
+    },
+  }
+}
+
 pub fn check_variable<'a>(
   scope: &Rc<RefCell<Scope>>,
   identifier: &Identifier,
@@ -102,7 +125,6 @@ pub fn check_function_call_for_unary_operator<'a>(
   }
 }
 
-#[allow(unused_variables)]
 pub fn check_function_call_arguments<'a>(
   scope: &Rc<RefCell<Scope>>,
   identifier: &Identifier,
@@ -144,53 +166,22 @@ pub fn check_function_call_argument_type<'a>(
   identifier: &Identifier,
   span: &'a Span<'_>,
 ) -> Option<SemanticError<'a>> {
-  match arg_expression {
-    Expression::Literal { literal, .. } => {
-      if symbol_arg.0 != Ty::from(literal) {
-        Some(SemanticError::InvalidArgumentType {
+  if let Err(_) = arg_expression.check_semantics(scope) {
+    Some(SemanticError::InvalidArgument { span, identifier: identifier.clone() })
+  } else {
+    if let Some(ty) = get_expression_type(scope, arg_expression) {
+      if ty != symbol_arg.0 {
+        return Some(SemanticError::InvalidArgumentType {
           span,
           identifier: identifier.clone(),
           expected: symbol_arg.0.clone(),
-          actual: Ty::from(literal),
-        })
-      } else {
-        None
-      }
-    }
-    Expression::Variable { identifier, index_expression, .. } => {
-      if let Some(error) = check_variable(scope, identifier, span, index_expression) {
-        return Some(error);
-      } else if let Some(Symbol::Variable(ty, ..)) = Scope::lookup(scope, identifier) {
-        if ty != symbol_arg.0 {
-          return Some(SemanticError::InvalidArgumentType {
-            span,
-            identifier: identifier.clone(),
-            expected: symbol_arg.0.clone(),
-            actual: ty,
-          });
-        }
+          actual: ty,
+        });
       }
       None
+    } else {
+      Some(SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
     }
-    Expression::FunctionCall { identifier, arguments, .. } => {
-      if let Some(error) = check_function_call(scope, identifier, span, arguments) {
-        Some(error)
-      } else if let Some(Symbol::Function(Some(ty), ..)) = Scope::lookup(scope, identifier) {
-        if ty != symbol_arg.0 {
-          Some(SemanticError::InvalidArgumentType {
-            span,
-            identifier: identifier.clone(),
-            expected: symbol_arg.0.clone(),
-            actual: ty,
-          })
-        } else {
-          None
-        }
-      } else {
-        Some(SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
-      }
-    }
-    _ => todo!(),
   }
 }
 
@@ -218,7 +209,7 @@ pub fn check_unary_expression<'a>(
         errors.push(error)
       }
     }
-    Expression::Unary { op: inner_op, .. } => {
+    Expression::Unary { op: inner_op, expression, .. } => {
       if let Err(exp_errors) = expression.check_semantics(scope) {
         errors.extend(exp_errors)
       }
@@ -226,7 +217,17 @@ pub fn check_unary_expression<'a>(
         errors.push(error)
       }
     }
-    _ => {}
+    Expression::Binary { op: binary_op, lhs, rhs, .. } => {
+      if let Err(lhs_errors) = lhs.check_semantics(scope) {
+        errors.extend(lhs_errors)
+      }
+      if let Err(rhs_errors) = rhs.check_semantics(scope) {
+        errors.extend(rhs_errors)
+      }
+      if let Some(error) = check_operator_combination(op, binary_op, span) {
+        errors.push(error)
+      }
+    }
   }
 
   errors
@@ -256,6 +257,22 @@ pub fn check_unary_operator_combination<'a>(
     }
     UnaryOp::Minus if *inner == UnaryOp::Not => {
       Some(SemanticError::UnaryOperatorCombinationError { span, inner, outer })
+    }
+    _ => None,
+  }
+}
+
+pub fn check_operator_combination<'a>(
+  unary_op: &'a UnaryOp,
+  binary_op: &'a BinaryOp,
+  span: &'a Span<'_>,
+) -> Option<SemanticError<'a>> {
+  match unary_op {
+    UnaryOp::Not if [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(binary_op) => {
+      Some(SemanticError::OperatorCombinationError { span, unary_op, binary_op })
+    }
+    UnaryOp::Minus if ![BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(binary_op) => {
+      Some(SemanticError::OperatorCombinationError { span, unary_op, binary_op })
     }
     _ => None,
   }
