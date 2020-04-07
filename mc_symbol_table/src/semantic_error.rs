@@ -165,7 +165,39 @@ mod test {
 
   use super::*;
   #[test]
-  fn semantic_expression_funcion_call_check() {
+  fn semantic_expression_funcion_call_type_check() {
+    let expr = "pi(true, 5.0)";
+    let function_call = Expression::FunctionCall {
+      identifier: Identifier::from("pi"),
+      arguments: vec![
+        Expression::Literal { literal: Literal::Bool(true), span: Span::new(&expr, 3, 7).unwrap() },
+        Expression::Literal { literal: Literal::Float(5.0), span: Span::new(&expr, 9, 12).unwrap() },
+      ],
+      span: Span::new(&expr, 0, 13).unwrap(),
+    };
+
+    let scope = Scope::new();
+
+    scope
+      .borrow_mut()
+      .symbols
+      .insert(Identifier::from("pi"), Symbol::Function(Some(Ty::Int), vec![(Ty::Bool, None), (Ty::Int, None)]));
+
+    let result = function_call.check_semantics(&scope);
+    let errors = result.expect_err("no errors found");
+
+    assert!(errors.contains(&SemanticError::InvalidArgumentType {
+      span: &Span::new(&expr, 0, 13).unwrap(),
+      identifier: Identifier::from("pi"),
+      expected: Ty::Int,
+      actual: Ty::Float
+    }));
+
+    assert_eq!(errors.len(), 1);
+  }
+
+  #[test]
+  fn semantic_expression_funcion_call_arguments_count_check() {
     let expr = "pi(true, 5)";
     let function_call = Expression::FunctionCall {
       identifier: Identifier::from("pi"),
@@ -217,36 +249,43 @@ mod test {
 
     let mut result = variable_without_index.check_semantics(&scope);
     let mut errors = result.expect_err("no errors found");
+
     assert!(errors.contains(&SemanticError::NotDeclared {
       span: &Span::new("x", 0, 1).unwrap(),
       identifier: Identifier::from("x")
     }));
+
     assert_eq!(errors.len(), 1);
 
     scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Variable(Ty::Int, None));
     result = variable_without_index.check_semantics(&scope);
+
     assert_eq!(result, Ok(()));
 
     scope = Scope::new();
     scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Variable(Ty::Int, Some(5)));
     result = variable_with_index.check_semantics(&scope);
     errors = result.expect_err("no errors found");
+
     assert!(errors.contains(&SemanticError::IndexOutOfBounds {
       span: &Span::new("x[10]", 2, 4).unwrap(),
       identifier: Identifier::from("x"),
       actual: 10,
       size: 5
     }));
+
     assert_eq!(errors.len(), 1);
 
     scope = Scope::new();
     scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Function(Some(Ty::Int), Vec::new()));
     result = variable_with_index.check_semantics(&scope);
     errors = result.expect_err("no errors found");
+
     assert!(errors.contains(&SemanticError::WrongUseOfFunction {
       span: &Span::new("x[10]", 0, 5).unwrap(),
       identifier: Identifier::from("x")
     }));
+
     assert_eq!(errors.len(), 1);
   }
 }
