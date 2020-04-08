@@ -256,6 +256,42 @@ pub fn check_unary_expression<'a>(
   errors
 }
 
+pub fn check_binary_expression<'a>(
+  scope: &Rc<RefCell<Scope>>,
+  op: &'a BinaryOp,
+  lhs: &'a Expression<'a>,
+  rhs: &'a Expression<'a>,
+  span: &'a Span<'_>,
+) -> Vec<SemanticError<'a>> {
+  let mut errors = Vec::new();
+
+  if let Err(lhs_errors) = lhs.check_semantics(scope) {
+    errors.extend(lhs_errors)
+  }
+  if let Err(rhs_errors) = rhs.check_semantics(scope) {
+    errors.extend(rhs_errors)
+  }
+
+  if let (Some(lhs_ty), Some(rhs_ty)) = (get_expression_type(scope, lhs), get_expression_type(scope, rhs)) {
+    if lhs_ty != rhs_ty {
+      errors.push(SemanticError::BinaryOperatorTypeCombinationError { span, op, lhs_ty, rhs_ty })
+    } else if let Some(error) = check_binary_opeartor_compatability(op, lhs_ty, span) {
+      errors.push(error)
+    }
+  }
+
+  // Determine the right span, when nesting a call to a `void` function in a binary expression.
+  for exp in [lhs, rhs].iter() {
+    if let Expression::FunctionCall { identifier, span, .. } = exp {
+      if let Some(Symbol::Function(None, ..)) = Scope::lookup(scope, identifier) {
+        errors.push(SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
+      }
+    }
+  }
+
+  errors
+}
+
 pub fn check_unary_operator_compatability<'a>(
   op: &'a UnaryOp,
   ty: Ty,
@@ -265,6 +301,25 @@ pub fn check_unary_operator_compatability<'a>(
     Ty::Bool if *op == UnaryOp::Minus => Some(SemanticError::UnaryOperatorTypeError { span, op, ty }),
     Ty::Int | Ty::Float if *op == UnaryOp::Not => Some(SemanticError::UnaryOperatorTypeError { span, op, ty }),
     Ty::String => Some(SemanticError::UnaryOperatorTypeError { span, op, ty }),
+    _ => None,
+  }
+}
+
+pub fn check_binary_opeartor_compatability<'a>(
+  op: &'a BinaryOp,
+  ty: Ty,
+  span: &'a Span<'_>,
+) -> Option<SemanticError<'a>> {
+  match ty {
+    Ty::Bool if [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(op) => {
+      Some(SemanticError::BinaryOperatorTypeError { span, op, ty })
+    }
+    Ty::Int | Ty::Float if [BinaryOp::Land, BinaryOp::Lor].contains(op) => {
+      Some(SemanticError::BinaryOperatorTypeError { span, op, ty })
+    }
+    Ty::String if ![BinaryOp::Eq, BinaryOp::Neq].contains(op) => {
+      Some(SemanticError::BinaryOperatorTypeError { span, op, ty })
+    }
     _ => None,
   }
 }

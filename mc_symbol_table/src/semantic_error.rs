@@ -79,6 +79,17 @@ pub enum SemanticError<'a> {
     unary_op: &'a UnaryOp,
     binary_op: &'a BinaryOp,
   },
+  BinaryOperatorTypeCombinationError {
+    span: &'a Span<'a>,
+    op: &'a BinaryOp,
+    lhs_ty: Ty,
+    rhs_ty: Ty,
+  },
+  BinaryOperatorTypeError {
+    span: &'a Span<'a>,
+    op: &'a BinaryOp,
+    ty: Ty,
+  },
 }
 
 macro_rules! write_err {
@@ -132,6 +143,12 @@ impl fmt::Display for SemanticError<'_> {
       Self::ReturnTypeExpected { span, identifier } => {
         write_err!(f, span, "expected return type for function '{}'", identifier)
       }
+      Self::BinaryOperatorTypeCombinationError { span, op, lhs_ty, rhs_ty } => {
+        write_err!(f, span, "operator '{}' cannot be used with types '{}' ans '{}'", op, lhs_ty, rhs_ty)
+      }
+      Self::BinaryOperatorTypeError { span, op, ty } => {
+        write_err!(f, span, "operator '{}' cannot be used with type '{}'", op, ty)
+      }
     }
   }
 }
@@ -157,7 +174,7 @@ impl CheckSemantics for Expression<'_> {
           errors.push(error);
         }
       }
-      _ => todo!(),
+      Self::Binary { op, lhs, rhs, span } => errors.extend(check_binary_expression(scope, op, lhs, rhs, span)),
     };
 
     if errors.is_empty() {
