@@ -6,6 +6,7 @@ use std::io::stdout;
 use clap::{value_t, App, Arg};
 use mc_symbol_table::mc_view_symbol_table;
 
+#[cfg_attr(tarpaulin, skip)]
 fn main() -> std::io::Result<()> {
   let matches = App::new("mC Symbol Table Viewer")
     .set_term_width(0)

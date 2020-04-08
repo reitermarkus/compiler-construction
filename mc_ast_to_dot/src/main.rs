@@ -6,6 +6,7 @@ use std::io::stdout;
 use clap::{value_t, App, Arg};
 use mc_ast_to_dot::mc_ast_to_dot;
 
+#[cfg_attr(tarpaulin, skip)]
 fn main() -> std::io::Result<()> {
   let matches = App::new("mC AST to DOT Converter")
     .set_term_width(0)
