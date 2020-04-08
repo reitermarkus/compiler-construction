@@ -455,10 +455,7 @@ mod test {
       }),
       rhs: Box::new(Expression::Unary {
         op: UnaryOp::Not,
-        expression: Box::new(Expression::Literal {
-          literal: Literal::Int(5),
-          span: Span::new(&expr, 7, 8).unwrap(),
-        }),
+        expression: Box::new(Expression::Literal { literal: Literal::Int(5), span: Span::new(&expr, 7, 8).unwrap() }),
         span: Span::new(&expr, 6, 8).unwrap(),
       }),
       span: Span::new(&expr, 0, 8).unwrap(),
