@@ -442,4 +442,76 @@ mod test {
 
     assert_eq!(errors.len(), 2);
   }
+
+  #[test]
+  fn semantic_binary_expression_check() {
+    let mut expr = "var + !5";
+    let mut binary = Expression::Binary {
+      op: BinaryOp::Plus,
+      lhs: Box::new(Expression::Variable {
+        identifier: Identifier::from("var"),
+        index_expression: None,
+        span: Span::new(&expr, 0, 3).unwrap(),
+      }),
+      rhs: Box::new(Expression::Unary {
+        op: UnaryOp::Not,
+        expression: Box::new(Expression::Literal {
+          literal: Literal::Int(5),
+          span: Span::new(&expr, 7, 8).unwrap(),
+        }),
+        span: Span::new(&expr, 6, 8).unwrap(),
+      }),
+      span: Span::new(&expr, 0, 8).unwrap(),
+    };
+
+    let scope = Scope::new();
+
+    scope.borrow_mut().symbols.insert(Identifier::from("var"), Symbol::Variable(Ty::String, None));
+
+    let result = binary.check_semantics(&scope);
+    let errors = result.expect_err("no errors found");
+
+    assert!(errors.contains(&SemanticError::UnaryOperatorTypeError {
+      span: &Span::new(&expr, 6, 8).unwrap(),
+      op: &UnaryOp::Not,
+      ty: Ty::Int,
+    }));
+    assert!(errors.contains(&SemanticError::BinaryOperatorTypeCombinationError {
+      span: &Span::new(&expr, 0, 8).unwrap(),
+      op: &BinaryOp::Plus,
+      lhs_ty: Ty::String,
+      rhs_ty: Ty::Bool,
+    }));
+
+    assert_eq!(errors.len(), 2);
+
+    expr = "var + var2";
+    binary = Expression::Binary {
+      op: BinaryOp::Plus,
+      lhs: Box::new(Expression::Variable {
+        identifier: Identifier::from("var"),
+        index_expression: None,
+        span: Span::new(&expr, 0, 3).unwrap(),
+      }),
+      rhs: Box::new(Expression::Variable {
+        identifier: Identifier::from("var2"),
+        index_expression: None,
+        span: Span::new(&expr, 6, 10).unwrap(),
+      }),
+      span: Span::new(&expr, 0, 10).unwrap(),
+    };
+
+    scope.borrow_mut().symbols.insert(Identifier::from("var2"), Symbol::Variable(Ty::String, None));
+
+    let result = binary.check_semantics(&scope);
+    let errors = result.expect_err("no errors found");
+
+    assert!(errors.contains(&SemanticError::BinaryOperatorTypeError {
+      span: &Span::new(&expr, 0, 10).unwrap(),
+      op: &BinaryOp::Plus,
+      ty: Ty::String,
+    }));
+
+    assert_eq!(errors.len(), 1);
+  }
 }
