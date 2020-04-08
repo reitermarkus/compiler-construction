@@ -27,7 +27,7 @@ jobs:
           command: clippy
           args: -- -D warnings
       - name: Coverage
-        uses: actions-rs/tarpaulin@v0.1
+        uses: actions-rs/tarpaulin@v0.1.1
         with:
           args: -- --test-threads 1
       - name: Upload Coverage
