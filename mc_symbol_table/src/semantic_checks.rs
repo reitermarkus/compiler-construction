@@ -232,7 +232,7 @@ pub fn check_unary_expression<'a>(
         errors.push(error)
       }
     }
-    Expression::Unary { op: inner_op, expression, .. } => {
+    Expression::Unary { op: inner_op, .. } => {
       if let Err(exp_errors) = expression.check_semantics(scope) {
         errors.extend(exp_errors)
       }
@@ -240,12 +240,9 @@ pub fn check_unary_expression<'a>(
         errors.push(error)
       }
     }
-    Expression::Binary { op: binary_op, lhs, rhs, .. } => {
-      if let Err(lhs_errors) = lhs.check_semantics(scope) {
-        errors.extend(lhs_errors)
-      }
-      if let Err(rhs_errors) = rhs.check_semantics(scope) {
-        errors.extend(rhs_errors)
+    Expression::Binary { op: binary_op, .. } => {
+      if let Err(exp_errors) = expression.check_semantics(scope) {
+        errors.extend(exp_errors)
       }
       if let Some(error) = check_operator_combination(op, binary_op, span) {
         errors.push(error)

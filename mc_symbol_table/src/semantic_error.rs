@@ -382,4 +382,64 @@ mod test {
 
     assert_eq!(errors.len(), 1);
   }
+
+  #[test]
+  fn semantic_unary_expression_check() {
+    let mut expr = "!variable";
+    let mut unary = Expression::Unary {
+      op: UnaryOp::Not,
+      expression: Box::new(Expression::Variable {
+        identifier: Identifier::from("variable"),
+        index_expression: None,
+        span: Span::new(&expr, 1, 9).unwrap(),
+      }),
+      span: Span::new(&expr, 0, 9).unwrap(),
+    };
+
+    let scope = Scope::new();
+
+    scope.borrow_mut().symbols.insert(Identifier::from("variable"), Symbol::Variable(Ty::Int, None));
+
+    let result = unary.check_semantics(&scope);
+    let errors = result.expect_err("no errors found");
+
+    assert!(errors.contains(&SemanticError::UnaryOperatorTypeError {
+      span: &Span::new(&expr, 0, 9).unwrap(),
+      op: &UnaryOp::Not,
+      ty: Ty::Int,
+    }));
+
+    assert_eq!(errors.len(), 1);
+
+    expr = "-!variable";
+    unary = Expression::Unary {
+      op: UnaryOp::Minus,
+      expression: Box::new(Expression::Unary {
+        op: UnaryOp::Not,
+        expression: Box::new(Expression::Variable {
+          identifier: Identifier::from("variable"),
+          index_expression: None,
+          span: Span::new(&expr, 2, 10).unwrap(),
+        }),
+        span: Span::new(&expr, 1, 10).unwrap(),
+      }),
+      span: Span::new(&expr, 0, 10).unwrap(),
+    };
+
+    let result = unary.check_semantics(&scope);
+    let errors = result.expect_err("no errors found");
+
+    assert!(errors.contains(&SemanticError::UnaryOperatorTypeError {
+      span: &Span::new(&expr, 1, 10).unwrap(),
+      op: &UnaryOp::Not,
+      ty: Ty::Int,
+    }));
+    assert!(errors.contains(&SemanticError::UnaryOperatorCombinationError {
+      span: &Span::new(&expr, 0, 10).unwrap(),
+      outer: &UnaryOp::Minus,
+      inner: &UnaryOp::Not,
+    }));
+
+    assert_eq!(errors.len(), 2);
+  }
 }
