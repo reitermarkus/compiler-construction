@@ -64,6 +64,12 @@ pub enum SemanticError<'a> {
     expected: Ty,
     actual: Ty,
   },
+  InvalidDeclarationType {
+    span: &'a Span<'a>,
+    identifier: Identifier,
+    expected: Ty,
+    actual: Ty,
+  },
   InvalidArgument {
     span: &'a Span<'a>,
     identifier: Identifier,
@@ -107,6 +113,9 @@ impl fmt::Display for SemanticError<'_> {
       ),
       Self::InvalidArgumentType { span, identifier, expected, actual } => {
         write_err!(f, span, "function '{}' expected argument of type {}, found {}", identifier, expected, actual)
+      }
+      Self::InvalidDeclarationType { span, identifier, expected, actual } => {
+        write_err!(f, span, "variable '{}' expected type {}, found {}", identifier, expected, actual)
       }
       Self::InvalidArgument { span, identifier } => {
         write_err!(f, span, "invalid argument supplied to function '{}'", identifier)
@@ -155,6 +164,41 @@ impl CheckSemantics for Expression<'_> {
       Ok(())
     } else {
       Err(errors)
+    }
+  }
+}
+
+impl CheckSemantics for Assignment<'_> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    let mut errors = Vec::new();
+
+    match Scope::lookup(scope, &self.identifier) {
+      Some(Symbol::Function(..)) => {
+        errors.push(SemanticError::WrongUseOfFunction { span: &self.span, identifier: self.identifier.clone() })
+      }
+      Some(Symbol::Variable(ty, size)) => {
+        if let Some(error) = check_variable_index(&self.identifier, &self.span, size, &self.index_expression) {
+          errors.push(error)
+        }
+
+        if let Some(r_ty) = get_expression_type(scope, &self.rvalue) {
+          if ty != r_ty {
+            errors.push(SemanticError::InvalidDeclarationType {
+              span: &self.span,
+              identifier: self.identifier.clone(),
+              expected: ty,
+              actual: r_ty,
+            });
+          }
+        };
+      }
+      None => errors.push(SemanticError::NotDeclared { span: &self.span, identifier: self.identifier.clone() }),
+    };
+
+    if !errors.is_empty() {
+      Err(errors)
+    } else {
+      Ok(())
     }
   }
 }
@@ -226,6 +270,39 @@ mod test {
     }));
 
     assert_eq!(errors.len(), 1);
+  }
+
+  #[test]
+  fn assignment_type_check() {
+    let assignment_str = "x = 2.0";
+
+    let assignment = Assignment {
+      identifier: Identifier::from("x"),
+      span: Span::new(assignment_str, 0, 7).unwrap(),
+      index_expression: None,
+      rvalue: Expression::Literal { literal: Literal::Float(2.0), span: Span::new(assignment_str, 4, 7).unwrap() },
+    };
+
+    let scope = Scope::new();
+
+    let mut result = assignment.check_semantics(&scope);
+    let mut errors = result.expect_err("no errors found");
+
+    assert!(errors.contains(&SemanticError::NotDeclared {
+      span: &Span::new(assignment_str, 0, 7).unwrap(),
+      identifier: Identifier::from("x")
+    }));
+
+    scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Variable(Ty::Int, None));
+    result = assignment.check_semantics(&scope);
+    errors = result.expect_err("no errors found");
+
+    assert!(errors.contains(&SemanticError::InvalidDeclarationType {
+      span: &Span::new(assignment_str, 0, 7).unwrap(),
+      identifier: Identifier::from("x"),
+      expected: Ty::Int,
+      actual: Ty::Float
+    }));
   }
 
   #[test]

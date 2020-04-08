@@ -38,7 +38,7 @@ pub fn check_variable<'a>(
 ) -> Option<SemanticError<'a>> {
   match Scope::lookup(scope, identifier) {
     Some(Symbol::Function(..)) => Some(SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() }),
-    Some(Symbol::Variable(.., size)) => check_variable_index(identifier, span, size, index_expression),
+    Some(Symbol::Variable(.., size)) => check_variable_boxed_index(identifier, span, size, index_expression),
     None => Some(SemanticError::NotDeclared { span, identifier: identifier.clone() }),
   }
 }
@@ -53,7 +53,7 @@ pub fn check_variable_for_unary_operator<'a>(
   match Scope::lookup(scope, identifier) {
     Some(Symbol::Function(..)) => Some(SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() }),
     Some(Symbol::Variable(ty, size)) => {
-      if let Some(error) = check_variable_index(identifier, span, size, index_expression) {
+      if let Some(error) = check_variable_boxed_index(identifier, span, size, index_expression) {
         Some(error)
       } else {
         check_unary_operator_compatability(op, ty, span)
@@ -63,7 +63,20 @@ pub fn check_variable_for_unary_operator<'a>(
   }
 }
 
-pub fn check_variable_index<'a>(
+pub fn index_bounds_check<'a>(
+  index: usize,
+  size: usize,
+  identifier: &Identifier,
+  span: &'a Span<'_>,
+) -> Option<SemanticError<'a>> {
+  if index as usize >= size {
+    Some(SemanticError::IndexOutOfBounds { span: &span, identifier: identifier.clone(), size, actual: index })
+  } else {
+    None
+  }
+}
+
+pub fn check_variable_boxed_index<'a>(
   identifier: &Identifier,
   span: &'a Span<'_>,
   size: Option<usize>,
@@ -72,17 +85,29 @@ pub fn check_variable_index<'a>(
   match (size, index_expression) {
     (Some(size), Some(index_expression)) => {
       if let Expression::Literal { literal: Literal::Int(index), span } = &**index_expression {
-        if *index < 0 || *index as usize >= size {
-          return Some(SemanticError::IndexOutOfBounds {
-            span: &span,
-            identifier: identifier.clone(),
-            size: size as usize,
-            actual: *index as usize,
-          });
-        }
+        index_bounds_check(*index as usize, size, identifier, span)
+      } else {
+        None
       }
+    }
+    (None, Some(_)) => Some(SemanticError::ArrayError { span, identifier: identifier.clone() }),
+    _ => None,
+  }
+}
 
-      None
+pub fn check_variable_index<'a>(
+  identifier: &Identifier,
+  span: &'a Span<'_>,
+  size: Option<usize>,
+  index_expression: &'a Option<Expression<'a>>,
+) -> Option<SemanticError<'a>> {
+  match (size, index_expression) {
+    (Some(size), Some(index_expression)) => {
+      if let Expression::Literal { literal: Literal::Int(index), span } = index_expression {
+        index_bounds_check(*index as usize, size, identifier, span)
+      } else {
+        None
+      }
     }
     (None, Some(_)) => Some(SemanticError::ArrayError { span, identifier: identifier.clone() }),
     _ => None,
