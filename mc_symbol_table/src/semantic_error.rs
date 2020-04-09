@@ -70,6 +70,12 @@ pub enum SemanticError<'a> {
     expected: Ty,
     actual: Ty,
   },
+  InvalidReturnType {
+    span: &'a Span<'a>,
+    identifier: Identifier,
+    expected: Ty,
+    actual: Ty,
+  },
   InvalidArgument {
     span: &'a Span<'a>,
     identifier: Identifier,
@@ -127,6 +133,9 @@ impl fmt::Display for SemanticError<'_> {
       }
       Self::InvalidDeclarationType { span, identifier, expected, actual } => {
         write_err!(f, span, "variable '{}' expected type {}, found {}", identifier, expected, actual)
+      }
+      Self::InvalidReturnType { span, identifier, expected, actual } => {
+        write_err!(f, span, "function '{}' expected return type {}, found {}", identifier, expected, actual)
       }
       Self::InvalidArgument { span, identifier } => {
         write_err!(f, span, "invalid argument supplied to function '{}'", identifier)
@@ -220,11 +229,106 @@ impl CheckSemantics for Assignment<'_> {
   }
 }
 
+impl CheckSemantics for FunctionDeclaration<'_> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    let mut errors = Vec::new();
+
+    if self.ty.is_some() {
+      let return_type = self
+        .body
+        .statements
+        .iter()
+        .map(|x| match x {
+          Statement::Ret(ret) => Some(ret),
+          _ => None,
+        })
+        .next()
+        .and_then(|ret| ret)
+        .and_then(|ret| ret.expression.as_ref())
+        .and_then(|expr| get_expression_type(scope, &expr));
+
+      if let Some(ty) = return_type {
+        if &ty != self.ty.as_ref().unwrap() {
+          errors.push(SemanticError::InvalidReturnType {
+            identifier: self.identifier.clone(),
+            span: &self.span,
+            expected: self.ty.clone().unwrap(),
+            actual: ty,
+          })
+        };
+      } else {
+        errors.push(SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span });
+      }
+    }
+
+    if !errors.is_empty() {
+      Err(errors)
+    } else {
+      Ok(())
+    }
+  }
+}
+
 #[cfg(test)]
 mod test {
   use pest::Span;
 
   use super::*;
+  #[test]
+  fn semantic_function_declaration_check() {
+    let function_declaration = FunctionDeclaration {
+      ty: Some(Ty::Float),
+      identifier: Identifier::from("sum"),
+      parameters: vec![
+        Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("n") },
+        Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("m") },
+      ],
+      body: CompoundStatement {
+        statements: vec![Statement::Ret(ReturnStatement {
+          expression: Some(Expression::Binary {
+            op: BinaryOp::Plus,
+            lhs: Box::new(Expression::Variable {
+              identifier: Identifier::from("n"),
+              index_expression: None,
+              span: Span::new("", 0, 0).unwrap(),
+            }),
+            rhs: Box::new(Expression::Variable {
+              identifier: Identifier::from("m"),
+              index_expression: None,
+              span: Span::new("", 0, 0).unwrap(),
+            }),
+            span: Span::new("", 0, 0).unwrap(),
+          }),
+          span: Span::new("", 0, 0).unwrap(),
+        })],
+        span: Span::new("", 0, 0).unwrap(),
+      },
+      span: Span::new("", 0, 0).unwrap(),
+    };
+
+    let scope = Scope::new();
+
+    let function_scope = Scope::new_child(&scope, "function");
+    let param_n_id = Identifier::from("n");
+    let param_symbol = Symbol::Variable(Ty::Int, None);
+    let param_m_id = Identifier::from("m");
+
+    function_scope.borrow_mut().insert(param_n_id.clone(), param_symbol.clone());
+    function_scope.borrow_mut().insert(param_m_id.clone(), param_symbol.clone());
+
+    scope.borrow_mut().symbols.insert(Identifier::from("sum"), Symbol::Function(Some(Ty::Float), Vec::new()));
+
+    let result = function_declaration.check_semantics(&scope.borrow().children[0]);
+    let errors = result.expect_err("no errors found");
+
+    assert!(errors.contains(&SemanticError::InvalidReturnType {
+      span: &Span::new("", 0, 0).unwrap(),
+      identifier: Identifier::from("sum"),
+      expected: Ty::Float,
+      actual: Ty::Int
+    }));
+  }
+
   #[test]
   fn semantic_expression_funcion_call_type_check() {
     let expr = "pi(true, 5.0)";
