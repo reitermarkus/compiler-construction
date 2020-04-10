@@ -20,6 +20,10 @@ pub enum SemanticError<'a> {
     span: &'a Span<'a>,
     identifier: Identifier,
   },
+  AlreadyDeclared {
+    span: &'a Span<'a>,
+    identifier: Identifier,
+  },
   ArrayError {
     span: &'a Span<'a>,
     identifier: Identifier,
@@ -113,6 +117,9 @@ impl fmt::Display for SemanticError<'_> {
       Self::Type { span, expected, actual } => write_err!(f, span, "expected type {}, found type {}", expected, actual),
       Self::NotDeclared { span, identifier } => {
         write_err!(f, span, "variable '{}' not declared in this scope", identifier)
+      }
+      Self::AlreadyDeclared { span, identifier } => {
+        write_err!(f, span, "variable '{}' already declared in this scope", identifier)
       }
       Self::ArrayError { span, identifier } => write_err!(f, span, "variable '{}' is not an array", identifier),
       Self::IndexOutOfBounds { span, identifier, size, actual } => {
@@ -220,6 +227,28 @@ impl CheckSemantics for Assignment<'_> {
       }
       None => errors.push(SemanticError::NotDeclared { span: &self.span, identifier: self.identifier.clone() }),
     };
+
+    if !errors.is_empty() {
+      Err(errors)
+    } else {
+      Ok(())
+    }
+  }
+}
+
+impl CheckSemantics for Declaration<'_> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    let mut errors = Vec::new();
+
+    match Scope::lookup(scope, &self.identifier) {
+      Some(Symbol::Variable(ty, size)) => {
+        if !(ty == self.ty && size == self.count) {
+          errors.push(SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() })
+        }
+      }
+      Some(_) => errors.push(SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() }),
+      None => {}
+    }
 
     if !errors.is_empty() {
       Err(errors)
@@ -423,6 +452,32 @@ mod test {
       identifier: Identifier::from("x"),
       expected: Ty::Int,
       actual: Ty::Float
+    }));
+  }
+
+  #[test]
+  fn semantic_declaration_check() {
+    let declaration_str = "int x = 1";
+
+    let declaration = Declaration {
+      identifier: Identifier::from("x"),
+      span: Span::new(declaration_str, 0, 9).unwrap(),
+      ty: Ty::Int,
+      count: None,
+    };
+
+    let scope = Scope::new();
+
+    let mut result = declaration.check_semantics(&scope);
+    assert_eq!(result, Ok(()));
+
+    scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Function(Some(Ty::Int), [].to_vec()));
+    result = declaration.check_semantics(&scope);
+    let errors = result.expect_err("no errors found");
+
+    assert!(errors.contains(&SemanticError::AlreadyDeclared {
+      span: &Span::new(declaration_str, 0, 9).unwrap(),
+      identifier: Identifier::from("x")
     }));
   }
 
