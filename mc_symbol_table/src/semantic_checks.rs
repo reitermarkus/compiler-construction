@@ -43,26 +43,6 @@ pub fn check_variable<'a>(
   }
 }
 
-pub fn check_variable_for_unary_operator<'a>(
-  scope: &Rc<RefCell<Scope>>,
-  identifier: &Identifier,
-  span: &'a Span<'_>,
-  index_expression: &'a Option<Box<Expression<'a>>>,
-  op: &'a UnaryOp,
-) -> Option<SemanticError<'a>> {
-  match Scope::lookup(scope, identifier) {
-    Some(Symbol::Function(..)) => Some(SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() }),
-    Some(Symbol::Variable(ty, size)) => {
-      if let Some(error) = check_variable_boxed_index(identifier, span, size, index_expression) {
-        Some(error)
-      } else {
-        check_unary_operator_compatability(op, ty, span)
-      }
-    }
-    None => Some(SemanticError::NotDeclared { span, identifier: identifier.clone() }),
-  }
-}
-
 pub fn index_bounds_check<'a>(
   index: usize,
   size: usize,
@@ -122,29 +102,6 @@ pub fn check_function_call<'a>(
 ) -> Option<SemanticError<'a>> {
   match Scope::lookup(scope, identifier) {
     Some(Symbol::Function(..)) => check_function_call_arguments(scope, identifier, span, arguments),
-    Some(Symbol::Variable(..)) => Some(SemanticError::NotAFunction { span, identifier: identifier.clone() }),
-    None => Some(SemanticError::NotDeclared { span, identifier: identifier.clone() }),
-  }
-}
-
-pub fn check_function_call_for_unary_operator<'a>(
-  scope: &Rc<RefCell<Scope>>,
-  identifier: &Identifier,
-  span: &'a Span<'_>,
-  arguments: &'a [Expression<'a>],
-  op: &'a UnaryOp,
-) -> Option<SemanticError<'a>> {
-  match Scope::lookup(scope, identifier) {
-    Some(Symbol::Function(Some(ty), ..)) => {
-      if let Some(error) = check_function_call_arguments(scope, identifier, span, arguments) {
-        Some(error)
-      } else {
-        check_unary_operator_compatability(op, ty, span)
-      }
-    }
-    Some(Symbol::Function(None, ..)) => {
-      Some(SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
-    }
     Some(Symbol::Variable(..)) => Some(SemanticError::NotAFunction { span, identifier: identifier.clone() }),
     None => Some(SemanticError::NotDeclared { span, identifier: identifier.clone() }),
   }
@@ -223,13 +180,21 @@ pub fn check_unary_expression<'a>(
       }
     }
     Expression::Variable { identifier, index_expression, .. } => {
-      if let Some(error) = check_variable_for_unary_operator(scope, identifier, span, index_expression, op) {
+      if let Some(error) = check_variable(scope, identifier, span, index_expression) {
         errors.push(error)
+      } else if let Some(ty) = get_expression_type(scope, expression) {
+        if let Some(error) = check_unary_operator_compatability(op, ty, span) {
+          errors.push(error)
+        }
       }
     }
     Expression::FunctionCall { identifier, arguments, .. } => {
-      if let Some(error) = check_function_call_for_unary_operator(scope, identifier, span, arguments, op) {
+      if let Some(error) = check_function_call(scope, identifier, span, arguments) {
         errors.push(error)
+      } else if let Some(ty) = get_expression_type(scope, expression) {
+        if let Some(error) = check_unary_operator_compatability(op, ty, span) {
+          errors.push(error)
+        }
       }
     }
     Expression::Unary { op: inner_op, .. } => {
