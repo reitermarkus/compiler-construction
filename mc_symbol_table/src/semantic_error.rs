@@ -324,6 +324,21 @@ mod test {
   use pest::Span;
 
   use super::*;
+
+  #[test]
+  fn semantic_program_check() {
+    let program = Program {
+      function_declarations: Vec::new(),
+      span: Span::new("", 0, 0).unwrap(),
+    };
+
+    let scope = Scope::new();
+    let result = program.check_semantics(&scope);
+    let errors = result.expect_err("no errors found");
+
+    assert!(errors.contains(&SemanticError::NoMainFunction { span: &Span::new("", 0, 0).unwrap() }))
+  }
+
   #[test]
   fn semantic_function_declaration_check() {
     let function_declaration = FunctionDeclaration {
