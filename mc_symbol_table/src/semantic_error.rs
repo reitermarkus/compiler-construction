@@ -1,12 +1,8 @@
-use std::cell::RefCell;
 use std::fmt;
-use std::rc::Rc;
 
 use pest::Span;
 
 use mc_parser::ast::*;
-
-use crate::*;
 
 #[derive(PartialEq, Debug)]
 pub enum SemanticError<'a> {
@@ -173,164 +169,17 @@ impl fmt::Display for SemanticError<'_> {
   }
 }
 
-pub trait CheckSemantics {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>>;
-}
-
-impl CheckSemantics for Expression<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
-
-    match self {
-      Self::Literal { .. } => {}
-      Self::Variable { identifier, span, index_expression } => {
-        if let Some(error) = check_variable(scope, identifier, span, index_expression) {
-          errors.push(error);
-        }
-      }
-      Self::Unary { op, expression, span } => errors.extend(check_unary_expression(scope, op, expression, span)),
-      Self::FunctionCall { identifier, arguments, span } => {
-        if let Some(error) = check_function_call(scope, identifier, span, arguments) {
-          errors.push(error);
-        }
-      }
-      Self::Binary { op, lhs, rhs, span } => errors.extend(check_binary_expression(scope, op, lhs, rhs, span)),
-    };
-
-    if errors.is_empty() {
-      Ok(())
-    } else {
-      Err(errors)
-    }
-  }
-}
-
-impl CheckSemantics for Assignment<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
-
-    match Scope::lookup(scope, &self.identifier) {
-      Some(Symbol::Function(..)) => {
-        errors.push(SemanticError::WrongUseOfFunction { span: &self.span, identifier: self.identifier.clone() })
-      }
-      Some(Symbol::Variable(ty, size)) => {
-        if let Some(error) = check_variable_index(&self.identifier, &self.span, size, &self.index_expression) {
-          errors.push(error)
-        }
-
-        if let Some(r_ty) = get_expression_type(scope, &self.rvalue) {
-          if ty != r_ty {
-            errors.push(SemanticError::InvalidDeclarationType {
-              span: &self.span,
-              identifier: self.identifier.clone(),
-              expected: ty,
-              actual: r_ty,
-            });
-          }
-        };
-      }
-      None => errors.push(SemanticError::NotDeclared { span: &self.span, identifier: self.identifier.clone() }),
-    };
-
-    if !errors.is_empty() {
-      Err(errors)
-    } else {
-      Ok(())
-    }
-  }
-}
-
-impl CheckSemantics for Declaration<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
-
-    match Scope::lookup(scope, &self.identifier) {
-      Some(Symbol::Variable(ty, size)) => {
-        if !(ty == self.ty && size == self.count) {
-          errors.push(SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() })
-        }
-      }
-      Some(_) => errors.push(SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() }),
-      None => {}
-    }
-
-    if !errors.is_empty() {
-      Err(errors)
-    } else {
-      Ok(())
-    }
-  }
-}
-
-impl CheckSemantics for FunctionDeclaration<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
-
-    if self.ty.is_some() {
-      let return_type = self
-        .body
-        .statements
-        .iter()
-        .map(|x| match x {
-          Statement::Ret(ret) => Some(ret),
-          _ => None,
-        })
-        .next()
-        .and_then(|ret| ret)
-        .and_then(|ret| ret.expression.as_ref())
-        .and_then(|expr| get_expression_type(scope, &expr));
-
-      if let Some(ty) = return_type {
-        if &ty != self.ty.as_ref().unwrap() {
-          errors.push(SemanticError::InvalidReturnType {
-            identifier: self.identifier.clone(),
-            span: &self.span,
-            expected: self.ty.clone().unwrap(),
-            actual: ty,
-          })
-        };
-      } else {
-        errors.push(SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span });
-      }
-    }
-
-    if !errors.is_empty() {
-      Err(errors)
-    } else {
-      Ok(())
-    }
-  }
-}
-
-impl CheckSemantics for Program<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
-
-    if let Some(Symbol::Function(..)) = Scope::lookup(scope, &Identifier::from("main")) {
-    } else {
-      errors.push(SemanticError::NoMainFunction { span: &self.span })
-    }
-
-    if !errors.is_empty() {
-      Err(errors)
-    } else {
-      Ok(())
-    }
-  }
-}
-
 #[cfg(test)]
 mod test {
   use pest::Span;
+
+  use crate::*;
 
   use super::*;
 
   #[test]
   fn semantic_program_check() {
-    let program = Program {
-      function_declarations: Vec::new(),
-      span: Span::new("", 0, 0).unwrap(),
-    };
+    let program = Program { function_declarations: Vec::new(), span: Span::new("", 0, 0).unwrap() };
 
     let scope = Scope::new();
     let result = program.check_semantics(&scope);
