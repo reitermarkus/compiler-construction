@@ -96,12 +96,37 @@ impl CheckSemantics for Declaration<'_> {
   }
 }
 
+impl CheckSemantics for IfStatement<'_> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    let mut errors = Vec::new();
+
+    errors.extend(check_condition(scope, &self.condition, &self.span));
+
+    if let Err(if_errors) = self.block.check_semantics(scope) {
+      errors.extend(if_errors);
+    }
+
+    if let Some(else_statement) = &self.else_block {
+      if let Err(else_errors) = else_statement.check_semantics(scope) {
+        errors.extend(else_errors);
+      }
+    }
+
+    if !errors.is_empty() {
+      Err(errors)
+    } else {
+      Ok(())
+    }
+  }
+}
+
 impl CheckSemantics for Statement<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     match self {
       Self::Assignment(assignment) => assignment.check_semantics(scope),
       Self::Decl(declaration) => declaration.check_semantics(scope),
       Self::Expression(expression) => expression.check_semantics(scope),
+      Self::If(if_statement) => if_statement.check_semantics(scope),
       _ => Ok(()),
     }
   }
@@ -249,6 +274,28 @@ pub fn check_variable_index<'a>(
     (None, Some(_)) => Some(SemanticError::ArrayError { span, identifier: identifier.clone() }),
     _ => None,
   }
+}
+
+pub fn check_condition<'a>(
+  scope: &Rc<RefCell<Scope>>,
+  condition: &'a Expression<'a>,
+  span: &'a Span<'_>,
+) -> Vec<SemanticError<'a>> {
+  let mut errors = Vec::new();
+
+  if let Some(condition_ty) = get_expression_type(scope, condition) {
+    if condition_ty != Ty::Bool {
+      errors.push(SemanticError::InvalidConditionType { span, actual: condition_ty })
+    }
+  } else {
+    errors.push(SemanticError::InvalidCondition { span })
+  }
+
+  if let Err(expression_errors) = condition.check_semantics(scope) {
+    errors.extend(expression_errors)
+  }
+
+  errors
 }
 
 pub fn check_function_call<'a>(

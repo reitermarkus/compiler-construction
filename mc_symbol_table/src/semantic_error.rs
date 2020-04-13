@@ -99,6 +99,13 @@ pub enum SemanticError<'a> {
   NoMainFunction {
     span: &'a Span<'a>,
   },
+  InvalidConditionType {
+    span: &'a Span<'a>,
+    actual: Ty,
+  },
+  InvalidCondition {
+    span: &'a Span<'a>,
+  },
 }
 
 macro_rules! write_err {
@@ -164,7 +171,11 @@ impl fmt::Display for SemanticError<'_> {
       Self::BinaryOperatorTypeError { span, op, ty } => {
         write_err!(f, span, "operator '{}' cannot be used with type '{}'", op, ty)
       }
-      Self::NoMainFunction { span } => write_err!(f, span, "rquired function 'main' not found"),
+      Self::NoMainFunction { span } => write_err!(f, span, "required function 'main' not found"),
+      Self::InvalidCondition { span } => write_err!(f, span, "invalid condition"),
+      Self::InvalidConditionType { span, actual } => {
+        write_err!(f, span, "expected type '{}' for condition, found '{}'", Ty::Bool, actual)
+      }
     }
   }
 }
