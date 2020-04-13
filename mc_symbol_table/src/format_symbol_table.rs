@@ -50,6 +50,7 @@ mod tests {
         },
         span: Span::new("", 0, 0).unwrap(),
       }],
+      span: Span::new("", 0, 0).unwrap(),
     };
 
     let scope = Scope::new();

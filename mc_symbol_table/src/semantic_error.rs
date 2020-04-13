@@ -100,6 +100,9 @@ pub enum SemanticError<'a> {
     op: &'a BinaryOp,
     ty: Ty,
   },
+  NoMainFunction {
+    span: &'a Span<'a>,
+  },
 }
 
 macro_rules! write_err {
@@ -165,6 +168,7 @@ impl fmt::Display for SemanticError<'_> {
       Self::BinaryOperatorTypeError { span, op, ty } => {
         write_err!(f, span, "operator '{}' cannot be used with type '{}'", op, ty)
       }
+      Self::NoMainFunction { span } => write_err!(f, span, "rquired function 'main' not found"),
     }
   }
 }
@@ -288,6 +292,23 @@ impl CheckSemantics for FunctionDeclaration<'_> {
       } else {
         errors.push(SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span });
       }
+    }
+
+    if !errors.is_empty() {
+      Err(errors)
+    } else {
+      Ok(())
+    }
+  }
+}
+
+impl CheckSemantics for Program<'_> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    let mut errors = Vec::new();
+
+    if let Some(Symbol::Function(..)) = Scope::lookup(scope, &Identifier::from("main")) {
+    } else {
+      errors.push(SemanticError::NoMainFunction { span: &self.span })
     }
 
     if !errors.is_empty() {

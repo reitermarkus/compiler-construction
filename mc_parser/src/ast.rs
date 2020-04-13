@@ -576,6 +576,7 @@ impl<'a> FromPest<'a> for FunctionDeclaration<'a> {
 #[derive(PartialEq, Debug)]
 pub struct Program<'a> {
   pub function_declarations: Vec<FunctionDeclaration<'a>>,
+  pub span: Span<'a>,
 }
 
 impl<'a> FromPest<'a> for Program<'a> {
@@ -583,7 +584,9 @@ impl<'a> FromPest<'a> for Program<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let inner = pairs.next().expect("no program found").into_inner();
+    let pair = pairs.next().expect("no program found");
+    let span = pair.as_span();
+    let inner = pair.into_inner();
 
     Ok(Self {
       function_declarations: inner
@@ -592,6 +595,7 @@ impl<'a> FromPest<'a> for Program<'a> {
           FunctionDeclaration::from_pest(&mut Pairs::single(dec)).expect("failed to parse function declaration")
         })
         .collect(),
+      span,
     })
   }
 }
