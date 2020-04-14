@@ -27,9 +27,8 @@ jobs:
           command: clippy
           args: -- -D warnings
       - name: Coverage
-        uses: actions-rs/tarpaulin@v0.1.1
+        uses: actions-rs/tarpaulin@v0.1
         with:
-          version: 0.11.1
           args: -- --test-threads 1
       - name: Upload Coverage
         uses: codecov/codecov-action@v1
