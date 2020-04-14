@@ -65,7 +65,6 @@ impl Scope {
     self.symbols.insert(identifier, symbol);
   }
 
-  #[allow(dead_code)]
   pub fn lookup(scope: &Rc<RefCell<Self>>, identifier: &Identifier) -> Option<Symbol> {
     let scope = scope.borrow();
 

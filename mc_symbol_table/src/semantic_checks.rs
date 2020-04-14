@@ -103,12 +103,68 @@ impl CheckSemantics for IfStatement<'_> {
     errors.extend(check_condition(scope, &self.condition, &self.span));
 
     if let Err(if_errors) = self.block.check_semantics(scope) {
-      errors.extend(if_errors);
+      errors.extend(if_errors)
     }
 
     if let Some(else_statement) = &self.else_block {
       if let Err(else_errors) = else_statement.check_semantics(scope) {
-        errors.extend(else_errors);
+        errors.extend(else_errors)
+      }
+    }
+
+    if !errors.is_empty() {
+      Err(errors)
+    } else {
+      Ok(())
+    }
+  }
+}
+
+impl CheckSemantics for WhileStatement<'_> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    let mut errors = Vec::new();
+
+    errors.extend(check_condition(scope, &self.condition, &self.span));
+
+    if let Err(while_errors) = self.block.check_semantics(scope) {
+      errors.extend(while_errors)
+    }
+
+    if !errors.is_empty() {
+      Err(errors)
+    } else {
+      Ok(())
+    }
+  }
+}
+
+impl CheckSemantics for ReturnStatement<'_> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    let mut errors = Vec::new();
+
+    //TODO: check if return is allowed with correct type
+
+    if let Some(return_expression) = &self.expression {
+      if let Err(return_expression_errors) = return_expression.check_semantics(scope) {
+        errors.extend(return_expression_errors)
+      }
+    }
+
+    if !errors.is_empty() {
+      Err(errors)
+    } else {
+      Ok(())
+    }
+  }
+}
+
+impl CheckSemantics for CompoundStatement<'_> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    let mut errors = Vec::new();
+
+    for statement in &self.statements {
+      if let Err(statement_errors) = statement.check_semantics(scope) {
+        errors.extend(statement_errors)
       }
     }
 
@@ -127,7 +183,9 @@ impl CheckSemantics for Statement<'_> {
       Self::Decl(declaration) => declaration.check_semantics(scope),
       Self::Expression(expression) => expression.check_semantics(scope),
       Self::If(if_statement) => if_statement.check_semantics(scope),
-      _ => Ok(()),
+      Self::While(while_statement) => while_statement.check_semantics(scope),
+      Self::Ret(ret_statement) => ret_statement.check_semantics(scope),
+      Self::Compound(compound) => compound.check_semantics(scope),
     }
   }
 }
