@@ -82,6 +82,8 @@ impl CheckSemantics for Declaration<'_> {
       Some(Symbol::Variable(ty, size)) => {
         if !(ty == self.ty && size == self.count) {
           errors.push(SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() })
+        } else if let Some(Symbol::Variable(..)) = Scope::lookup_in_scope(scope, &self.identifier) {
+          errors.push(SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() })
         }
       }
       Some(_) => errors.push(SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() }),

@@ -367,7 +367,7 @@ mod test {
     let mut result = declaration.check_semantics(&scope);
     assert_eq!(result, Ok(()));
 
-    scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Function(Some(Ty::Int), [].to_vec()));
+    scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Variable(Ty::Int, None));
     result = declaration.check_semantics(&scope);
     let errors = result.expect_err("no errors found");
 
@@ -375,6 +375,10 @@ mod test {
       span: &Span::new(declaration_str, 0, 9).unwrap(),
       identifier: Identifier::from("x")
     }));
+
+    let child = Scope::new_child(&scope, "block");
+    result = declaration.check_semantics(&child);
+    assert_eq!(result, Ok(()));
   }
 
   #[test]

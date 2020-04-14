@@ -78,6 +78,16 @@ impl Scope {
       None
     }
   }
+
+  pub fn lookup_in_scope(scope: &Rc<RefCell<Self>>, identifier: &Identifier) -> Option<Symbol> {
+    let scope = scope.borrow();
+
+    if let Some(symbol) = scope.symbols.get(identifier) {
+      Some(symbol.clone())
+    } else {
+      None
+    }
+  }
 }
 
 #[derive(Debug, PartialEq, Clone)]
