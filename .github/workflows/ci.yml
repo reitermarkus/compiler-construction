@@ -29,6 +29,6 @@ jobs:
       - name: Coverage
         uses: actions-rs/tarpaulin@v0.1
         with:
-          args: -- --test-threads 1
+          args: --ignore-tests -- --test-threads 1
       - name: Upload Coverage
         uses: codecov/codecov-action@v1
