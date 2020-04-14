@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::stdout;
 
 use clap::{value_t, App, Arg};
-use mc_symbol_table::mc_view_symbol_table;
+use mc_symbol_table::mc_symbol_table;
 
 #[cfg_attr(tarpaulin, skip)]
 fn main() -> std::io::Result<()> {
@@ -20,8 +20,8 @@ fn main() -> std::io::Result<()> {
   let in_file = value_t!(matches, "file", String).unwrap();
 
   if let Some(out_file) = out_file.map(File::create) {
-    mc_view_symbol_table(in_file, out_file?)
+    mc_symbol_table(in_file, out_file?)
   } else {
-    mc_view_symbol_table(in_file, stdout())
+    mc_symbol_table(in_file, stdout())
   }
 }

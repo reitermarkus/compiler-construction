@@ -22,7 +22,7 @@ mod semantic_checks;
 #[allow(unused_imports)]
 use semantic_checks::*;
 
-pub fn mc_view_symbol_table(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::Result<()> {
+pub fn mc_symbol_table(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::Result<()> {
   let mut contents = String::new();
 
   if in_file.as_ref() == Path::new("-") {
