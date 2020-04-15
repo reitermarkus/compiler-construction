@@ -51,20 +51,18 @@ impl AddToScope for ReturnStatement<'_> {
 
 impl AddToScope for Declaration<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    let res = self.check_semantics(scope);
     (*scope.borrow_mut()).insert(self.identifier.clone(), Symbol::Variable(self.ty.clone(), self.count));
-
-    Ok(())
+    res
   }
 }
 
-#[allow(unused_variables)]
 impl AddToScope for Assignment<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    Ok(())
+    self.check_semantics(scope)
   }
 }
 
-#[allow(unused_variables)]
 impl AddToScope for Expression<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     self.check_semantics(scope)

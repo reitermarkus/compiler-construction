@@ -74,22 +74,8 @@ impl CheckSemantics for Assignment<'_> {
 
 impl CheckSemantics for Declaration<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
-
-    match Scope::lookup(scope, &self.identifier) {
-      Some(Symbol::Variable(ty, size)) => {
-        if !(ty == self.ty && size == self.count) {
-          errors.push(SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() })
-        } else if let Some(Symbol::Variable(..)) = Scope::lookup_in_scope(scope, &self.identifier) {
-          errors.push(SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() })
-        }
-      }
-      Some(_) => errors.push(SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() }),
-      None => {}
-    }
-
-    if !errors.is_empty() {
-      Err(errors)
+    if Scope::lookup_in_scope(scope, &self.identifier).is_some() {
+      Err(vec![SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() }])
     } else {
       Ok(())
     }
@@ -390,7 +376,6 @@ pub fn check_function_call_arguments<'a>(
       .zip(arguments.iter())
       .filter_map(|(arg, argument)| check_function_call_argument_type(scope, arg, argument, identifier, span))
       .collect();
-  } else {
   }
 
   Vec::with_capacity(0)
