@@ -154,34 +154,54 @@ impl CheckSemantics for FunctionDeclaration<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let mut res = Ok(());
 
-    if self.ty.is_some() {
-      let return_type = self
-        .body
-        .statements
-        .iter()
-        .map(|x| match x {
-          Statement::Ret(ret) => Some(ret),
-          _ => None,
-        })
-        .next()
-        .and_then(|ret| ret)
-        .and_then(|ret| ret.expression.as_ref())
-        .and_then(|expr| get_expression_type(scope, &expr));
+    if Scope::lookup(scope, &self.identifier).is_some() {
+      push_error!(res, SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() })
+    }
 
-      if let Some(ty) = return_type {
-        if &ty != self.ty.as_ref().unwrap() {
+    let ret_expressions = self
+      .body
+      .statements
+      .iter()
+      .filter_map(|x| match x {
+        Statement::Ret(ret) => Some(ret),
+        _ => None,
+      })
+      .filter_map(|x| x.expression.as_ref())
+      .collect::<Vec<&Expression<'_>>>();
+
+    // Check that return statements match the functions type.
+    if let Some(function_ty) = &self.ty {
+      if ret_expressions.is_empty() {
+        push_error!(res, SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span })
+      }
+
+      for ret_expr in ret_expressions {
+        if let Some(expr_ty) = get_expression_type(scope, ret_expr) {
+          if expr_ty != *function_ty {
+            push_error!(
+              res,
+              SemanticError::InvalidReturnType {
+                identifier: self.identifier.clone(),
+                span: ret_expr.get_span(),
+                expected: function_ty.clone(),
+                actual: expr_ty,
+              }
+            )
+          }
+        }
+      }
+    } else if !ret_expressions.is_empty() {
+      for ret_expr in ret_expressions {
+        if let Some(expr_ty) = get_expression_type(scope, ret_expr) {
           push_error!(
             res,
-            SemanticError::InvalidReturnType {
+            SemanticError::NoReturnTypeExpected {
               identifier: self.identifier.clone(),
-              span: &self.span,
-              expected: self.ty.clone().unwrap(),
-              actual: ty,
+              span: ret_expr.get_span(),
+              actual: expr_ty,
             }
           )
-        };
-      } else {
-        push_error!(res, SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span })
+        }
       }
     }
 

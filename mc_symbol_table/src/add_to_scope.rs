@@ -93,10 +93,9 @@ impl AddToScope for FunctionDeclaration<'_> {
     let mut res = Ok(());
 
     for param in &self.parameters {
-      (*scope.borrow_mut()).insert(param.identifier.clone(), Symbol::Variable(param.ty.clone(), param.count));
       extend_errors!(res, param.check_semantics(scope));
+      (*scope.borrow_mut()).insert(param.identifier.clone(), Symbol::Variable(param.ty.clone(), param.count));
     }
-    extend_errors!(res, self.check_semantics(scope));
 
     extend_errors!(res, self.body.add_to_scope(scope));
     res
@@ -108,6 +107,8 @@ impl AddToScope for Program<'_> {
     let mut res = Ok(());
 
     for function in &self.function_declarations {
+      extend_errors!(res, function.check_semantics(scope));
+
       (*scope.borrow_mut()).insert(
         function.identifier.clone(),
         Symbol::Function(

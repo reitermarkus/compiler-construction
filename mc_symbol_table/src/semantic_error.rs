@@ -106,6 +106,11 @@ pub enum SemanticError<'a> {
   InvalidCondition {
     span: &'a Span<'a>,
   },
+  NoReturnTypeExpected {
+    span: &'a Span<'a>,
+    identifier: Identifier,
+    actual: Ty,
+  },
 }
 
 macro_rules! write_err {
@@ -175,6 +180,9 @@ impl fmt::Display for SemanticError<'_> {
       Self::InvalidCondition { span } => write_err!(f, span, "invalid condition"),
       Self::InvalidConditionType { span, actual } => {
         write_err!(f, span, "expected type '{}' for condition, found '{}'", Ty::Bool, actual)
+      }
+      Self::NoReturnTypeExpected { span, identifier, actual } => {
+        write_err!(f, span, "no return type expected for 'void' function '{}', found '{}'", identifier, actual)
       }
     }
   }
