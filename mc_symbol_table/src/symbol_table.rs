@@ -46,7 +46,16 @@ impl fmt::Display for Scope {
 
 impl Scope {
   pub fn new() -> Rc<RefCell<Self>> {
-    Rc::new(RefCell::new(Scope::default()))
+    let mut scope = Scope::default();
+
+    scope.insert(Identifier::from("print"), Symbol::Function(None, vec![(Ty::String, None)]));
+    scope.insert(Identifier::from("print_nl"), Symbol::Function(None, vec![]));
+    scope.insert(Identifier::from("print_int"), Symbol::Function(None, vec![(Ty::Int, None)]));
+    scope.insert(Identifier::from("print_float"), Symbol::Function(None, vec![(Ty::Float, None)]));
+    scope.insert(Identifier::from("read_int"), Symbol::Function(Some(Ty::Int), vec![]));
+    scope.insert(Identifier::from("read_float"), Symbol::Function(Some(Ty::Float), vec![]));
+
+    Rc::new(RefCell::new(scope))
   }
 
   pub fn new_child(parent: &Rc<RefCell<Self>>, name: &str) -> Rc<RefCell<Self>> {

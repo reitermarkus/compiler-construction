@@ -184,6 +184,7 @@ impl fmt::Display for SemanticError<'_> {
 mod test {
   use pest::Span;
 
+  use crate::semantic_checks::CheckSemantics;
   use crate::*;
 
   use super::*;

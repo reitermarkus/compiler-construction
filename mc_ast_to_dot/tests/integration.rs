@@ -13,6 +13,7 @@ fn integration_test() -> io::Result<()> {
     let mc_file = example_dir.join(example_file_name);
 
     if mc_file.exists() {
+      eprintln!("{}", mc_file.display());
       mc_ast_to_dot(mc_file, sink())?;
     }
   }

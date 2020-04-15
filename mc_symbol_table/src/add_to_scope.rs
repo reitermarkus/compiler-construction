@@ -5,6 +5,8 @@ use mc_parser::ast::*;
 
 use crate::*;
 
+use crate::semantic_checks::*;
+
 pub trait AddToScope {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>>;
 }
@@ -65,7 +67,7 @@ impl AddToScope for Assignment<'_> {
 #[allow(unused_variables)]
 impl AddToScope for Expression<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    Ok(())
+    self.check_semantics(scope)
   }
 }
 

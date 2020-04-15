@@ -24,9 +24,7 @@ impl CheckSemantics for Expression<'_> {
       }
       Self::Unary { op, expression, span } => errors.extend(check_unary_expression(scope, op, expression, span)),
       Self::FunctionCall { identifier, arguments, span } => {
-        if let Some(error) = check_function_call(scope, identifier, span, arguments) {
-          errors.push(error);
-        }
+        errors.extend(check_function_call(scope, identifier, span, arguments));
       }
       Self::Binary { op, lhs, rhs, span } => errors.extend(check_binary_expression(scope, op, lhs, rhs, span)),
     };
@@ -363,11 +361,11 @@ pub fn check_function_call<'a>(
   identifier: &Identifier,
   span: &'a Span<'_>,
   arguments: &'a [Expression<'a>],
-) -> Option<SemanticError<'a>> {
+) -> Vec<SemanticError<'a>> {
   match Scope::lookup(scope, identifier) {
     Some(Symbol::Function(..)) => check_function_call_arguments(scope, identifier, span, arguments),
-    Some(Symbol::Variable(..)) => Some(SemanticError::NotAFunction { span, identifier: identifier.clone() }),
-    None => Some(SemanticError::NotDeclared { span, identifier: identifier.clone() }),
+    Some(Symbol::Variable(..)) => vec![SemanticError::NotAFunction { span, identifier: identifier.clone() }],
+    None => vec![SemanticError::NotDeclared { span, identifier: identifier.clone() }],
   }
 }
 
@@ -376,33 +374,26 @@ pub fn check_function_call_arguments<'a>(
   identifier: &Identifier,
   span: &'a Span<'_>,
   arguments: &'a [Expression<'a>],
-) -> Option<SemanticError<'a>> {
+) -> Vec<SemanticError<'a>> {
   if let Some(Symbol::Function(_, args)) = Scope::lookup(scope, identifier) {
     if args.len() != arguments.len() {
-      return Some(SemanticError::InvalidAmountOfArguments {
+      return vec![SemanticError::InvalidAmountOfArguments {
         span,
         identifier: identifier.clone(),
         expected: args.len(),
         actual: arguments.len(),
-      });
+      }];
     }
 
     return args
       .iter()
-      .enumerate()
-      .map(|(i, arg)| {
-        if let Some(argument) = arguments.get(i) {
-          check_function_call_argument_type(scope, arg, &argument, identifier, span)
-        } else {
-          None
-        }
-      })
-      .filter(|err| err.is_some())
-      .collect::<Vec<Option<SemanticError<'a>>>>()
-      .remove(0);
+      .zip(arguments.iter())
+      .filter_map(|(arg, argument)| check_function_call_argument_type(scope, arg, argument, identifier, span))
+      .collect();
+  } else {
   }
 
-  None
+  Vec::with_capacity(0)
 }
 
 pub fn check_function_call_argument_type<'a>(
@@ -453,9 +444,9 @@ pub fn check_unary_expression<'a>(
       }
     }
     Expression::FunctionCall { identifier, arguments, .. } => {
-      if let Some(error) = check_function_call(scope, identifier, span, arguments) {
-        errors.push(error)
-      } else if let Some(ty) = get_expression_type(scope, expression) {
+      errors.extend(check_function_call(scope, identifier, span, arguments));
+
+      if let Some(ty) = get_expression_type(scope, expression) {
         if let Some(error) = check_unary_operator_compatability(op, ty, span) {
           errors.push(error)
         }

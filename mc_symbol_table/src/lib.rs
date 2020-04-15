@@ -19,8 +19,6 @@ mod semantic_error;
 use semantic_error::SemanticError;
 
 mod semantic_checks;
-#[allow(unused_imports)]
-use semantic_checks::*;
 
 pub fn mc_symbol_table(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::Result<()> {
   let mut contents = String::new();
