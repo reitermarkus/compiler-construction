@@ -76,6 +76,16 @@ impl CheckSemantics for Declaration<'_> {
   }
 }
 
+impl CheckSemantics for Parameter<'_> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    if Scope::lookup(scope, &self.identifier).is_some() {
+      Err(vec![SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() }])
+    } else {
+      Ok(())
+    }
+  }
+}
+
 impl CheckSemantics for IfStatement<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let mut res = Ok(());
@@ -105,8 +115,6 @@ impl CheckSemantics for WhileStatement<'_> {
 impl CheckSemantics for ReturnStatement<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let mut res = Ok(());
-
-    //TODO: check if return is allowed with correct type
 
     if let Some(return_expression) = &self.expression {
       extend_errors!(res, return_expression.check_semantics(scope));

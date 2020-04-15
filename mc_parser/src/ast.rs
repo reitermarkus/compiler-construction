@@ -326,18 +326,21 @@ impl From<&str> for Identifier {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct Parameter {
+pub struct Parameter<'a> {
   pub ty: Ty,
   pub count: Option<usize>,
   pub identifier: Identifier,
+  pub span: Span<'a>,
 }
 
-impl FromPest<'_> for Parameter {
+impl<'a> FromPest<'a> for Parameter<'a> {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no parameter found").into_inner();
+  fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let pair = pairs.next().expect("no parameter found");
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
 
     let mut param_type = inner.next().expect("no declaration type").into_inner();
     let (ty, count) = match (param_type.next(), param_type.next()) {
@@ -348,7 +351,7 @@ impl FromPest<'_> for Parameter {
 
     let identifier = Identifier::from_pest(&mut inner)?;
 
-    Ok(Self { ty, count, identifier })
+    Ok(Self { ty, count, identifier, span })
   }
 }
 
@@ -542,7 +545,7 @@ impl<'a> FromPest<'a> for Statement<'a> {
 pub struct FunctionDeclaration<'a> {
   pub ty: Option<Ty>,
   pub identifier: Identifier,
-  pub parameters: Vec<Parameter>,
+  pub parameters: Vec<Parameter<'a>>,
   pub body: CompoundStatement<'a>,
   pub span: Span<'a>,
 }
@@ -786,7 +789,12 @@ mod tests {
       FunctionDeclaration {
         ty: Some(Ty::Int),
         identifier: Identifier::from("sum"),
-        parameters: vec![Parameter { ty: Ty::Int, count: Some(16), identifier: Identifier::from("n") }],
+        parameters: vec![Parameter {
+          ty: Ty::Int,
+          count: Some(16),
+          identifier: Identifier::from("n"),
+          span: Span::new(&if_stmt, 8, 17).unwrap(),
+        }],
         body: CompoundStatement { statements: vec![], span: Span::new(&if_stmt, 19, 22).unwrap() },
         span: Span::new(&if_stmt, 0, 22).unwrap(),
       }

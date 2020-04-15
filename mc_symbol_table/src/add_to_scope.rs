@@ -90,11 +90,16 @@ impl AddToScope for CompoundStatement<'_> {
 
 impl AddToScope for FunctionDeclaration<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    let mut res = Ok(());
+
     for param in &self.parameters {
       (*scope.borrow_mut()).insert(param.identifier.clone(), Symbol::Variable(param.ty.clone(), param.count));
+      extend_errors!(res, param.check_semantics(scope));
     }
+    extend_errors!(res, self.check_semantics(scope));
 
-    self.body.add_to_scope(scope)
+    extend_errors!(res, self.body.add_to_scope(scope));
+    res
   }
 }
 
@@ -134,8 +139,13 @@ mod tests {
         ty: Some(Ty::Int),
         identifier: Identifier::from("fib"),
         parameters: vec![
-          Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("n") },
-          Parameter { ty: Ty::Bool, count: None, identifier: Identifier::from("debug") },
+          Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("n"), span: Span::new("", 0, 0).unwrap() },
+          Parameter {
+            ty: Ty::Bool,
+            count: None,
+            identifier: Identifier::from("debug"),
+            span: Span::new("", 0, 0).unwrap(),
+          },
         ],
         body: CompoundStatement {
           statements: vec![

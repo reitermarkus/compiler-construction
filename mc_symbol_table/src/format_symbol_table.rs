@@ -36,8 +36,13 @@ mod tests {
         ty: Some(Ty::Int),
         identifier: Identifier::from("fib"),
         parameters: vec![
-          Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("n") },
-          Parameter { ty: Ty::Bool, count: None, identifier: Identifier::from("debug") },
+          Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("n"), span: Span::new("", 0, 0).unwrap() },
+          Parameter {
+            ty: Ty::Bool,
+            count: None,
+            identifier: Identifier::from("debug"),
+            span: Span::new("", 0, 0).unwrap(),
+          },
         ],
         body: CompoundStatement {
           statements: vec![Statement::Decl(Declaration {

@@ -216,7 +216,12 @@ mod tests {
       function_declarations: vec![FunctionDeclaration {
         ty: Some(Ty::Int),
         identifier: Identifier::from("fib"),
-        parameters: vec![Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("n") }],
+        parameters: vec![Parameter {
+          ty: Ty::Int,
+          count: None,
+          identifier: Identifier::from("n"),
+          span: Span::new("", 0, 0).unwrap(),
+        }],
         body: CompoundStatement {
           statements: vec![
             Statement::If(Box::new(IfStatement {
