@@ -5,6 +5,7 @@ use pest::Span;
 
 use mc_parser::ast::*;
 
+use super::extend_errors;
 use crate::*;
 
 pub trait CheckSemantics {
@@ -13,62 +14,55 @@ pub trait CheckSemantics {
 
 impl CheckSemantics for Expression<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
+    let mut res = Ok(());
 
     match self {
       Self::Literal { .. } => {}
       Self::Variable { identifier, span, index_expression } => {
-        if let Some(error) = check_variable(scope, identifier, span, index_expression) {
-          errors.push(error);
-        }
+        extend_errors!(res, check_variable(scope, identifier, span, index_expression));
       }
-      Self::Unary { op, expression, span } => errors.extend(check_unary_expression(scope, op, expression, span)),
+      Self::Unary { op, expression, span } => extend_errors!(res, check_unary_expression(scope, op, expression, span)),
       Self::FunctionCall { identifier, arguments, span } => {
-        errors.extend(check_function_call(scope, identifier, span, arguments));
+        extend_errors!(res, check_function_call(scope, identifier, span, arguments));
       }
-      Self::Binary { op, lhs, rhs, span } => errors.extend(check_binary_expression(scope, op, lhs, rhs, span)),
+      Self::Binary { op, lhs, rhs, span } => {
+        extend_errors!(res, check_binary_expression(scope, op, lhs, rhs, span));
+      }
     };
 
-    if errors.is_empty() {
-      Ok(())
-    } else {
-      Err(errors)
-    }
+    res
   }
 }
 
 impl CheckSemantics for Assignment<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
+    let mut res = Ok(());
 
     match Scope::lookup(scope, &self.identifier) {
       Some(Symbol::Function(..)) => {
-        errors.push(SemanticError::WrongUseOfFunction { span: &self.span, identifier: self.identifier.clone() })
+        push_error!(res, SemanticError::WrongUseOfFunction { span: &self.span, identifier: self.identifier.clone() });
       }
       Some(Symbol::Variable(ty, size)) => {
-        if let Some(error) = check_variable_index(&self.identifier, &self.span, size, &self.index_expression) {
-          errors.push(error)
-        }
+        extend_errors!(res, check_variable_index(&self.identifier, &self.span, size, &self.index_expression));
 
         if let Some(r_ty) = get_expression_type(scope, &self.rvalue) {
           if ty != r_ty {
-            errors.push(SemanticError::InvalidDeclarationType {
-              span: &self.span,
-              identifier: self.identifier.clone(),
-              expected: ty,
-              actual: r_ty,
-            });
+            push_error!(
+              res,
+              SemanticError::InvalidDeclarationType {
+                span: &self.span,
+                identifier: self.identifier.clone(),
+                expected: ty,
+                actual: r_ty,
+              }
+            );
           }
         };
       }
-      None => errors.push(SemanticError::NotDeclared { span: &self.span, identifier: self.identifier.clone() }),
+      None => push_error!(res, SemanticError::NotDeclared { span: &self.span, identifier: self.identifier.clone() }),
     };
 
-    if !errors.is_empty() {
-      Err(errors)
-    } else {
-      Ok(())
-    }
+    res
   }
 }
 
@@ -84,81 +78,53 @@ impl CheckSemantics for Declaration<'_> {
 
 impl CheckSemantics for IfStatement<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
+    let mut res = Ok(());
 
-    errors.extend(check_condition(scope, &self.condition, &self.span));
-
-    if let Err(if_errors) = self.block.check_semantics(scope) {
-      errors.extend(if_errors)
-    }
+    extend_errors!(res, check_condition(scope, &self.condition, &self.span));
+    extend_errors!(res, self.block.check_semantics(scope));
 
     if let Some(else_statement) = &self.else_block {
-      if let Err(else_errors) = else_statement.check_semantics(scope) {
-        errors.extend(else_errors)
-      }
+      extend_errors!(res, else_statement.check_semantics(scope));
     }
 
-    if !errors.is_empty() {
-      Err(errors)
-    } else {
-      Ok(())
-    }
+    res
   }
 }
 
 impl CheckSemantics for WhileStatement<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
+    let mut res = Ok(());
 
-    errors.extend(check_condition(scope, &self.condition, &self.span));
+    extend_errors!(res, check_condition(scope, &self.condition, &self.span));
+    extend_errors!(res, self.block.check_semantics(scope));
 
-    if let Err(while_errors) = self.block.check_semantics(scope) {
-      errors.extend(while_errors)
-    }
-
-    if !errors.is_empty() {
-      Err(errors)
-    } else {
-      Ok(())
-    }
+    res
   }
 }
 
 impl CheckSemantics for ReturnStatement<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
+    let mut res = Ok(());
 
     //TODO: check if return is allowed with correct type
 
     if let Some(return_expression) = &self.expression {
-      if let Err(return_expression_errors) = return_expression.check_semantics(scope) {
-        errors.extend(return_expression_errors)
-      }
+      extend_errors!(res, return_expression.check_semantics(scope));
     }
 
-    if !errors.is_empty() {
-      Err(errors)
-    } else {
-      Ok(())
-    }
+    res
   }
 }
 
 impl CheckSemantics for CompoundStatement<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
+    let mut res = Ok(());
 
     for statement in &self.statements {
-      if let Err(statement_errors) = statement.check_semantics(scope) {
-        errors.extend(statement_errors)
-      }
+      extend_errors!(res, statement.check_semantics(scope));
     }
 
-    if !errors.is_empty() {
-      Err(errors)
-    } else {
-      Ok(())
-    }
+    res
   }
 }
 
@@ -178,7 +144,7 @@ impl CheckSemantics for Statement<'_> {
 
 impl CheckSemantics for FunctionDeclaration<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
+    let mut res = Ok(());
 
     if self.ty.is_some() {
       let return_type = self
@@ -196,40 +162,32 @@ impl CheckSemantics for FunctionDeclaration<'_> {
 
       if let Some(ty) = return_type {
         if &ty != self.ty.as_ref().unwrap() {
-          errors.push(SemanticError::InvalidReturnType {
-            identifier: self.identifier.clone(),
-            span: &self.span,
-            expected: self.ty.clone().unwrap(),
-            actual: ty,
-          })
+          push_error!(
+            res,
+            SemanticError::InvalidReturnType {
+              identifier: self.identifier.clone(),
+              span: &self.span,
+              expected: self.ty.clone().unwrap(),
+              actual: ty,
+            }
+          )
         };
       } else {
-        errors.push(SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span });
+        push_error!(res, SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span })
       }
     }
 
-    if !errors.is_empty() {
-      Err(errors)
-    } else {
-      Ok(())
-    }
+    res
   }
 }
 
 impl CheckSemantics for Program<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut errors = Vec::new();
-
-    if let Some(Symbol::Function(..)) = Scope::lookup(scope, &Identifier::from("main")) {
-    } else {
-      errors.push(SemanticError::NoMainFunction { span: &self.span })
+    if !matches!(Scope::lookup(scope, &Identifier::from("main")), Some(Symbol::Function(..))) {
+      return Err(vec![SemanticError::NoMainFunction { span: &self.span }]);
     }
 
-    if !errors.is_empty() {
-      Err(errors)
-    } else {
-      Ok(())
-    }
+    Ok(())
   }
 }
 
@@ -261,11 +219,11 @@ pub fn check_variable<'a>(
   identifier: &Identifier,
   span: &'a Span<'_>,
   index_expression: &'a Option<Box<Expression<'a>>>,
-) -> Option<SemanticError<'a>> {
+) -> Result<(), Vec<SemanticError<'a>>> {
   match Scope::lookup(scope, identifier) {
-    Some(Symbol::Function(..)) => Some(SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() }),
+    Some(Symbol::Function(..)) => Err(vec![SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() }]),
     Some(Symbol::Variable(.., size)) => check_variable_boxed_index(identifier, span, size, index_expression),
-    None => Some(SemanticError::NotDeclared { span, identifier: identifier.clone() }),
+    None => Err(vec![SemanticError::NotDeclared { span, identifier: identifier.clone() }]),
   }
 }
 
@@ -274,11 +232,11 @@ pub fn index_bounds_check<'a>(
   size: usize,
   identifier: &Identifier,
   span: &'a Span<'_>,
-) -> Option<SemanticError<'a>> {
+) -> Result<(), Vec<SemanticError<'a>>> {
   if index as usize >= size {
-    Some(SemanticError::IndexOutOfBounds { span: &span, identifier: identifier.clone(), size, actual: index })
+    Err(vec![SemanticError::IndexOutOfBounds { span: &span, identifier: identifier.clone(), size, actual: index }])
   } else {
-    None
+    Ok(())
   }
 }
 
@@ -287,17 +245,17 @@ pub fn check_variable_boxed_index<'a>(
   span: &'a Span<'_>,
   size: Option<usize>,
   index_expression: &'a Option<Box<Expression<'a>>>,
-) -> Option<SemanticError<'a>> {
+) -> Result<(), Vec<SemanticError<'a>>> {
   match (size, index_expression) {
     (Some(size), Some(index_expression)) => {
       if let Expression::Literal { literal: Literal::Int(index), span } = &**index_expression {
         index_bounds_check(*index as usize, size, identifier, span)
       } else {
-        None
+        Ok(())
       }
     }
-    (None, Some(_)) => Some(SemanticError::ArrayError { span, identifier: identifier.clone() }),
-    _ => None,
+    (None, Some(_)) => Err(vec![SemanticError::ArrayError { span, identifier: identifier.clone() }]),
+    _ => Ok(()),
   }
 }
 
@@ -306,17 +264,17 @@ pub fn check_variable_index<'a>(
   span: &'a Span<'_>,
   size: Option<usize>,
   index_expression: &'a Option<Expression<'a>>,
-) -> Option<SemanticError<'a>> {
+) -> Result<(), Vec<SemanticError<'a>>> {
   match (size, index_expression) {
     (Some(size), Some(index_expression)) => {
       if let Expression::Literal { literal: Literal::Int(index), span } = index_expression {
         index_bounds_check(*index as usize, size, identifier, span)
       } else {
-        None
+        Ok(())
       }
     }
-    (None, Some(_)) => Some(SemanticError::ArrayError { span, identifier: identifier.clone() }),
-    _ => None,
+    (None, Some(_)) => Err(vec![SemanticError::ArrayError { span, identifier: identifier.clone() }]),
+    _ => Ok(()),
   }
 }
 
@@ -324,22 +282,20 @@ pub fn check_condition<'a>(
   scope: &Rc<RefCell<Scope>>,
   condition: &'a Expression<'a>,
   span: &'a Span<'_>,
-) -> Vec<SemanticError<'a>> {
-  let mut errors = Vec::new();
-
-  if let Some(condition_ty) = get_expression_type(scope, condition) {
+) -> Result<(), Vec<SemanticError<'a>>> {
+  let mut res = if let Some(condition_ty) = get_expression_type(scope, condition) {
     if condition_ty != Ty::Bool {
-      errors.push(SemanticError::InvalidConditionType { span, actual: condition_ty })
+      Err(vec![SemanticError::InvalidConditionType { span, actual: condition_ty }])
+    } else {
+      Ok(())
     }
   } else {
-    errors.push(SemanticError::InvalidCondition { span })
-  }
+    Err(vec![SemanticError::InvalidCondition { span }])
+  };
 
-  if let Err(expression_errors) = condition.check_semantics(scope) {
-    errors.extend(expression_errors)
-  }
+  extend_errors!(res, condition.check_semantics(scope));
 
-  errors
+  res
 }
 
 pub fn check_function_call<'a>(
@@ -347,11 +303,11 @@ pub fn check_function_call<'a>(
   identifier: &Identifier,
   span: &'a Span<'_>,
   arguments: &'a [Expression<'a>],
-) -> Vec<SemanticError<'a>> {
+) -> Result<(), Vec<SemanticError<'a>>> {
   match Scope::lookup(scope, identifier) {
     Some(Symbol::Function(..)) => check_function_call_arguments(scope, identifier, span, arguments),
-    Some(Symbol::Variable(..)) => vec![SemanticError::NotAFunction { span, identifier: identifier.clone() }],
-    None => vec![SemanticError::NotDeclared { span, identifier: identifier.clone() }],
+    Some(Symbol::Variable(..)) => Err(vec![SemanticError::NotAFunction { span, identifier: identifier.clone() }]),
+    None => Err(vec![SemanticError::NotDeclared { span, identifier: identifier.clone() }]),
   }
 }
 
@@ -360,25 +316,31 @@ pub fn check_function_call_arguments<'a>(
   identifier: &Identifier,
   span: &'a Span<'_>,
   arguments: &'a [Expression<'a>],
-) -> Vec<SemanticError<'a>> {
+) -> Result<(), Vec<SemanticError<'a>>> {
   if let Some(Symbol::Function(_, args)) = Scope::lookup(scope, identifier) {
     if args.len() != arguments.len() {
-      return vec![SemanticError::InvalidAmountOfArguments {
+      return Err(vec![SemanticError::InvalidAmountOfArguments {
         span,
         identifier: identifier.clone(),
         expected: args.len(),
         actual: arguments.len(),
-      }];
+      }]);
     }
 
-    return args
+    let mut res = Ok(());
+
+    for r in args
       .iter()
       .zip(arguments.iter())
-      .filter_map(|(arg, argument)| check_function_call_argument_type(scope, arg, argument, identifier, span))
-      .collect();
+      .map(|(arg, argument)| check_function_call_argument_type(scope, arg, argument, identifier, span))
+    {
+      extend_errors!(res, r);
+    }
+
+    return res;
   }
 
-  Vec::with_capacity(0)
+  Ok(())
 }
 
 pub fn check_function_call_argument_type<'a>(
@@ -387,21 +349,22 @@ pub fn check_function_call_argument_type<'a>(
   arg_expression: &'a Expression<'a>,
   identifier: &Identifier,
   span: &'a Span<'_>,
-) -> Option<SemanticError<'a>> {
+) -> Result<(), Vec<SemanticError<'a>>> {
   if arg_expression.check_semantics(scope).is_err() {
-    Some(SemanticError::InvalidArgument { span, identifier: identifier.clone() })
+    Err(vec![SemanticError::InvalidArgument { span, identifier: identifier.clone() }])
   } else if let Some(ty) = get_expression_type(scope, arg_expression) {
     if ty != symbol_arg.0 {
-      return Some(SemanticError::InvalidArgumentType {
+      return Err(vec![SemanticError::InvalidArgumentType {
         span,
         identifier: identifier.clone(),
         expected: symbol_arg.0.clone(),
         actual: ty,
-      });
+      }]);
     }
-    None
+
+    Ok(())
   } else {
-    Some(SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
+    Err(vec![SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() }])
   }
 }
 
@@ -410,52 +373,38 @@ pub fn check_unary_expression<'a>(
   op: &'a UnaryOp,
   expression: &'a Expression<'a>,
   span: &'a Span<'_>,
-) -> Vec<SemanticError<'a>> {
-  let mut errors = Vec::new();
+) -> Result<(), Vec<SemanticError<'a>>> {
+  let mut res = Ok(());
 
   match expression {
     Expression::Literal { literal, .. } => {
-      if let Some(error) = check_unary_operator_compatability(op, Ty::from(literal), span) {
-        errors.push(error)
-      }
+      extend_errors!(res, check_unary_operator_compatability(op, Ty::from(literal), span));
     }
     Expression::Variable { identifier, index_expression, .. } => {
-      if let Some(error) = check_variable(scope, identifier, span, index_expression) {
-        errors.push(error)
-      } else if let Some(ty) = get_expression_type(scope, expression) {
-        if let Some(error) = check_unary_operator_compatability(op, ty, span) {
-          errors.push(error)
-        }
+      extend_errors!(res, check_variable(scope, identifier, span, index_expression));
+
+      if let Some(ty) = get_expression_type(scope, expression) {
+        extend_errors!(res, check_unary_operator_compatability(op, ty, span));
       }
     }
     Expression::FunctionCall { identifier, arguments, .. } => {
-      errors.extend(check_function_call(scope, identifier, span, arguments));
+      extend_errors!(res, check_function_call(scope, identifier, span, arguments));
 
       if let Some(ty) = get_expression_type(scope, expression) {
-        if let Some(error) = check_unary_operator_compatability(op, ty, span) {
-          errors.push(error)
-        }
+        extend_errors!(res, check_unary_operator_compatability(op, ty, span));
       }
     }
     Expression::Unary { op: inner_op, .. } => {
-      if let Err(exp_errors) = expression.check_semantics(scope) {
-        errors.extend(exp_errors)
-      }
-      if let Some(error) = check_unary_operator_combination(inner_op, op, span) {
-        errors.push(error)
-      }
+      extend_errors!(res, expression.check_semantics(scope));
+      extend_errors!(res, check_unary_operator_combination(inner_op, op, span));
     }
     Expression::Binary { op: binary_op, .. } => {
-      if let Err(exp_errors) = expression.check_semantics(scope) {
-        errors.extend(exp_errors)
-      }
-      if let Some(error) = check_operator_combination(op, binary_op, span) {
-        errors.push(error)
-      }
+      extend_errors!(res, expression.check_semantics(scope));
+      extend_errors!(res, check_operator_combination(op, binary_op, span));
     }
   }
 
-  errors
+  res
 }
 
 pub fn check_binary_expression<'a>(
@@ -464,21 +413,17 @@ pub fn check_binary_expression<'a>(
   lhs: &'a Expression<'a>,
   rhs: &'a Expression<'a>,
   span: &'a Span<'_>,
-) -> Vec<SemanticError<'a>> {
-  let mut errors = Vec::new();
+) -> Result<(), Vec<SemanticError<'a>>> {
+  let mut res = Ok(());
 
-  if let Err(lhs_errors) = lhs.check_semantics(scope) {
-    errors.extend(lhs_errors)
-  }
-  if let Err(rhs_errors) = rhs.check_semantics(scope) {
-    errors.extend(rhs_errors)
-  }
+  extend_errors!(res, lhs.check_semantics(scope));
+  extend_errors!(res, rhs.check_semantics(scope));
 
   if let (Some(lhs_ty), Some(rhs_ty)) = (get_expression_type(scope, lhs), get_expression_type(scope, rhs)) {
     if lhs_ty != rhs_ty {
-      errors.push(SemanticError::BinaryOperatorTypeCombinationError { span, op, lhs_ty, rhs_ty })
-    } else if let Some(error) = check_binary_opeartor_compatability(op, lhs_ty, span) {
-      errors.push(error)
+      push_error!(res, SemanticError::BinaryOperatorTypeCombinationError { span, op, lhs_ty, rhs_ty });
+    } else {
+      extend_errors!(res, check_binary_opeartor_compatability(op, lhs_ty, span));
     }
   }
 
@@ -486,24 +431,24 @@ pub fn check_binary_expression<'a>(
   for exp in [lhs, rhs].iter() {
     if let Expression::FunctionCall { identifier, span, .. } = exp {
       if let Some(Symbol::Function(None, ..)) = Scope::lookup(scope, identifier) {
-        errors.push(SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
+        push_error!(res, SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
       }
     }
   }
 
-  errors
+  res
 }
 
 pub fn check_unary_operator_compatability<'a>(
   op: &'a UnaryOp,
   ty: Ty,
   span: &'a Span<'_>,
-) -> Option<SemanticError<'a>> {
+) -> Result<(), Vec<SemanticError<'a>>> {
   match ty {
-    Ty::Bool if *op == UnaryOp::Minus => Some(SemanticError::UnaryOperatorTypeError { span, op, ty }),
-    Ty::Int | Ty::Float if *op == UnaryOp::Not => Some(SemanticError::UnaryOperatorTypeError { span, op, ty }),
-    Ty::String => Some(SemanticError::UnaryOperatorTypeError { span, op, ty }),
-    _ => None,
+    Ty::Bool if *op == UnaryOp::Minus => Err(vec![SemanticError::UnaryOperatorTypeError { span, op, ty }]),
+    Ty::Int | Ty::Float if *op == UnaryOp::Not => Err(vec![SemanticError::UnaryOperatorTypeError { span, op, ty }]),
+    Ty::String => Err(vec![SemanticError::UnaryOperatorTypeError { span, op, ty }]),
+    _ => Ok(()),
   }
 }
 
@@ -511,18 +456,18 @@ pub fn check_binary_opeartor_compatability<'a>(
   op: &'a BinaryOp,
   ty: Ty,
   span: &'a Span<'_>,
-) -> Option<SemanticError<'a>> {
+) -> Result<(), Vec<SemanticError<'a>>> {
   match ty {
     Ty::Bool if [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(op) => {
-      Some(SemanticError::BinaryOperatorTypeError { span, op, ty })
+      Err(vec![SemanticError::BinaryOperatorTypeError { span, op, ty }])
     }
     Ty::Int | Ty::Float if [BinaryOp::Land, BinaryOp::Lor].contains(op) => {
-      Some(SemanticError::BinaryOperatorTypeError { span, op, ty })
+      Err(vec![SemanticError::BinaryOperatorTypeError { span, op, ty }])
     }
     Ty::String if ![BinaryOp::Eq, BinaryOp::Neq].contains(op) => {
-      Some(SemanticError::BinaryOperatorTypeError { span, op, ty })
+      Err(vec![SemanticError::BinaryOperatorTypeError { span, op, ty }])
     }
-    _ => None,
+    _ => Ok(()),
   }
 }
 
@@ -530,15 +475,15 @@ pub fn check_unary_operator_combination<'a>(
   inner: &'a UnaryOp,
   outer: &'a UnaryOp,
   span: &'a Span<'_>,
-) -> Option<SemanticError<'a>> {
+) -> Result<(), Vec<SemanticError<'a>>> {
   match outer {
     UnaryOp::Not if *inner == UnaryOp::Minus => {
-      Some(SemanticError::UnaryOperatorCombinationError { span, inner, outer })
+      Err(vec![SemanticError::UnaryOperatorCombinationError { span, inner, outer }])
     }
     UnaryOp::Minus if *inner == UnaryOp::Not => {
-      Some(SemanticError::UnaryOperatorCombinationError { span, inner, outer })
+      Err(vec![SemanticError::UnaryOperatorCombinationError { span, inner, outer }])
     }
-    _ => None,
+    _ => Ok(()),
   }
 }
 
@@ -546,14 +491,14 @@ pub fn check_operator_combination<'a>(
   unary_op: &'a UnaryOp,
   binary_op: &'a BinaryOp,
   span: &'a Span<'_>,
-) -> Option<SemanticError<'a>> {
+) -> Result<(), Vec<SemanticError<'a>>> {
   match unary_op {
     UnaryOp::Not if [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(binary_op) => {
-      Some(SemanticError::OperatorCombinationError { span, unary_op, binary_op })
+      Err(vec![SemanticError::OperatorCombinationError { span, unary_op, binary_op }])
     }
     UnaryOp::Minus if ![BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(binary_op) => {
-      Some(SemanticError::OperatorCombinationError { span, unary_op, binary_op })
+      Err(vec![SemanticError::OperatorCombinationError { span, unary_op, binary_op }])
     }
-    _ => None,
+    _ => Ok(()),
   }
 }

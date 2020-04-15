@@ -5,6 +5,7 @@ use mc_parser::ast::*;
 
 use crate::*;
 
+use super::extend_errors;
 use crate::semantic_checks::*;
 
 pub trait AddToScope {
@@ -18,17 +19,7 @@ impl AddToScope for IfStatement<'_> {
 
     if let Some(statement) = &self.else_block {
       let else_scope = Scope::new_child(scope, "if_else");
-
-      if let Err(err) = statement.add_to_scope(&else_scope) {
-        match res {
-          Ok(_) => {
-            res = Err(err);
-          }
-          Err(ref mut errors) => {
-            errors.extend(err);
-          }
-        }
-      }
+      extend_errors!(res, statement.add_to_scope(&else_scope));
     }
 
     res
@@ -87,19 +78,10 @@ impl AddToScope for CompoundStatement<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let child_scope = Scope::new_child(scope, "block");
 
-    let mut res: Result<(), Vec<SemanticError<'_>>> = Ok(());
+    let mut res = Ok(());
 
     for statement in self.statements.iter() {
-      if let Err(err) = statement.add_to_scope(&child_scope) {
-        match res {
-          Ok(_) => {
-            res = Err(err);
-          }
-          Err(ref mut errors) => {
-            errors.extend(err);
-          }
-        }
-      }
+      extend_errors!(res, statement.add_to_scope(&child_scope));
     }
 
     res
@@ -130,17 +112,10 @@ impl AddToScope for Program<'_> {
       );
       let child_scope = Scope::new_child(scope, "function");
 
-      if let Err(err) = function.add_to_scope(&child_scope) {
-        match res {
-          Ok(_) => {
-            res = Err(err);
-          }
-          Err(ref mut errors) => {
-            errors.extend(err);
-          }
-        }
-      }
+      extend_errors!(res, function.add_to_scope(&child_scope));
     }
+
+    extend_errors!(res, self.check_semantics(scope));
 
     res
   }

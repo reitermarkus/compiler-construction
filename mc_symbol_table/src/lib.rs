@@ -20,6 +20,36 @@ use semantic_error::SemanticError;
 
 mod semantic_checks;
 
+#[macro_export]
+macro_rules! push_error {
+  ($res:expr, $err:expr) => {
+    match $res {
+      Ok(_) => {
+        $res = Err(vec![$err]);
+      }
+      Err(ref mut errors) => {
+        errors.push($err);
+      }
+    }
+  };
+}
+
+#[macro_export]
+macro_rules! extend_errors {
+  ($res:expr, $err:expr) => {
+    if let Err(err) = $err {
+      match $res {
+        Ok(_) => {
+          $res = Err(err);
+        }
+        Err(ref mut errors) => {
+          errors.extend(err);
+        }
+      }
+    }
+  };
+}
+
 pub fn mc_symbol_table(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::Result<()> {
   let mut contents = String::new();
 
