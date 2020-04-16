@@ -154,10 +154,6 @@ impl CheckSemantics for FunctionDeclaration<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let mut res = Ok(());
 
-    if Scope::lookup(scope, &self.identifier).is_some() {
-      push_error!(res, SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() })
-    }
-
     let ret_expressions = self
       .body
       .statements
@@ -324,6 +320,18 @@ pub fn check_condition<'a>(
   extend_errors!(res, condition.check_semantics(scope));
 
   res
+}
+
+pub fn check_function_identifier_available<'a>(
+  scope: &Rc<RefCell<Scope>>,
+  identifier: &Identifier,
+  span: &'a Span<'_>,
+) -> Result<(), Vec<SemanticError<'a>>> {
+  if Scope::lookup(scope, identifier).is_some() {
+    Err(vec![SemanticError::AlreadyDeclared { span, identifier: identifier.clone() }])
+  } else {
+    Ok(())
+  }
 }
 
 pub fn check_function_call<'a>(
