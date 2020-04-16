@@ -584,7 +584,7 @@ mod test {
   fn semantic_if_statement_check() {
     let expr = "if (10 - 9)
       var = 1;";
-    let if_statement = Statement::If(Box::new(IfStatement {
+    let if_statement = IfStatement {
       condition: Expression::Binary {
         op: BinaryOp::Minus,
         lhs: Box::new(Expression::Literal { literal: Literal::Int(10), span: Span::new(&expr, 4, 5).unwrap() }),
@@ -599,7 +599,7 @@ mod test {
       })),
       else_block: None,
       span: Span::new(&expr, 0, 26).unwrap(),
-    }));
+    };
 
     let scope = Scope::new();
     let result = if_statement.check_semantics(&scope);
@@ -607,26 +607,22 @@ mod test {
 
     assert!(errors
       .contains(&SemanticError::InvalidConditionType { span: &Span::new(&expr, 0, 26).unwrap(), actual: Ty::Int }));
-    assert!(errors.contains(&SemanticError::NotDeclared {
-      span: &Span::new(&expr, 18, 25).unwrap(),
-      identifier: Identifier::from("var"),
-    }));
 
-    assert_eq!(errors.len(), 2);
+    assert_eq!(errors.len(), 1);
   }
 
   #[test]
   fn semantic_while_and_return_statement_check() {
     let expr = "while (0)
       return 1;";
-    let while_statement = Statement::While(Box::new(WhileStatement {
+    let while_statement = WhileStatement {
       condition: Expression::Literal { literal: Literal::Int(0), span: Span::new(&expr, 7, 8).unwrap() },
       block: Statement::Ret(ReturnStatement {
         expression: Some(Expression::Literal { literal: Literal::Int(1), span: Span::new(&expr, 23, 24).unwrap() }),
         span: Span::new(&expr, 16, 24).unwrap(),
       }),
       span: Span::new(&expr, 0, 25).unwrap(),
-    }));
+    };
 
     let scope = Scope::new();
     let result = while_statement.check_semantics(&scope);
@@ -634,15 +630,7 @@ mod test {
 
     assert!(errors
       .contains(&SemanticError::InvalidConditionType { span: &Span::new(&expr, 0, 25).unwrap(), actual: Ty::Int }));
-    /*
-    assert!(errors.contains(&SemanticError::WrongReturnType {
-      span: &Span::new(&expr, 16, 24).unwrap(),
-      actual: Ty::Int,
-      expected: Ty::Bool,
-    }));
 
-    assert_eq!(errors.len(), 2);
-    */
     assert_eq!(errors.len(), 1);
   }
 }

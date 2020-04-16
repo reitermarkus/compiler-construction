@@ -15,7 +15,9 @@ pub trait AddToScope {
 impl AddToScope for IfStatement<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let then_scope = Scope::new_child(scope, "if_then");
-    let mut res = self.block.add_to_scope(&then_scope);
+    let mut res = self.check_semantics(scope);
+
+    extend_errors!(res, self.block.add_to_scope(&then_scope));
 
     if let Some(statement) = &self.else_block {
       let else_scope = Scope::new_child(scope, "if_else");
@@ -28,15 +30,19 @@ impl AddToScope for IfStatement<'_> {
 
 impl AddToScope for WhileStatement<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+    let mut res = self.check_semantics(scope);
+
     let child_scope = Scope::new_child(scope, "while");
-    self.block.add_to_scope(&child_scope)
+    extend_errors!(res, self.block.add_to_scope(&child_scope));
+
+    res
   }
 }
 
 #[allow(unused_variables)]
 impl AddToScope for ReturnStatement<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    Ok(())
+    self.check_semantics(scope)
   }
 }
 

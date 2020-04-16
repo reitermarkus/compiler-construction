@@ -88,27 +88,13 @@ impl CheckSemantics for Parameter<'_> {
 
 impl CheckSemantics for IfStatement<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut res = Ok(());
-
-    extend_errors!(res, check_condition(scope, &self.condition, &self.span));
-    extend_errors!(res, self.block.check_semantics(scope));
-
-    if let Some(else_statement) = &self.else_block {
-      extend_errors!(res, else_statement.check_semantics(scope));
-    }
-
-    res
+    check_condition(scope, &self.condition, &self.span)
   }
 }
 
 impl CheckSemantics for WhileStatement<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut res = Ok(());
-
-    extend_errors!(res, check_condition(scope, &self.condition, &self.span));
-    extend_errors!(res, self.block.check_semantics(scope));
-
-    res
+    check_condition(scope, &self.condition, &self.span)
   }
 }
 
@@ -121,32 +107,6 @@ impl CheckSemantics for ReturnStatement<'_> {
     }
 
     res
-  }
-}
-
-impl CheckSemantics for CompoundStatement<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    let mut res = Ok(());
-
-    for statement in &self.statements {
-      extend_errors!(res, statement.check_semantics(scope));
-    }
-
-    res
-  }
-}
-
-impl CheckSemantics for Statement<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    match self {
-      Self::Assignment(assignment) => assignment.check_semantics(scope),
-      Self::Decl(declaration) => declaration.check_semantics(scope),
-      Self::Expression(expression) => expression.check_semantics(scope),
-      Self::If(if_statement) => if_statement.check_semantics(scope),
-      Self::While(while_statement) => while_statement.check_semantics(scope),
-      Self::Ret(ret_statement) => ret_statement.check_semantics(scope),
-      Self::Compound(compound) => compound.check_semantics(scope),
-    }
   }
 }
 
