@@ -628,6 +628,51 @@ mod tests {
   }
 
   #[test]
+  fn if_condition_from_pest() {
+    let expr = "(!visited[traversal_count] && distance[traversal_count] < min_distance)";
+    let mut pairs = McParser::parse(Rule::expression, &expr).unwrap();
+
+    assert_eq!(
+      Expression::from_pest(&mut pairs).unwrap(),
+      Expression::Binary {
+        op: BinaryOp::Land,
+        lhs: Box::new(Expression::Unary {
+          op: UnaryOp::Not,
+          expression: Box::new(Expression::Variable {
+            identifier: Identifier::from("visited"),
+            index_expression: Some(Box::new(Expression::Variable {
+              identifier: Identifier::from("traversal_count"),
+              index_expression: None,
+              span: Span::new(&expr, 10, 25).unwrap(),
+            })),
+            span: Span::new(&expr, 2, 26).unwrap(),
+          }),
+          span: Span::new(&expr, 1, 26).unwrap(),
+        }),
+        rhs: Box::new(Expression::Binary {
+          op: BinaryOp::Lt,
+          lhs: Box::new(Expression::Variable {
+            identifier: Identifier::from("distance"),
+            index_expression: Some(Box::new(Expression::Variable {
+              identifier: Identifier::from("traversal_count"),
+              index_expression: None,
+              span: Span::new(&expr, 39, 54).unwrap(),
+            })),
+            span: Span::new(&expr, 30, 55).unwrap(),
+          }),
+          rhs: Box::new(Expression::Variable {
+            identifier: Identifier::from("min_distance"),
+            index_expression: None,
+            span: Span::new(&expr, 58, 70).unwrap(),
+          }),
+          span: Span::new(&expr, 30, 70).unwrap(),
+        }),
+        span: Span::new(&expr, 1, 70).unwrap(),
+      }
+    )
+  }
+
+  #[test]
   fn expression_from_pest() {
     let expr = "2 * 2 + 4 / (-4.9 - pi(true, nested()))";
     let mut pairs = McParser::parse(Rule::expression, &expr).unwrap();
