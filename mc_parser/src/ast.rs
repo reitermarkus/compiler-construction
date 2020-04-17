@@ -235,11 +235,10 @@ impl<'a> Expression<'a> {
 
         let mut pairs = pair.into_inner();
 
-        Expression::Unary {
-          op: UnaryOp::from_pest(&mut pairs)?,
-          expression: Box::new(climber.climb(pairs, primary, infix)?.0),
-          span,
-        }
+        let op = UnaryOp::from_pest(&mut pairs)?;
+        let expression = Box::new(climber.climb(pairs, primary, infix)?.0);
+
+        Expression::Unary { op, expression, span }
       }
       Rule::expression | Rule::par_expression => climber.climb(pair.into_inner(), primary, infix)?.0,
       Rule::call_expr => {
@@ -265,22 +264,17 @@ impl<'a> Expression<'a> {
         let span = pair.as_span();
         Expression::Literal { literal: Literal::from_pest(&mut pair.into_inner())?, span }
       }
-      Rule::identifier => {
+      Rule::variable_expression => {
         let span = pair.as_span();
 
-        let mut pairs = Pairs::single(pair);
+        let mut pairs = pair.into_inner();
 
         let identifier = Identifier::from_pest(&mut pairs)?;
 
-        Expression::Variable {
-          identifier,
-          index_expression: pairs
-            .next()
-            .map(|index| Expression::from_pest(&mut Pairs::single(index)))
-            .transpose()?
-            .map(Box::new),
-          span,
-        }
+        let index_expression =
+          if pairs.peek().is_some() { Some(Box::new(Expression::from_pest(&mut pairs)?)) } else { None };
+
+        Expression::Variable { identifier, index_expression, span }
       }
       _ => unreachable!(),
     };
@@ -628,8 +622,8 @@ mod tests {
   }
 
   #[test]
-  fn if_condition_from_pest() {
-    let expr = "(!visited[traversal_count] && distance[traversal_count] < min_distance)";
+  fn index_expression_from_pest() {
+    let expr = "!visited[traversal_count] && distance[traversal_count] < min_distance";
     let mut pairs = McParser::parse(Rule::expression, &expr).unwrap();
 
     assert_eq!(
@@ -643,11 +637,11 @@ mod tests {
             index_expression: Some(Box::new(Expression::Variable {
               identifier: Identifier::from("traversal_count"),
               index_expression: None,
-              span: Span::new(&expr, 10, 25).unwrap(),
+              span: Span::new(&expr, 9, 24).unwrap(),
             })),
-            span: Span::new(&expr, 2, 26).unwrap(),
+            span: Span::new(&expr, 1, 25).unwrap(),
           }),
-          span: Span::new(&expr, 1, 26).unwrap(),
+          span: Span::new(&expr, 0, 25).unwrap(),
         }),
         rhs: Box::new(Expression::Binary {
           op: BinaryOp::Lt,
@@ -656,18 +650,18 @@ mod tests {
             index_expression: Some(Box::new(Expression::Variable {
               identifier: Identifier::from("traversal_count"),
               index_expression: None,
-              span: Span::new(&expr, 39, 54).unwrap(),
+              span: Span::new(&expr, 38, 53).unwrap(),
             })),
-            span: Span::new(&expr, 30, 55).unwrap(),
+            span: Span::new(&expr, 29, 54).unwrap(),
           }),
           rhs: Box::new(Expression::Variable {
             identifier: Identifier::from("min_distance"),
             index_expression: None,
-            span: Span::new(&expr, 58, 70).unwrap(),
+            span: Span::new(&expr, 57, 69).unwrap(),
           }),
-          span: Span::new(&expr, 30, 70).unwrap(),
+          span: Span::new(&expr, 29, 69).unwrap(),
         }),
-        span: Span::new(&expr, 1, 70).unwrap(),
+        span: Span::new(&expr, 0, 69).unwrap(),
       }
     )
   }
