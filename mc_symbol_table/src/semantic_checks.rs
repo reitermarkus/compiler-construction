@@ -110,6 +110,37 @@ impl CheckSemantics for ReturnStatement<'_> {
   }
 }
 
+fn iterate_statements<'a>(smt: &'a Statement<'a>) -> Option<Vec<(bool, Option<Span<'_>>, &'a ReturnStatement<'a>)>> {
+  match smt {
+    Statement::Ret(ret) => Some(vec![(false, None, ret)]),
+    Statement::If(if_smt) => {
+      if let Some(else_block) = &if_smt.else_block {
+        Some(
+          iterate_statements(&if_smt.block)
+            .iter()
+            .chain(iterate_statements(&else_block).iter())
+            .flat_map(|smt| smt.clone())
+            .map(|(_, _, smt)| (true, Some(if_smt.span.clone()), smt))
+            .collect::<Vec<_>>(),
+        )
+      } else {
+        Some(
+          iterate_statements(&if_smt.block)
+            .iter()
+            .flat_map(|smt| smt.clone())
+            .map(|(_, _, smt)| (true, Some(if_smt.span.clone()), smt))
+            .collect::<Vec<_>>(),
+        )
+      }
+    }
+    Statement::While(while_smt) => iterate_statements(&while_smt.block),
+    Statement::Compound(compound_smt) => {
+      Some(compound_smt.statements.iter().filter_map(|s| iterate_statements(s)).flatten().collect::<Vec<_>>())
+    }
+    _ => None,
+  }
+}
+
 impl CheckSemantics for FunctionDeclaration<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let mut res = Ok(());
@@ -118,12 +149,10 @@ impl CheckSemantics for FunctionDeclaration<'_> {
       .body
       .statements
       .iter()
-      .filter_map(|x| match x {
-        Statement::Ret(ret) => Some(ret),
-        _ => None,
-      })
-      .filter_map(|x| x.expression.as_ref())
-      .collect::<Vec<&Expression<'_>>>();
+      .filter_map(|x| iterate_statements(x))
+      .flatten()
+      .map(|(is_if, span, x)| (is_if, span, x.expression.as_ref()))
+      .collect::<Vec<_>>();
 
     // Check that return statements match the functions type.
     if let Some(function_ty) = &self.ty {
@@ -131,32 +160,45 @@ impl CheckSemantics for FunctionDeclaration<'_> {
         push_error!(res, SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span })
       }
 
-      for ret_expr in ret_expressions {
-        if let Some(expr_ty) = get_expression_type(scope, ret_expr) {
-          if expr_ty != *function_ty {
-            push_error!(
-              res,
-              SemanticError::InvalidReturnType {
-                identifier: self.identifier.clone(),
-                span: ret_expr.get_span(),
-                expected: function_ty.clone(),
-                actual: expr_ty,
-              }
-            )
+      if !ret_expressions.iter().any(|(is_if, _, _)| !(*is_if)) {
+        let if_count = ret_expressions.iter().fold(0, |acc, (is_if, _, _)| if *is_if { acc + 1 } else { acc });
+
+        if if_count % 2 != 0 {
+          let (_, span, _) = ret_expressions.iter().find(|(is_if, _, _)| *is_if).unwrap();
+          push_error!(res, SemanticError::MatchingReturnError { span: span.clone().unwrap() })
+        }
+      }
+
+      for (_, _, ret_expr) in ret_expressions.iter() {
+        if let Some(ret) = ret_expr {
+          if let Some(expr_ty) = get_expression_type(scope, ret) {
+            if expr_ty != *function_ty {
+              push_error!(
+                res,
+                SemanticError::InvalidReturnType {
+                  identifier: self.identifier.clone(),
+                  span: ret.get_span(),
+                  expected: function_ty.clone(),
+                  actual: expr_ty,
+                }
+              )
+            }
           }
         }
       }
     } else if !ret_expressions.is_empty() {
-      for ret_expr in ret_expressions {
-        if let Some(expr_ty) = get_expression_type(scope, ret_expr) {
-          push_error!(
-            res,
-            SemanticError::NoReturnTypeExpected {
-              identifier: self.identifier.clone(),
-              span: ret_expr.get_span(),
-              actual: expr_ty,
-            }
-          )
+      for (_, _, ret_expr) in ret_expressions.iter() {
+        if let Some(ret) = ret_expr {
+          if let Some(expr_ty) = get_expression_type(scope, ret) {
+            push_error!(
+              res,
+              SemanticError::NoReturnTypeExpected {
+                identifier: self.identifier.clone(),
+                span: ret.get_span(),
+                actual: expr_ty,
+              }
+            )
+          }
         }
       }
     }

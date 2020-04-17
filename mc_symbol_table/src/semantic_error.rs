@@ -76,6 +76,9 @@ pub enum SemanticError<'a> {
     expected: Ty,
     actual: Ty,
   },
+  MatchingReturnError {
+    span: Span<'a>,
+  },
   InvalidArgument {
     span: &'a Span<'a>,
     identifier: Identifier,
@@ -167,6 +170,7 @@ impl fmt::Display for SemanticError<'_> {
       Self::OperatorCombinationError { span, unary_op, binary_op } => {
         write_err!(f, span, "unary operator '{}' cannot be combined with binary operator '{}'", unary_op, binary_op)
       }
+      Self::MatchingReturnError { span } => write_err!(f, span, "if statement expects matching return statement"),
       Self::ReturnTypeExpected { span, identifier } => {
         write_err!(f, span, "expected return type for function '{}'", identifier)
       }
