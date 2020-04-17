@@ -64,8 +64,8 @@ assignment = { identifier ~ ("[" ~ expression ~ "]")? ~ "=" ~ expression }
 // Expressions
 
 unary_expression = ${ unary_operator ~ term }
-par_expression = { "(" ~ expression ~ ")" }
-variable_expression = ${ identifier ~ ("[" ~ expression ~ "]")? }
+par_expression = ${ "(" ~ WHITESPACE* ~ expression ~ WHITESPACE* ~ ")" }
+variable_expression = ${ identifier ~ ("[" ~ WHITESPACE* ~ expression ~ WHITESPACE* ~ "]")? }
 
 term = _{
     literal
@@ -75,7 +75,7 @@ term = _{
   | par_expression
 }
 
-expression = { term ~ (binary_operator ~ term)* }
+expression = ${ term ~ (WHITESPACE* ~ binary_operator ~ WHITESPACE* ~ term)* }
 
 
 // Statements
@@ -102,8 +102,8 @@ compound_stmt = { "{" ~ statement* ~ "}" }
 function_def = { ("void" | ty) ~ identifier ~ "(" ~ parameters? ~ ")" ~ compound_stmt }
 parameters = { declaration ~ ("," ~ declaration)* }
 
-call_expr = { identifier ~ "(" ~ arguments? ~ ")" }
-arguments = { expression ~ ("," ~ expression)* }
+call_expr = ${ identifier ~ "(" ~ WHITESPACE* ~ arguments? ~ WHITESPACE* ~ ")" }
+arguments = ${ expression ~ (WHITESPACE* ~ "," ~ WHITESPACE* ~ expression)* }
 
 
 // Program

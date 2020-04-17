@@ -206,6 +206,32 @@ mod tests {
 
     parses_to! {
       parser: McParser,
+      input:  "path_cost[i * 4 + j]",
+      rule:   Rule::expression,
+      tokens: [
+                expression(0, 20, [
+                  variable_expression(0, 20, [
+                    identifier(0, 9),
+                    expression(10, 19, [
+                      variable_expression(10, 11, [
+                        identifier(10, 11),
+                      ]),
+                      times(12, 13),
+                      literal(14, 15, [
+                        int(14, 15),
+                      ]),
+                      plus(16, 17),
+                      variable_expression(18, 19, [
+                        identifier(18, 19),
+                      ]),
+                    ])
+                  ]),
+                ])
+              ]
+    }
+
+    parses_to! {
+      parser: McParser,
       input:  r#"("")"#,
       rule:   Rule::expression,
       tokens: [
@@ -300,7 +326,9 @@ mod tests {
       tokens: [
                 if_stmt(0, 37, [
                   expression(4, 9, [
-                    identifier(4, 5),
+                    variable_expression(4, 5, [
+                      identifier(4, 5),
+                    ]),
                     gt(6, 7),
                     literal(8, 9, [
                       int(8, 9)
