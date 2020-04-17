@@ -123,8 +123,10 @@ impl AddToScope for Program<'_> {
           function.parameters.iter().map(|p| (p.ty.clone(), p.count)).collect::<Vec<(Ty, Option<usize>)>>(),
         ),
       );
-      let child_scope = Scope::new_child(scope, "function");
+    }
 
+    for function in &self.function_declarations {
+      let child_scope = Scope::new_child(scope, "function");
       extend_errors!(res, function.add_to_scope(&child_scope));
     }
 
