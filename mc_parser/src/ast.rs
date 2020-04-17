@@ -50,7 +50,7 @@ impl<'a> FromPest<'a> for Ty {
   type FatalError = String;
 
   fn from_pest(pest: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pest.next().unwrap();
+    let pair = pest.next().ok_or(ConversionError::NoMatch)?;
 
     Ok(match pair.as_str() {
       "bool" => Self::Bool,
@@ -86,15 +86,15 @@ impl<'a> FromPest<'a> for Literal {
   type FatalError = String;
 
   fn from_pest(pest: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pest.next().unwrap();
+    let pair = pest.next().ok_or(ConversionError::NoMatch)?;
+
+    let parse_error = |ty| ConversionError::Malformed(format!("failed to parse {:?} as {}", pair.as_str(), ty));
 
     Ok(match pair.as_rule() {
-      Rule::float => Self::Float(pair.as_str().parse::<f64>().expect("failed to parse float")),
-      Rule::int => Self::Int(pair.as_str().parse::<i64>().expect("failed to parse int")),
-      Rule::boolean => Self::Bool(pair.as_str().parse::<bool>().expect("failed to parse bool")),
-      Rule::string => {
-        Self::String(pair.into_inner().next().expect("failed to get inner string value").as_str().to_owned())
-      }
+      Rule::float => Self::Float(pair.as_str().parse::<f64>().map_err(|_| parse_error(Ty::Float))?),
+      Rule::int => Self::Int(pair.as_str().parse::<i64>().map_err(|_| parse_error(Ty::Int))?),
+      Rule::boolean => Self::Bool(pair.as_str().parse::<bool>().map_err(|_| parse_error(Ty::Bool))?),
+      Rule::string => Self::String(pair.into_inner().next().ok_or(ConversionError::NoMatch)?.as_str().to_owned()),
       _ => return Err(ConversionError::Malformed(format!("expected literal, found {:?}", pair))),
     })
   }
@@ -121,7 +121,7 @@ impl<'a> FromPest<'a> for UnaryOp {
   type FatalError = String;
 
   fn from_pest(pest: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let op = pest.next().unwrap();
+    let op = pest.next().ok_or(ConversionError::NoMatch)?;
 
     Ok(match op.as_rule() {
       Rule::unary_minus => Self::Minus,
@@ -172,7 +172,7 @@ impl<'a> FromPest<'a> for BinaryOp {
   type FatalError = String;
 
   fn from_pest(pest: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let op = pest.next().unwrap();
+    let op = pest.next().ok_or(ConversionError::NoMatch)?;
 
     Ok(match op.as_rule() {
       Rule::plus => Self::Plus,
@@ -298,7 +298,7 @@ impl<'a> FromPest<'a> for Expression<'a> {
   type FatalError = String;
 
   fn from_pest(pest: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pest.next().expect("no expression found");
+    let pair = pest.next().ok_or(ConversionError::NoMatch)?;
     let climber = climber();
     Self::consume(pair, &climber).map(|r| r.0)
   }
@@ -318,7 +318,7 @@ impl FromPest<'_> for Identifier {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let identifier = pairs.next().expect("no identifier found").as_str();
+    let identifier = pairs.next().ok_or(ConversionError::NoMatch)?.as_str();
     Ok(Self(identifier.into()))
   }
 }
@@ -342,14 +342,23 @@ impl<'a> FromPest<'a> for Parameter<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pairs.next().expect("no parameter found");
+    let pair = pairs.next().ok_or(ConversionError::NoMatch)?;
     let span = pair.as_span();
     let mut inner = pair.into_inner();
 
-    let mut param_type = inner.next().expect("no declaration type").into_inner();
+    let mut param_type = inner.next().ok_or(ConversionError::NoMatch)?.into_inner();
     let (ty, count) = match (param_type.next(), param_type.next()) {
-      (Some(ty), Some(int)) => (Ty::from_pest(&mut Pairs::single(ty))?, Some(int.as_str().parse::<usize>().unwrap())),
+      (Some(ty), Some(int)) => (
+        Ty::from_pest(&mut Pairs::single(ty))?,
+        Some(
+          int
+            .as_str()
+            .parse::<usize>()
+            .map_err(|_| ConversionError::Malformed(format!("failed to parse {:?} as {}", int.as_str(), Ty::Int)))?,
+        ),
+      ),
       (Some(ty), None) => (Ty::from_pest(&mut Pairs::single(ty))?, None),
+      (None, None) => return Err(ConversionError::NoMatch),
       _ => unreachable!(),
     };
 
@@ -372,7 +381,7 @@ impl<'a> FromPest<'a> for Assignment<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pairs.next().expect("no assignment found");
+    let pair = pairs.next().ok_or(ConversionError::NoMatch)?;
     let span = pair.as_span();
     let mut inner = pair.into_inner();
 
@@ -403,14 +412,23 @@ impl<'a> FromPest<'a> for Declaration<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pairs.next().expect("no declaration found");
+    let pair = pairs.next().ok_or(ConversionError::NoMatch)?;
     let span = pair.as_span();
     let mut inner = pair.into_inner();
 
-    let mut dec_type = inner.next().expect("no declaration type found").into_inner();
+    let mut dec_type = inner.next().ok_or(ConversionError::NoMatch)?.into_inner();
     let (ty, count) = match (dec_type.next(), dec_type.next()) {
-      (Some(ty), Some(int)) => (Ty::from_pest(&mut Pairs::single(ty))?, Some(int.as_str().parse::<usize>().unwrap())),
+      (Some(ty), Some(int)) => (
+        Ty::from_pest(&mut Pairs::single(ty))?,
+        Some(
+          int
+            .as_str()
+            .parse::<usize>()
+            .map_err(|_| ConversionError::Malformed(format!("failed to parse {:?} as {}", int.as_str(), Ty::Int)))?,
+        ),
+      ),
       (Some(ty), None) => (Ty::from_pest(&mut Pairs::single(ty))?, None),
+      (None, None) => return Err(ConversionError::NoMatch),
       _ => unreachable!(),
     };
 
@@ -433,7 +451,7 @@ impl<'a> FromPest<'a> for IfStatement<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pairs.next().expect("no if statement found");
+    let pair = pairs.next().ok_or(ConversionError::NoMatch)?;
     let span = pair.as_span();
     let mut inner = pair.into_inner();
 
@@ -461,7 +479,7 @@ impl<'a> FromPest<'a> for WhileStatement<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pairs.next().expect("no while statement found");
+    let pair = pairs.next().ok_or(ConversionError::NoMatch)?;
     let span = pair.as_span();
     let mut inner = pair.into_inner();
 
@@ -480,7 +498,7 @@ impl<'a> FromPest<'a> for ReturnStatement<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pairs.next().expect("no return statement found");
+    let pair = pairs.next().ok_or(ConversionError::NoMatch)?;
     let span = pair.as_span();
     let mut inner = pair.into_inner();
 
@@ -501,7 +519,7 @@ impl<'a> FromPest<'a> for CompoundStatement<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pairs.next().expect("no compound statement found");
+    let pair = pairs.next().ok_or(ConversionError::NoMatch)?;
     let span = pair.as_span();
 
     Ok(Self {
@@ -530,9 +548,9 @@ impl<'a> FromPest<'a> for Statement<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let mut inner = pairs.next().expect("no statement found").into_inner();
+    let mut inner = pairs.next().ok_or(ConversionError::NoMatch)?.into_inner();
 
-    Ok(match inner.peek().unwrap().as_rule() {
+    Ok(match inner.peek().ok_or(ConversionError::NoMatch)?.as_rule() {
       Rule::if_stmt => Self::If(Box::new(IfStatement::from_pest(&mut inner)?)),
       Rule::while_stmt => Self::While(Box::new(WhileStatement::from_pest(&mut inner)?)),
       Rule::ret_stmt => Self::Ret(ReturnStatement::from_pest(&mut inner)?),
@@ -559,7 +577,7 @@ impl<'a> FromPest<'a> for FunctionDeclaration<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pairs.next().expect("no function declaration found");
+    let pair = pairs.next().ok_or(ConversionError::NoMatch)?;
     let span = pair.as_span();
     let mut inner = pair.into_inner();
 
@@ -568,7 +586,7 @@ impl<'a> FromPest<'a> for FunctionDeclaration<'a> {
     let identifier = Identifier::from_pest(&mut inner)?;
 
     let parameters = if inner.peek().map(|p| p.as_rule()) == Some(Rule::parameters) {
-      let params = inner.next().unwrap().into_inner();
+      let params = inner.next().ok_or(ConversionError::NoMatch)?.into_inner();
       params.map(|p| Parameter::from_pest(&mut Pairs::single(p))).collect::<Result<Vec<_>, _>>()?
     } else {
       vec![]
@@ -591,17 +609,15 @@ impl<'a> FromPest<'a> for Program<'a> {
   type FatalError = String;
 
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pairs.next().expect("no program found");
+    let pair = pairs.next().ok_or(ConversionError::NoMatch)?;
     let span = pair.as_span();
     let inner = pair.into_inner();
 
     Ok(Self {
       function_declarations: inner
         .take_while(|p| p.as_rule() != Rule::EOI)
-        .map(|dec| {
-          FunctionDeclaration::from_pest(&mut Pairs::single(dec)).expect("failed to parse function declaration")
-        })
-        .collect(),
+        .map(|dec| FunctionDeclaration::from_pest(&mut Pairs::single(dec)))
+        .collect::<Result<Vec<_>, _>>()?,
       span,
     })
   }
