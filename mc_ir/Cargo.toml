@@ -1,0 +1,8 @@
+[package]
+name = "mc_ir"
+version = "0.1.0"
+authors = ["Lukas Dötlinger <lukas@doetlinger.at>"]
+edition = "2018"
+
+[dependencies]
+mc_parser = { path = "../mc_parser" }
