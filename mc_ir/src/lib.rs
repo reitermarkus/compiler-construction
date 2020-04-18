@@ -4,6 +4,8 @@ use std::fs::File;
 use std::io::{prelude::*, stdin};
 use std::path::Path;
 
+mod ir;
+
 pub fn mc_ir(in_file: impl AsRef<Path>, mut _out_stream: impl Write) -> std::io::Result<()> {
   let mut contents = String::new();
 
