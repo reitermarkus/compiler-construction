@@ -110,32 +110,31 @@ impl CheckSemantics for ReturnStatement<'_> {
   }
 }
 
-fn iterate_statements<'a>(smt: &'a Statement<'a>) -> Option<Vec<(bool, Option<Span<'_>>, &'a ReturnStatement<'a>)>> {
+fn iterate_statements<'a>(from: &'a str, smt: &'a Statement<'a>) -> Option<Vec<(&'a str, usize, Option<Span<'a>>, &'a ReturnStatement<'a>)>> {
   match smt {
-    Statement::Ret(ret) => Some(vec![(false, None, ret)]),
+    Statement::Ret(ret) => Some(vec![("main", 0, None, ret)]),
     Statement::If(if_smt) => {
       if let Some(else_block) = &if_smt.else_block {
         Some(
-          iterate_statements(&if_smt.block)
+          iterate_statements("if", &if_smt.block)
             .iter()
-            .chain(iterate_statements(&else_block).iter())
+            .chain(iterate_statements("if", &else_block).iter())
             .flat_map(|smt| smt.clone())
-            .map(|(_, _, smt)| (true, Some(if_smt.span.clone()), smt))
+            .map(|(from, level, _, smt)| if from == "if" { ("if", level + 1, Some(if_smt.span.clone()), smt) } else { ("if", level, Some(if_smt.span.clone()), smt) })
             .collect::<Vec<_>>(),
         )
       } else {
         Some(
-          iterate_statements(&if_smt.block)
+          iterate_statements("if", &if_smt.block)
             .iter()
             .flat_map(|smt| smt.clone())
-            .map(|(_, _, smt)| (true, Some(if_smt.span.clone()), smt))
+            .map(|(from, level, _, smt)| if from == "if" { ("if", level + 1, Some(if_smt.span.clone()), smt) } else { ("if", level, Some(if_smt.span.clone()), smt) })
             .collect::<Vec<_>>(),
         )
       }
-    }
-    Statement::While(while_smt) => iterate_statements(&while_smt.block),
+    },
     Statement::Compound(compound_smt) => {
-      Some(compound_smt.statements.iter().filter_map(|s| iterate_statements(s)).flatten().collect::<Vec<_>>())
+      Some(compound_smt.statements.iter().filter_map(|s| iterate_statements(from, s)).flatten().collect::<Vec<_>>())
     }
     _ => None,
   }
@@ -149,9 +148,9 @@ impl CheckSemantics for FunctionDeclaration<'_> {
       .body
       .statements
       .iter()
-      .filter_map(|x| iterate_statements(x))
+      .filter_map(|x| iterate_statements("", x))
       .flatten()
-      .map(|(is_if, span, x)| (is_if, span, x.expression.as_ref()))
+      .map(|(from, level, span, x)| (from, level, span, x.expression.as_ref()))
       .collect::<Vec<_>>();
 
     // Check that return statements match the functions type.
@@ -160,16 +159,25 @@ impl CheckSemantics for FunctionDeclaration<'_> {
         push_error!(res, SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span })
       }
 
-      if !ret_expressions.iter().any(|(is_if, _, _)| !(*is_if)) {
-        let if_count = ret_expressions.iter().fold(0, |acc, (is_if, _, _)| if *is_if { acc + 1 } else { acc });
+      if ret_expressions.iter().all(|(from, _, _, _)| *from != "main") {
+        let if_returns = ret_expressions.iter().filter(|(from, _, _, _)| *from == "if").collect::<Vec<_>>();
 
-        if if_count % 2 != 0 {
-          let (_, span, _) = ret_expressions.iter().find(|(is_if, _, _)| *is_if).unwrap();
-          push_error!(res, SemanticError::MatchingReturnError { span: span.clone().unwrap() })
+        if if_returns.len() >= 2 {
+          for chunk in if_returns.chunks(2) {
+            if chunk.len() == 2 {
+              if chunk[0].1 != chunk[1].1 {
+                push_error!(res, SemanticError::MatchingReturnError { span: chunk[0].2.clone().unwrap() })
+              }
+            } else if chunk[0].1 != 0 {
+              push_error!(res, SemanticError::MatchingReturnError { span: chunk[0].2.clone().unwrap() })
+            }
+          }
+        } else if if_returns.len() == 1 {
+          push_error!(res, SemanticError::MatchingReturnError { span: if_returns[0].2.clone().unwrap() })
         }
       }
 
-      for (_, _, ret_expr) in ret_expressions.iter() {
+      for (_, _, _, ret_expr) in ret_expressions.iter() {
         if let Some(ret) = ret_expr {
           if let Some(expr_ty) = get_expression_type(scope, ret) {
             if expr_ty != *function_ty {
@@ -187,7 +195,7 @@ impl CheckSemantics for FunctionDeclaration<'_> {
         }
       }
     } else if !ret_expressions.is_empty() {
-      for (_, _, ret_expr) in ret_expressions.iter() {
+      for (_, _, _, ret_expr) in ret_expressions.iter() {
         if let Some(ret) = ret_expr {
           if let Some(expr_ty) = get_expression_type(scope, ret) {
             push_error!(
