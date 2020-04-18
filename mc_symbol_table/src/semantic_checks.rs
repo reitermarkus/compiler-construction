@@ -540,3 +540,98 @@ pub fn check_operator_combination<'a>(
     _ => Ok(()),
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use std::convert::TryFrom;
+
+  use super::*;
+
+  #[test]
+  fn check_return_statement() {
+    let scope = Scope::new();
+    FunctionDeclaration::try_from(
+      r#"
+      bool ageforalco(int n) {
+        if (n < 21) {
+          return false;
+        }
+
+        return true;
+      }
+      "#
+      .trim(),
+    )
+    .unwrap()
+    .add_to_scope(&scope)
+    .unwrap();
+
+    let scope = Scope::new();
+    FunctionDeclaration::try_from(
+      r#"
+      bool ageforalco(int n) {
+        if (n < 21) {
+          return false;
+        } else {
+          return true;
+        }
+      }
+      "#
+      .trim(),
+    )
+    .unwrap()
+    .add_to_scope(&scope)
+    .unwrap();
+
+    let scope = Scope::new();
+    FunctionDeclaration::try_from(
+      r#"
+      bool ageforalco(int n) {
+        if (n < 21) {
+
+        } else {
+          return true;
+        }
+
+        return false;
+      }
+      "#
+      .trim(),
+    )
+    .unwrap()
+    .add_to_scope(&scope)
+    .unwrap();
+
+    let scope = Scope::new();
+    FunctionDeclaration::try_from(
+      r#"
+      bool ageforalco(int n) {
+        if (n < 21) {
+          return false;
+        }
+      }
+      "#
+      .trim(),
+    )
+    .unwrap()
+    .add_to_scope(&scope)
+    .unwrap_err();
+
+    let scope = Scope::new();
+    FunctionDeclaration::try_from(
+      r#"
+      bool ageforalco(int n) {
+        if (n < 21) {
+
+        } else {
+          return true;
+        }
+      }
+      "#
+      .trim(),
+    )
+    .unwrap()
+    .add_to_scope(&scope)
+    .unwrap_err();
+  }
+}

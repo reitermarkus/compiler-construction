@@ -1,13 +1,27 @@
+use std::convert::TryFrom;
 use std::fmt;
 
 use from_pest::{ConversionError, FromPest};
 use pest::{
   iterators::{Pair, Pairs},
   prec_climber::{Assoc, Operator, PrecClimber},
-  Span,
+  Parser, Span,
 };
 
-use crate::Rule;
+use crate::{McParser, Rule};
+
+macro_rules! impl_try_from_str {
+  ($ty:ident, $rule:expr) => {
+    impl<'a> TryFrom<&'a str> for $ty<'a> {
+      type Error = ConversionError<String>;
+
+      fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+        let mut parse_tree = McParser::parse($rule, s).map_err(|err| ConversionError::Malformed(err.to_string()))?;
+        Self::from_pest(&mut parse_tree)
+      }
+    }
+  };
+}
 
 pub fn climber() -> PrecClimber<Rule> {
   // Reference: https://en.cppreference.com/w/c/language/operator_precedence
@@ -293,6 +307,8 @@ impl<'a> Expression<'a> {
   }
 }
 
+impl_try_from_str!(Expression, Rule::expression);
+
 impl<'a> FromPest<'a> for Expression<'a> {
   type Rule = Rule;
   type FatalError = String;
@@ -337,6 +353,8 @@ pub struct Parameter<'a> {
   pub span: Span<'a>,
 }
 
+impl_try_from_str!(Parameter, Rule::declaration);
+
 impl<'a> FromPest<'a> for Parameter<'a> {
   type Rule = Rule;
   type FatalError = String;
@@ -376,6 +394,8 @@ pub struct Assignment<'a> {
   pub span: Span<'a>,
 }
 
+impl_try_from_str!(Assignment, Rule::assignment);
+
 impl<'a> FromPest<'a> for Assignment<'a> {
   type Rule = Rule;
   type FatalError = String;
@@ -406,6 +426,8 @@ pub struct Declaration<'a> {
   pub identifier: Identifier,
   pub span: Span<'a>,
 }
+
+impl_try_from_str!(Declaration, Rule::declaration);
 
 impl<'a> FromPest<'a> for Declaration<'a> {
   type Rule = Rule;
@@ -446,6 +468,8 @@ pub struct IfStatement<'a> {
   pub span: Span<'a>,
 }
 
+impl_try_from_str!(IfStatement, Rule::if_stmt);
+
 impl<'a> FromPest<'a> for IfStatement<'a> {
   type Rule = Rule;
   type FatalError = String;
@@ -474,6 +498,8 @@ pub struct WhileStatement<'a> {
   pub span: Span<'a>,
 }
 
+impl_try_from_str!(WhileStatement, Rule::while_stmt);
+
 impl<'a> FromPest<'a> for WhileStatement<'a> {
   type Rule = Rule;
   type FatalError = String;
@@ -492,6 +518,8 @@ pub struct ReturnStatement<'a> {
   pub expression: Option<Expression<'a>>,
   pub span: Span<'a>,
 }
+
+impl_try_from_str!(ReturnStatement, Rule::ret_stmt);
 
 impl<'a> FromPest<'a> for ReturnStatement<'a> {
   type Rule = Rule;
@@ -513,6 +541,8 @@ pub struct CompoundStatement<'a> {
   pub statements: Vec<Statement<'a>>,
   pub span: Span<'a>,
 }
+
+impl_try_from_str!(CompoundStatement, Rule::compound_stmt);
 
 impl<'a> FromPest<'a> for CompoundStatement<'a> {
   type Rule = Rule;
@@ -543,6 +573,8 @@ pub enum Statement<'a> {
   Compound(CompoundStatement<'a>),
 }
 
+impl_try_from_str!(Statement, Rule::statement);
+
 impl<'a> FromPest<'a> for Statement<'a> {
   type Rule = Rule;
   type FatalError = String;
@@ -571,6 +603,8 @@ pub struct FunctionDeclaration<'a> {
   pub body: CompoundStatement<'a>,
   pub span: Span<'a>,
 }
+
+impl_try_from_str!(FunctionDeclaration, Rule::function_def);
 
 impl<'a> FromPest<'a> for FunctionDeclaration<'a> {
   type Rule = Rule;
@@ -603,6 +637,8 @@ pub struct Program<'a> {
   pub function_declarations: Vec<FunctionDeclaration<'a>>,
   pub span: Span<'a>,
 }
+
+impl_try_from_str!(Program, Rule::program);
 
 impl<'a> FromPest<'a> for Program<'a> {
   type Rule = Rule;
