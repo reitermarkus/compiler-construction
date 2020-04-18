@@ -110,31 +110,45 @@ impl CheckSemantics for ReturnStatement<'_> {
   }
 }
 
-fn iterate_statements<'a>(from: &'a str, smt: &'a Statement<'a>) -> Option<Vec<(&'a str, usize, Option<Span<'a>>, &'a ReturnStatement<'a>)>> {
+type StatementsReturn<'a> = Option<Vec<(&'a str, usize, Option<Span<'a>>, &'a ReturnStatement<'a>)>>;
+
+fn recurse_statements<'a>(from: &'a str, smt: &'a Statement<'a>) -> StatementsReturn<'a> {
   match smt {
     Statement::Ret(ret) => Some(vec![("main", 0, None, ret)]),
     Statement::If(if_smt) => {
       if let Some(else_block) = &if_smt.else_block {
         Some(
-          iterate_statements("if", &if_smt.block)
+          recurse_statements("if", &if_smt.block)
             .iter()
-            .chain(iterate_statements("if", &else_block).iter())
+            .chain(recurse_statements("if", &else_block).iter())
             .flat_map(|smt| smt.clone())
-            .map(|(from, level, _, smt)| if from == "if" { ("if", level + 1, Some(if_smt.span.clone()), smt) } else { ("if", level, Some(if_smt.span.clone()), smt) })
+            .map(|(from, level, _, smt)| {
+              if from == "if" {
+                ("if", level + 1, Some(if_smt.span.clone()), smt)
+              } else {
+                ("if", level, Some(if_smt.span.clone()), smt)
+              }
+            })
             .collect::<Vec<_>>(),
         )
       } else {
         Some(
-          iterate_statements("if", &if_smt.block)
+          recurse_statements("if", &if_smt.block)
             .iter()
             .flat_map(|smt| smt.clone())
-            .map(|(from, level, _, smt)| if from == "if" { ("if", level + 1, Some(if_smt.span.clone()), smt) } else { ("if", level, Some(if_smt.span.clone()), smt) })
+            .map(|(from, level, _, smt)| {
+              if from == "if" {
+                ("if", level + 1, Some(if_smt.span.clone()), smt)
+              } else {
+                ("if", level, Some(if_smt.span.clone()), smt)
+              }
+            })
             .collect::<Vec<_>>(),
         )
       }
-    },
+    }
     Statement::Compound(compound_smt) => {
-      Some(compound_smt.statements.iter().filter_map(|s| iterate_statements(from, s)).flatten().collect::<Vec<_>>())
+      Some(compound_smt.statements.iter().filter_map(|s| recurse_statements(from, s)).flatten().collect::<Vec<_>>())
     }
     _ => None,
   }
@@ -148,7 +162,7 @@ impl CheckSemantics for FunctionDeclaration<'_> {
       .body
       .statements
       .iter()
-      .filter_map(|x| iterate_statements("", x))
+      .filter_map(|x| recurse_statements("", x))
       .flatten()
       .map(|(from, level, span, x)| (from, level, span, x.expression.as_ref()))
       .collect::<Vec<_>>();
