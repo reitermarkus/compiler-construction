@@ -98,6 +98,8 @@ impl AddToScope for FunctionDeclaration<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let mut res = Ok(());
 
+    scope.borrow_mut().return_type = self.ty.clone();
+
     for param in &self.parameters {
       extend_errors!(res, param.check_semantics(scope));
       (*scope.borrow_mut()).insert(param.identifier.clone(), Symbol::Variable(param.ty.clone(), param.count));

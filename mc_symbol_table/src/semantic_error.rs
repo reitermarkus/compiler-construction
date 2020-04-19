@@ -72,9 +72,8 @@ pub enum SemanticError<'a> {
   },
   InvalidReturnType {
     span: &'a Span<'a>,
-    identifier: Identifier,
-    expected: Ty,
-    actual: Ty,
+    expected: Option<Ty>,
+    actual: Option<Ty>,
   },
   MatchingReturnError {
     span: Span<'a>,
@@ -108,11 +107,6 @@ pub enum SemanticError<'a> {
   },
   InvalidCondition {
     span: &'a Span<'a>,
-  },
-  NoReturnTypeExpected {
-    span: &'a Span<'a>,
-    identifier: Identifier,
-    actual: Ty,
   },
 }
 
@@ -155,9 +149,13 @@ impl fmt::Display for SemanticError<'_> {
       Self::InvalidDeclarationType { span, identifier, expected, actual } => {
         write_err!(f, span, "variable '{}' expected type {}, found {}", identifier, expected, actual)
       }
-      Self::InvalidReturnType { span, identifier, expected, actual } => {
-        write_err!(f, span, "function '{}' expected return type {}, found {}", identifier, expected, actual)
-      }
+      Self::InvalidReturnType { span, expected, actual } => write_err!(
+        f,
+        span,
+        "expected return type {}, found {}",
+        expected.as_ref().map(|ty| ty.to_string()).unwrap_or_else(|| "void".into()),
+        actual.as_ref().map(|ty| ty.to_string()).unwrap_or_else(|| "void".into())
+      ),
       Self::InvalidArgument { span, identifier } => {
         write_err!(f, span, "invalid argument supplied to function '{}'", identifier)
       }
@@ -184,9 +182,6 @@ impl fmt::Display for SemanticError<'_> {
       Self::InvalidCondition { span } => write_err!(f, span, "invalid condition"),
       Self::InvalidConditionType { span, actual } => {
         write_err!(f, span, "expected type '{}' for condition, found '{}'", Ty::Bool, actual)
-      }
-      Self::NoReturnTypeExpected { span, identifier, actual } => {
-        write_err!(f, span, "no return type expected for 'void' function '{}', found '{}'", identifier, actual)
       }
     }
   }
@@ -256,14 +251,13 @@ mod test {
 
     scope.borrow_mut().symbols.insert(Identifier::from("sum"), Symbol::Function(Some(Ty::Float), Vec::new()));
 
-    let result = function_declaration.check_semantics(&scope.borrow().children[0]);
+    let result = function_declaration.add_to_scope(&scope.borrow().children[0]);
     let errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::InvalidReturnType {
       span: &Span::new("", 0, 0).unwrap(),
-      identifier: Identifier::from("sum"),
-      expected: Ty::Float,
-      actual: Ty::Int
+      expected: Some(Ty::Float),
+      actual: Some(Ty::Int)
     }));
   }
 

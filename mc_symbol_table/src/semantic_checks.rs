@@ -102,8 +102,24 @@ impl CheckSemantics for ReturnStatement<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let mut res = Ok(());
 
-    if let Some(return_expression) = &self.expression {
+    let expected_return_type = Scope::return_type(scope);
+
+    let actual_return_type = if let Some(return_expression) = &self.expression {
       extend_errors!(res, return_expression.check_semantics(scope));
+      get_expression_type(scope, return_expression)
+    } else {
+      None
+    };
+
+    if actual_return_type != expected_return_type {
+      push_error!(
+        res,
+        SemanticError::InvalidReturnType {
+          span: &self.span,
+          expected: expected_return_type,
+          actual: actual_return_type,
+        }
+      )
     }
 
     res
@@ -155,8 +171,12 @@ fn recurse_statements<'a>(from: &'a str, smt: &'a Statement<'a>) -> StatementsRe
 }
 
 impl CheckSemantics for FunctionDeclaration<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+  fn check_semantics(&self, _scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let mut res = Ok(());
+
+    if self.identifier == "main".into() && self.ty != Some(Ty::Int) {
+      push_error!(res, SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span });
+    }
 
     let ret_expressions = self
       .body
@@ -168,9 +188,9 @@ impl CheckSemantics for FunctionDeclaration<'_> {
       .collect::<Vec<_>>();
 
     // Check that return statements match the functions type.
-    if let Some(function_ty) = &self.ty {
+    if self.ty.is_some() {
       if ret_expressions.is_empty() {
-        push_error!(res, SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span })
+        push_error!(res, SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span });
       }
 
       if ret_expressions.iter().all(|(from, _, _, _)| *from != "main") {
@@ -188,39 +208,6 @@ impl CheckSemantics for FunctionDeclaration<'_> {
           }
         } else if if_returns.len() == 1 {
           push_error!(res, SemanticError::MatchingReturnError { span: if_returns[0].2.clone().unwrap() })
-        }
-      }
-
-      for (_, _, _, ret_expr) in ret_expressions.iter() {
-        if let Some(ret) = ret_expr {
-          if let Some(expr_ty) = get_expression_type(scope, ret) {
-            if expr_ty != *function_ty {
-              push_error!(
-                res,
-                SemanticError::InvalidReturnType {
-                  identifier: self.identifier.clone(),
-                  span: ret.get_span(),
-                  expected: function_ty.clone(),
-                  actual: expr_ty,
-                }
-              )
-            }
-          }
-        }
-      }
-    } else if !ret_expressions.is_empty() {
-      for (_, _, _, ret_expr) in ret_expressions.iter() {
-        if let Some(ret) = ret_expr {
-          if let Some(expr_ty) = get_expression_type(scope, ret) {
-            push_error!(
-              res,
-              SemanticError::NoReturnTypeExpected {
-                identifier: self.identifier.clone(),
-                span: ret.get_span(),
-                actual: expr_ty,
-              }
-            )
-          }
         }
       }
     }
@@ -568,6 +555,35 @@ mod tests {
   use std::convert::TryFrom;
 
   use super::*;
+
+  #[test]
+  fn wrong_return_type() {
+    let scope = Scope::new();
+    FunctionDeclaration::try_from(
+      r#"
+      void example() {
+        return true;
+      }
+      "#
+      .trim(),
+    )
+    .unwrap()
+    .add_to_scope(&scope)
+    .unwrap_err();
+
+    let scope = Scope::new();
+    FunctionDeclaration::try_from(
+      r#"
+      int example() {
+        return;
+      }
+      "#
+      .trim(),
+    )
+    .unwrap()
+    .add_to_scope(&scope)
+    .unwrap_err();
+  }
 
   #[test]
   fn check_return_statement() {

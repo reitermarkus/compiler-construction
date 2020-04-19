@@ -12,6 +12,7 @@ pub struct Scope {
   pub name: Option<String>,
   pub parent: Option<Rc<RefCell<Scope>>>,
   pub symbols: SymbolTable,
+  pub return_type: Option<Ty>,
   pub children: Vec<Rc<RefCell<Scope>>>,
 }
 
@@ -21,6 +22,7 @@ impl fmt::Debug for Scope {
       .field("name", &self.name)
       .field("has_parent", &self.parent.is_some())
       .field("symbols", &self.symbols)
+      .field("return_type", &self.return_type)
       .field("children", &self.children)
       .finish()
   }
@@ -93,6 +95,18 @@ impl Scope {
 
     if let Some(symbol) = scope.symbols.get(identifier) {
       Some(symbol.clone())
+    } else {
+      None
+    }
+  }
+
+  pub fn return_type(scope: &Rc<RefCell<Self>>) -> Option<Ty> {
+    let scope = scope.borrow();
+
+    if let Some(ty) = &scope.return_type {
+      Some(ty.clone())
+    } else if let Some(parent) = &scope.parent {
+      Self::return_type(parent)
     } else {
       None
     }
