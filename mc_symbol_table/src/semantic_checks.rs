@@ -103,7 +103,6 @@ impl CheckSemantics for ReturnStatement<'_> {
     let mut res = Ok(());
 
     let expected_return_type = Scope::return_type(scope);
-
     let actual_return_type = if let Some(return_expression) = &self.expression {
       extend_errors!(res, return_expression.check_semantics(scope));
       get_expression_type(scope, return_expression)
@@ -126,91 +125,93 @@ impl CheckSemantics for ReturnStatement<'_> {
   }
 }
 
-type StatementsReturn<'a> = Option<Vec<(&'a str, usize, Option<Span<'a>>, &'a ReturnStatement<'a>)>>;
+fn check_main_return_type<'a>(function_declaration: &'a FunctionDeclaration<'a>) -> Result<(), Vec<SemanticError<'a>>> {
+  let mut res = Ok(());
 
-fn recurse_statements<'a>(from: &'a str, smt: &'a Statement<'a>) -> StatementsReturn<'a> {
-  match smt {
-    Statement::Ret(ret) => Some(vec![("main", 0, None, ret)]),
-    Statement::If(if_smt) => {
-      if let Some(else_block) = &if_smt.else_block {
-        Some(
-          recurse_statements("if", &if_smt.block)
-            .iter()
-            .chain(recurse_statements("if", &else_block).iter())
-            .flat_map(|smt| smt.clone())
-            .map(|(from, level, _, smt)| {
-              if from == "if" {
-                ("if", level + 1, Some(if_smt.span.clone()), smt)
-              } else {
-                ("if", level, Some(if_smt.span.clone()), smt)
-              }
-            })
-            .collect::<Vec<_>>(),
-        )
-      } else {
-        Some(
-          recurse_statements("if", &if_smt.block)
-            .iter()
-            .flat_map(|smt| smt.clone())
-            .map(|(from, level, _, smt)| {
-              if from == "if" {
-                ("if", level + 1, Some(if_smt.span.clone()), smt)
-              } else {
-                ("if", level, Some(if_smt.span.clone()), smt)
-              }
-            })
-            .collect::<Vec<_>>(),
-        )
+  if function_declaration.identifier == "main".into() {
+    let actual_return_type = function_declaration.ty.clone();
+    let expected_return_type = Some(Ty::Int);
+
+    if actual_return_type != expected_return_type {
+      push_error!(
+        res,
+        SemanticError::InvalidReturnType {
+          span: &function_declaration.span,
+          actual: actual_return_type,
+          expected: expected_return_type
+        }
+      );
+    }
+  }
+
+  res
+}
+
+trait FindReturnStatement {
+  fn find_return_statement(&self) -> bool;
+}
+
+impl FindReturnStatement for Statement<'_> {
+  fn find_return_statement(&self) -> bool {
+    match self {
+      Statement::Compound(compound_statement) => compound_statement.find_return_statement(),
+      Statement::If(if_statement) => if_statement.find_return_statement(),
+      Statement::Ret(_) => true,
+      _ => false,
+    }
+  }
+}
+
+impl FindReturnStatement for CompoundStatement<'_> {
+  fn find_return_statement(&self) -> bool {
+    for statement in &self.statements {
+      if statement.find_return_statement() {
+        return true;
       }
     }
-    Statement::Compound(compound_smt) => {
-      Some(compound_smt.statements.iter().filter_map(|s| recurse_statements(from, s)).flatten().collect::<Vec<_>>())
-    }
-    _ => None,
+
+    false
   }
+}
+
+impl FindReturnStatement for IfStatement<'_> {
+  fn find_return_statement(&self) -> bool {
+    if let Some(else_block) = &self.else_block {
+      self.block.find_return_statement() && else_block.find_return_statement()
+    } else {
+      false
+    }
+  }
+}
+
+impl FindReturnStatement for FunctionDeclaration<'_> {
+  fn find_return_statement(&self) -> bool {
+    self.body.find_return_statement()
+  }
+}
+
+fn check_missing_return<'a>(function_declaration: &'a FunctionDeclaration<'a>) -> Result<(), Vec<SemanticError<'a>>> {
+  let mut res = Ok(());
+
+  if function_declaration.ty.is_some() && !function_declaration.body.find_return_statement() {
+    push_error!(
+      res,
+      SemanticError::MissingReturnStatement {
+        identifier: function_declaration.identifier.clone(),
+        span: &function_declaration.span
+      }
+    );
+  }
+
+  res
 }
 
 impl CheckSemantics for FunctionDeclaration<'_> {
   fn check_semantics(&self, _scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let mut res = Ok(());
 
-    if self.identifier == "main".into() && self.ty != Some(Ty::Int) {
-      push_error!(res, SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span });
-    }
-
-    let ret_expressions = self
-      .body
-      .statements
-      .iter()
-      .filter_map(|x| recurse_statements("", x))
-      .flatten()
-      .map(|(from, level, span, x)| (from, level, span, x.expression.as_ref()))
-      .collect::<Vec<_>>();
-
-    // Check that return statements match the functions type.
-    if self.ty.is_some() {
-      if ret_expressions.is_empty() {
-        push_error!(res, SemanticError::ReturnTypeExpected { identifier: self.identifier.clone(), span: &self.span });
-      }
-
-      if ret_expressions.iter().all(|(from, _, _, _)| *from != "main") {
-        let if_returns = ret_expressions.iter().filter(|(from, _, _, _)| *from == "if").collect::<Vec<_>>();
-
-        if if_returns.len() >= 2 {
-          for chunk in if_returns.chunks(2) {
-            if chunk.len() == 2 {
-              if chunk[0].1 != chunk[1].1 {
-                push_error!(res, SemanticError::MatchingReturnError { span: chunk[0].2.clone().unwrap() })
-              }
-            } else if chunk[0].1 != 0 {
-              push_error!(res, SemanticError::MatchingReturnError { span: chunk[0].2.clone().unwrap() })
-            }
-          }
-        } else if if_returns.len() == 1 {
-          push_error!(res, SemanticError::MatchingReturnError { span: if_returns[0].2.clone().unwrap() })
-        }
-      }
-    }
+    extend_errors!(res, check_main_return_type(self));
+    extend_errors!(res, check_missing_return(self));
 
     res
   }
@@ -398,21 +399,21 @@ pub fn check_function_call_argument_type<'a>(
   span: &'a Span<'_>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   if arg_expression.check_semantics(scope).is_err() {
-    Err(vec![SemanticError::InvalidArgument { span, identifier: identifier.clone() }])
-  } else if let Some(ty) = get_expression_type(scope, arg_expression) {
-    if ty != symbol_arg.0 {
-      return Err(vec![SemanticError::InvalidArgumentType {
-        span,
-        identifier: identifier.clone(),
-        expected: symbol_arg.0.clone(),
-        actual: ty,
-      }]);
-    }
-
-    Ok(())
-  } else {
-    Err(vec![SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() }])
+    return Err(vec![SemanticError::InvalidArgument { span, identifier: identifier.clone() }]);
   }
+
+  let ty = get_expression_type(scope, arg_expression);
+
+  if ty != Some(symbol_arg.0.clone()) {
+    return Err(vec![SemanticError::InvalidArgumentType {
+      span,
+      identifier: identifier.clone(),
+      expected: symbol_arg.0.clone(),
+      actual: ty,
+    }]);
+  }
+
+  Ok(())
 }
 
 pub fn check_unary_expression<'a>(
@@ -470,18 +471,18 @@ pub fn check_binary_expression<'a>(
     if lhs_ty != rhs_ty {
       push_error!(res, SemanticError::BinaryOperatorTypeCombinationError { span, op, lhs_ty, rhs_ty });
     } else {
-      extend_errors!(res, check_binary_opeartor_compatability(op, lhs_ty, span));
+      extend_errors!(res, check_binary_operator_compatibility(op, lhs_ty, span));
     }
   }
 
-  // Determine the right span, when nesting a call to a `void` function in a binary expression.
-  for exp in [lhs, rhs].iter() {
-    if let Expression::FunctionCall { identifier, span, .. } = exp {
-      if let Some(Symbol::Function(None, ..)) = Scope::lookup(scope, identifier) {
-        push_error!(res, SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
-      }
-    }
-  }
+  // // Determine the right span, when nesting a call to a `void` function in a binary expression.
+  // for exp in [lhs, rhs].iter() {
+  //   if let Expression::FunctionCall { identifier, span, .. } = exp {
+  //     if let Some(Symbol::Function(None, ..)) = Scope::lookup(scope, identifier) {
+  //       push_error!(res, SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
+  //     }
+  //   }
+  // }
 
   res
 }
@@ -499,7 +500,7 @@ pub fn check_unary_operator_compatability<'a>(
   }
 }
 
-pub fn check_binary_opeartor_compatability<'a>(
+pub fn check_binary_operator_compatibility<'a>(
   op: &'a BinaryOp,
   ty: Ty,
   span: &'a Span<'_>,
@@ -556,120 +557,149 @@ mod tests {
 
   use super::*;
 
-  #[test]
-  fn wrong_return_type() {
-    let scope = Scope::new();
-    FunctionDeclaration::try_from(
-      r#"
-      void example() {
-        return true;
-      }
-      "#
-      .trim(),
-    )
-    .unwrap()
-    .add_to_scope(&scope)
-    .unwrap_err();
+  macro_rules! expect_error {
+    ($ty:ident, $input:expr, $error:expr) => {
+      let scope = Scope::new();
+      let ast = $ty::try_from($input.trim()).expect("failed to convert input to AST");
+      let res = ast.add_to_scope(&scope);
 
-    let scope = Scope::new();
-    FunctionDeclaration::try_from(
-      r#"
-      int example() {
-        return;
+      let error: Option<&str> = $error;
+      if let Some(expected_error) = error {
+        let errors = res.unwrap_err();
+        let error_output = errors.iter().map(|err| err.to_string()).collect::<Vec<_>>().join("\n");
+
+        if !error_output.contains(expected_error) {
+          panic!("expected output {:?} to contain {:?}", error_output, expected_error);
+        }
+      } else {
+        res.unwrap();
       }
-      "#
-      .trim(),
-    )
-    .unwrap()
-    .add_to_scope(&scope)
-    .unwrap_err();
+    };
   }
 
   #[test]
-  fn check_return_statement() {
-    let scope = Scope::new();
-    FunctionDeclaration::try_from(
+  fn wrong_main_return_type() {
+    expect_error!(
+      FunctionDeclaration,
       r#"
-      bool ageforalco(int n) {
-        if (n < 21) {
-          return false;
+        void main() {
         }
+      "#,
+      Some("expected return type int, found void")
+    );
+  }
 
-        return true;
-      }
-      "#
-      .trim(),
-    )
-    .unwrap()
-    .add_to_scope(&scope)
-    .unwrap();
-
-    let scope = Scope::new();
-    FunctionDeclaration::try_from(
+  #[test]
+  fn void_without_return() {
+    expect_error!(
+      FunctionDeclaration,
       r#"
-      bool ageforalco(int n) {
-        if (n < 21) {
-          return false;
-        } else {
+        void example() {
+        }
+      "#,
+      None
+    );
+  }
+
+  #[test]
+  fn wrong_return_type() {
+    expect_error!(
+      FunctionDeclaration,
+      r#"
+        void example() {
           return true;
         }
-      }
-      "#
-      .trim(),
-    )
-    .unwrap()
-    .add_to_scope(&scope)
-    .unwrap();
+      "#,
+      Some("expected return type void, found bool")
+    );
 
-    let scope = Scope::new();
-    FunctionDeclaration::try_from(
+    expect_error!(
+      FunctionDeclaration,
       r#"
-      bool ageforalco(int n) {
-        if (n < 21) {
+      int example() {
+          return;
+        }
+      "#,
+      Some("expected return type int, found void")
+    );
+  }
 
-        } else {
+  #[test]
+  fn no_missing_return_statement() {
+    expect_error!(
+      FunctionDeclaration,
+      r#"
+        bool ageforalco(int n) {
+          if (n < 21) {
+            return false;
+          }
+
           return true;
         }
+      "#,
+      None
+    );
 
-        return false;
-      }
-      "#
-      .trim(),
-    )
-    .unwrap()
-    .add_to_scope(&scope)
-    .unwrap();
-
-    let scope = Scope::new();
-    FunctionDeclaration::try_from(
+    expect_error!(
+      FunctionDeclaration,
       r#"
-      bool ageforalco(int n) {
-        if (n < 21) {
+        bool ageforalco(int n) {
+          if (n < 21) {
+            return false;
+          } else {
+            return true;
+          }
+        }
+      "#,
+      None
+    );
+
+    expect_error!(
+      FunctionDeclaration,
+      r#"
+        bool ageforalco(int n) {
+          if (n < 21) {
+
+          } else {
+            return true;
+          }
+
           return false;
         }
-      }
-      "#
-      .trim(),
-    )
-    .unwrap()
-    .add_to_scope(&scope)
-    .unwrap_err();
+      "#,
+      None
+    );
+  }
 
-    let scope = Scope::new();
-    FunctionDeclaration::try_from(
+  #[test]
+  fn return_statement_after_if() {
+    expect_error!(
+      FunctionDeclaration,
       r#"
-      bool ageforalco(int n) {
-        if (n < 21) {
-
-        } else {
-          return true;
+        bool ageforalco(int n) {
+          if (n < 21) {
+            return false;
+          }
         }
-      }
-      "#
-      .trim(),
-    )
-    .unwrap()
-    .add_to_scope(&scope)
-    .unwrap_err();
+      "#,
+      Some("missing return statement in function 'ageforalco'")
+    );
+  }
+
+  #[test]
+  fn missing_return_if_else() {
+    expect_error!(
+      FunctionDeclaration,
+      r#"
+        bool ageforalco(int n) {
+          if (n < 21) {
+
+          } else {
+            return true;
+          }
+        }
+      "#,
+      Some("missing return statement in function 'ageforalco'")
+    );
   }
 }

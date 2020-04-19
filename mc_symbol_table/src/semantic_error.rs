@@ -48,7 +48,8 @@ pub enum SemanticError<'a> {
     outer: &'a UnaryOp,
     inner: &'a UnaryOp,
   },
-  ReturnTypeExpected {
+  /// Error when a non-void function is missing a return statement.
+  MissingReturnStatement {
     span: &'a Span<'a>,
     identifier: Identifier,
   },
@@ -62,7 +63,7 @@ pub enum SemanticError<'a> {
     span: &'a Span<'a>,
     identifier: Identifier,
     expected: Ty,
-    actual: Ty,
+    actual: Option<Ty>,
   },
   InvalidDeclarationType {
     span: &'a Span<'a>,
@@ -74,9 +75,6 @@ pub enum SemanticError<'a> {
     span: &'a Span<'a>,
     expected: Option<Ty>,
     actual: Option<Ty>,
-  },
-  MatchingReturnError {
-    span: Span<'a>,
   },
   InvalidArgument {
     span: &'a Span<'a>,
@@ -143,9 +141,14 @@ impl fmt::Display for SemanticError<'_> {
         expected,
         actual
       ),
-      Self::InvalidArgumentType { span, identifier, expected, actual } => {
-        write_err!(f, span, "function '{}' expected argument of type {}, found {}", identifier, expected, actual)
-      }
+      Self::InvalidArgumentType { span, identifier, expected, actual } => write_err!(
+        f,
+        span,
+        "function '{}' expected argument of type {}, found {}",
+        identifier,
+        expected,
+        actual.as_ref().map(|ty| ty.to_string()).unwrap_or_else(|| "void".into())
+      ),
       Self::InvalidDeclarationType { span, identifier, expected, actual } => {
         write_err!(f, span, "variable '{}' expected type {}, found {}", identifier, expected, actual)
       }
@@ -168,9 +171,8 @@ impl fmt::Display for SemanticError<'_> {
       Self::OperatorCombinationError { span, unary_op, binary_op } => {
         write_err!(f, span, "unary operator '{}' cannot be combined with binary operator '{}'", unary_op, binary_op)
       }
-      Self::MatchingReturnError { span } => write_err!(f, span, "if statement expects matching return statement"),
-      Self::ReturnTypeExpected { span, identifier } => {
-        write_err!(f, span, "expected return type for function '{}'", identifier)
+      Self::MissingReturnStatement { span, identifier } => {
+        write_err!(f, span, "missing return statement in function '{}'", identifier)
       }
       Self::BinaryOperatorTypeCombinationError { span, op, lhs_ty, rhs_ty } => {
         write_err!(f, span, "operator '{}' cannot be used with types '{}' ans '{}'", op, lhs_ty, rhs_ty)
@@ -287,7 +289,7 @@ mod test {
       span: &Span::new(&expr, 0, 13).unwrap(),
       identifier: Identifier::from("pi"),
       expected: Ty::Int,
-      actual: Ty::Float
+      actual: Some(Ty::Float)
     }));
 
     assert_eq!(errors.len(), 1);
