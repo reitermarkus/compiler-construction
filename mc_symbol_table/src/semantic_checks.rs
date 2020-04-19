@@ -702,4 +702,65 @@ mod tests {
       Some("missing return statement in function 'ageforalco'")
     );
   }
+
+  #[test]
+  fn nested_if_return() {
+    expect_error!(
+      FunctionDeclaration,
+      r#"
+        bool ageforalco(int n) {
+          if (n < 21) {
+            if (n > 2) {
+              return false;
+            } else {
+              return true;
+            }
+          } else {
+            return true;
+          }
+        }
+      "#,
+      None
+    );
+  }
+
+  #[test]
+  fn nested_if_main_return() {
+    expect_error!(
+      FunctionDeclaration,
+      r#"
+        bool ageforalco(int n) {
+          if (n < 21) {
+            if (n > 2) {
+              return false;
+            }
+          } else {
+            return true;
+          }
+
+          return false;
+        }
+      "#,
+      None
+    );
+  }
+
+  #[test]
+  fn nested_if_return_error() {
+    expect_error!(
+      FunctionDeclaration,
+      r#"
+        bool ageforalco(int n) {
+          if (n < 21) {
+            if (n > 2) {
+              return false;
+            }
+          } else {
+            return true;
+          }
+        }
+      "#,
+      Some("missing return statement in function 'ageforalco'")
+    );
+  }
 }
