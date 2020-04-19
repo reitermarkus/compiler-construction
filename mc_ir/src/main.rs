@@ -2,6 +2,7 @@
 
 use clap::{value_t, App, Arg};
 
+#[cfg_attr(tarpaulin, skip)]
 fn main() {
   let matches = App::new("mC IR Viewer")
     .set_term_width(0)
