@@ -404,7 +404,7 @@ pub fn check_function_call_argument_type<'a>(
 
   let ty = get_expression_type(scope, arg_expression);
 
-  if ty != Some(symbol_arg.0.clone()) {
+  if ty.as_ref() != Some(&symbol_arg.0) {
     return Err(vec![SemanticError::InvalidArgumentType {
       span,
       identifier: identifier.clone(),
