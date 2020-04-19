@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["BinaryOp",""],["Expression",""],["Literal",""],["Statement",""],["Ty",""],["UnaryOp",""]],"fn":[["climber",""]],"struct":[["Assignment",""],["CompoundStatement",""],["Declaration",""],["FunctionDeclaration",""],["Identifier",""],["IfStatement",""],["Parameter",""],["Program",""],["ReturnStatement",""],["WhileStatement",""]]});
