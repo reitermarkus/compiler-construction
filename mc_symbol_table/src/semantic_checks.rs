@@ -467,20 +467,13 @@ pub fn check_binary_expression<'a>(
   extend_errors!(res, lhs.check_semantics(scope));
   extend_errors!(res, rhs.check_semantics(scope));
 
-  if let (Some(lhs_ty), Some(rhs_ty)) = (get_expression_type(scope, lhs), get_expression_type(scope, rhs)) {
-    if lhs_ty != rhs_ty {
-      push_error!(res, SemanticError::BinaryOperatorTypeCombinationError { span, op, lhs_ty, rhs_ty });
-    } else {
-      extend_errors!(res, check_binary_operator_compatibility(op, lhs_ty, span));
-    }
-  }
+  let lhs_ty = get_expression_type(scope, lhs);
+  let rhs_ty = get_expression_type(scope, rhs);
 
-  for exp in [lhs, rhs].iter() {
-    if let Expression::FunctionCall { identifier, span, .. } = exp {
-      if let Some(Symbol::Function(None, ..)) = Scope::lookup(scope, identifier) {
-        push_error!(res, SemanticError::InvalidUseOfVoidFunction { span, identifier: identifier.clone() })
-      }
-    }
+  if (lhs_ty != rhs_ty) || lhs_ty.is_none() || rhs_ty.is_none() {
+    push_error!(res, SemanticError::BinaryOperatorTypeError { span, op, lhs_ty, rhs_ty });
+  } else {
+    extend_errors!(res, check_binary_operator_compatibility(op, lhs_ty, rhs_ty, span));
   }
 
   res
@@ -501,18 +494,19 @@ pub fn check_unary_operator_compatability<'a>(
 
 pub fn check_binary_operator_compatibility<'a>(
   op: &'a BinaryOp,
-  ty: Ty,
+  lhs_ty: Option<Ty>,
+  rhs_ty: Option<Ty>,
   span: &'a Span<'_>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
-  match ty {
+  match lhs_ty.clone().expect("no ty") {
     Ty::Bool if [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(op) => {
-      Err(vec![SemanticError::BinaryOperatorTypeError { span, op, ty }])
+      Err(vec![SemanticError::BinaryOperatorTypeError { span, op, lhs_ty, rhs_ty }])
     }
     Ty::Int | Ty::Float if [BinaryOp::Land, BinaryOp::Lor].contains(op) => {
-      Err(vec![SemanticError::BinaryOperatorTypeError { span, op, ty }])
+      Err(vec![SemanticError::BinaryOperatorTypeError { span, op, lhs_ty, rhs_ty }])
     }
     Ty::String if ![BinaryOp::Eq, BinaryOp::Neq].contains(op) => {
-      Err(vec![SemanticError::BinaryOperatorTypeError { span, op, ty }])
+      Err(vec![SemanticError::BinaryOperatorTypeError { span, op, lhs_ty, rhs_ty }])
     }
     _ => Ok(()),
   }
@@ -761,5 +755,10 @@ mod tests {
       "#,
       Some("missing return statement in function 'ageforalco'")
     );
+  }
+
+  #[test]
+  fn binary_operator_type_error() {
+    expect_error!(Expression, "true + 5", Some("operator '+' cannot be used with types 'bool' and 'int'"));
   }
 }

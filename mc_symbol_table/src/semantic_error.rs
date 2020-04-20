@@ -85,16 +85,11 @@ pub enum SemanticError<'a> {
     unary_op: &'a UnaryOp,
     binary_op: &'a BinaryOp,
   },
-  BinaryOperatorTypeCombinationError {
-    span: &'a Span<'a>,
-    op: &'a BinaryOp,
-    lhs_ty: Ty,
-    rhs_ty: Ty,
-  },
   BinaryOperatorTypeError {
     span: &'a Span<'a>,
     op: &'a BinaryOp,
-    ty: Ty,
+    lhs_ty: Option<Ty>,
+    rhs_ty: Option<Ty>,
   },
   NoMainFunction {
     span: &'a Span<'a>,
@@ -105,10 +100,6 @@ pub enum SemanticError<'a> {
   },
   InvalidCondition {
     span: &'a Span<'a>,
-  },
-  InvalidUseOfVoidFunction {
-    span: &'a Span<'a>,
-    identifier: Identifier,
   },
 }
 
@@ -178,19 +169,18 @@ impl fmt::Display for SemanticError<'_> {
       Self::MissingReturnStatement { span, identifier } => {
         write_err!(f, span, "missing return statement in function '{}'", identifier)
       }
-      Self::BinaryOperatorTypeCombinationError { span, op, lhs_ty, rhs_ty } => {
-        write_err!(f, span, "operator '{}' cannot be used with types '{}' ans '{}'", op, lhs_ty, rhs_ty)
-      }
-      Self::BinaryOperatorTypeError { span, op, ty } => {
-        write_err!(f, span, "operator '{}' cannot be used with type '{}'", op, ty)
-      }
+      Self::BinaryOperatorTypeError { span, op, lhs_ty, rhs_ty } => write_err!(
+        f,
+        span,
+        "operator '{}' cannot be used with types '{}' and '{}'",
+        op,
+        lhs_ty.as_ref().map(|ty| ty.to_string()).unwrap_or_else(|| "void".into()),
+        rhs_ty.as_ref().map(|ty| ty.to_string()).unwrap_or_else(|| "void".into())
+      ),
       Self::NoMainFunction { span } => write_err!(f, span, "required function 'main' not found"),
       Self::InvalidCondition { span } => write_err!(f, span, "invalid condition"),
       Self::InvalidConditionType { span, actual } => {
         write_err!(f, span, "expected type '{}' for condition, found '{}'", Ty::Bool, actual)
-      }
-      Self::InvalidUseOfVoidFunction { span, identifier } => {
-        write_err!(f, span, "function '{}' of type 'void' cannot be used here", identifier)
       }
     }
   }
@@ -548,11 +538,11 @@ mod test {
       op: &UnaryOp::Not,
       ty: Ty::Int,
     }));
-    assert!(errors.contains(&SemanticError::BinaryOperatorTypeCombinationError {
+    assert!(errors.contains(&SemanticError::BinaryOperatorTypeError {
       span: &Span::new(&expr, 0, 8).unwrap(),
       op: &BinaryOp::Plus,
-      lhs_ty: Ty::String,
-      rhs_ty: Ty::Bool,
+      lhs_ty: Some(Ty::String),
+      rhs_ty: Some(Ty::Bool),
     }));
 
     assert_eq!(errors.len(), 2);
@@ -581,7 +571,8 @@ mod test {
     assert!(errors.contains(&SemanticError::BinaryOperatorTypeError {
       span: &Span::new(&expr, 0, 10).unwrap(),
       op: &BinaryOp::Plus,
-      ty: Ty::String,
+      lhs_ty: Some(Ty::String),
+      rhs_ty: Some(Ty::String),
     }));
 
     assert_eq!(errors.len(), 1);
@@ -607,9 +598,11 @@ mod test {
     let result = binary.check_semantics(&scope);
     let errors = result.expect_err("no errors found");
 
-    assert!(errors.contains(&SemanticError::InvalidUseOfVoidFunction {
-      span: &Span::new(&expr, 0, 5).unwrap(),
-      identifier: Identifier::from("lol"),
+    assert!(errors.contains(&SemanticError::BinaryOperatorTypeError {
+      span: &Span::new(&expr, 0, 9).unwrap(),
+      op: &BinaryOp::Plus,
+      lhs_ty: None,
+      rhs_ty: Some(Ty::Int),
     }));
 
     assert_eq!(errors.len(), 1);
