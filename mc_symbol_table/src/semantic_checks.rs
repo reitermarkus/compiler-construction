@@ -475,14 +475,13 @@ pub fn check_binary_expression<'a>(
     }
   }
 
-  // // Determine the right span, when nesting a call to a `void` function in a binary expression.
-  // for exp in [lhs, rhs].iter() {
-  //   if let Expression::FunctionCall { identifier, span, .. } = exp {
-  //     if let Some(Symbol::Function(None, ..)) = Scope::lookup(scope, identifier) {
-  //       push_error!(res, SemanticError::ReturnTypeExpected { span, identifier: identifier.clone() })
-  //     }
-  //   }
-  // }
+  for exp in [lhs, rhs].iter() {
+    if let Expression::FunctionCall { identifier, span, .. } = exp {
+      if let Some(Symbol::Function(None, ..)) = Scope::lookup(scope, identifier) {
+        push_error!(res, SemanticError::InvalidUseOfVoidFunction { span, identifier: identifier.clone() })
+      }
+    }
+  }
 
   res
 }

@@ -106,6 +106,10 @@ pub enum SemanticError<'a> {
   InvalidCondition {
     span: &'a Span<'a>,
   },
+  InvalidUseOfVoidFunction {
+    span: &'a Span<'a>,
+    identifier: Identifier,
+  },
 }
 
 macro_rules! write_err {
@@ -184,6 +188,9 @@ impl fmt::Display for SemanticError<'_> {
       Self::InvalidCondition { span } => write_err!(f, span, "invalid condition"),
       Self::InvalidConditionType { span, actual } => {
         write_err!(f, span, "expected type '{}' for condition, found '{}'", Ty::Bool, actual)
+      }
+      Self::InvalidUseOfVoidFunction { span, identifier } => {
+        write_err!(f, span, "function '{}' of type 'void' cannot be used here", identifier)
       }
     }
   }
@@ -575,6 +582,34 @@ mod test {
       span: &Span::new(&expr, 0, 10).unwrap(),
       op: &BinaryOp::Plus,
       ty: Ty::String,
+    }));
+
+    assert_eq!(errors.len(), 1);
+  }
+
+  #[test]
+  fn semantic_binary_expression_check_for_void_function_call() {
+    let expr = "lol() + 5";
+    let binary = Expression::Binary {
+      op: BinaryOp::Plus,
+      lhs: Box::new(Expression::FunctionCall {
+        identifier: Identifier::from("lol"),
+        arguments: Vec::new(),
+        span: Span::new(&expr, 0, 5).unwrap(),
+      }),
+      rhs: Box::new(Expression::Literal { literal: Literal::Int(5), span: Span::new(&expr, 8, 9).unwrap() }),
+      span: Span::new(&expr, 0, 9).unwrap(),
+    };
+
+    let scope = Scope::new();
+    scope.borrow_mut().symbols.insert(Identifier::from("lol"), Symbol::Function(None, Vec::new()));
+
+    let result = binary.check_semantics(&scope);
+    let errors = result.expect_err("no errors found");
+
+    assert!(errors.contains(&SemanticError::InvalidUseOfVoidFunction {
+      span: &Span::new(&expr, 0, 5).unwrap(),
+      identifier: Identifier::from("lol"),
     }));
 
     assert_eq!(errors.len(), 1);
