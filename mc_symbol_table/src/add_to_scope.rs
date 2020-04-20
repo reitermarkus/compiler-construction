@@ -49,7 +49,7 @@ impl AddToScope for ReturnStatement<'_> {
 impl AddToScope for Declaration<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let res = self.check_semantics(scope);
-    (*scope.borrow_mut()).insert(self.identifier.clone(), Symbol::Variable(self.ty.clone(), self.count));
+    (*scope.borrow_mut()).insert(self.identifier.clone(), Symbol::Variable(self.ty, self.count));
     res
   }
 }
@@ -98,11 +98,11 @@ impl AddToScope for FunctionDeclaration<'_> {
   fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     let mut res = Ok(());
 
-    scope.borrow_mut().return_type = self.ty.clone();
+    scope.borrow_mut().return_type = self.ty;
 
     for param in &self.parameters {
       extend_errors!(res, param.check_semantics(scope));
-      (*scope.borrow_mut()).insert(param.identifier.clone(), Symbol::Variable(param.ty.clone(), param.count));
+      (*scope.borrow_mut()).insert(param.identifier.clone(), Symbol::Variable(param.ty, param.count));
     }
     extend_errors!(res, self.body.add_to_scope(scope));
 
@@ -121,8 +121,8 @@ impl AddToScope for Program<'_> {
       (*scope.borrow_mut()).insert(
         function.identifier.clone(),
         Symbol::Function(
-          function.ty.clone(),
-          function.parameters.iter().map(|p| (p.ty.clone(), p.count)).collect::<Vec<(Ty, Option<usize>)>>(),
+          function.ty,
+          function.parameters.iter().map(|p| (p.ty, p.count)).collect::<Vec<(Ty, Option<usize>)>>(),
         ),
       );
     }

@@ -103,8 +103,8 @@ impl Scope {
   pub fn return_type(scope: &Rc<RefCell<Self>>) -> Option<Ty> {
     let scope = scope.borrow();
 
-    if let Some(ty) = &scope.return_type {
-      Some(ty.clone())
+    if let Some(ty) = scope.return_type {
+      Some(ty)
     } else if let Some(parent) = &scope.parent {
       Self::return_type(parent)
     } else {

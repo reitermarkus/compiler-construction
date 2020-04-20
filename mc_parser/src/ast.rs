@@ -39,7 +39,7 @@ pub fn climber() -> PrecClimber<Rule> {
   ])
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub enum Ty {
   Bool,
   Int,

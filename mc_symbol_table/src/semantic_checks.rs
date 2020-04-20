@@ -129,7 +129,7 @@ fn check_main_return_type<'a>(function_declaration: &'a FunctionDeclaration<'a>)
   let mut res = Ok(());
 
   if function_declaration.identifier == "main".into() {
-    let actual_return_type = function_declaration.ty.clone();
+    let actual_return_type = function_declaration.ty;
     let expected_return_type = Some(Ty::Int);
 
     if actual_return_type != expected_return_type {
@@ -404,11 +404,11 @@ pub fn check_function_call_argument_type<'a>(
 
   let ty = get_expression_type(scope, arg_expression);
 
-  if ty.as_ref() != Some(&symbol_arg.0) {
+  if ty != Some(symbol_arg.0) {
     return Err(vec![SemanticError::InvalidArgumentType {
       span,
       identifier: identifier.clone(),
-      expected: symbol_arg.0.clone(),
+      expected: symbol_arg.0,
       actual: ty,
     }]);
   }
@@ -498,7 +498,7 @@ pub fn check_binary_operator_compatibility<'a>(
   rhs_ty: Option<Ty>,
   span: &'a Span<'_>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
-  match lhs_ty.clone().expect("no ty") {
+  match lhs_ty.expect("no ty") {
     Ty::Bool if [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(op) => {
       Err(vec![SemanticError::BinaryOperatorTypeError { span, op, lhs_ty, rhs_ty }])
     }
