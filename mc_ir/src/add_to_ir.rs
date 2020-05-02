@@ -62,10 +62,12 @@ impl<'a> AddToIr<'a> for Statement<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     match self {
       Self::Assignment(assignment) => assignment.add_to_ir(ir),
+      Self::Decl(_) => ir.last_ref(),
       Self::Expression(expression) => expression.add_to_ir(ir),
       Self::If(if_stmt) => if_stmt.add_to_ir(ir),
+      Self::While(while_stmt) => while_stmt.add_to_ir(ir),
+      Self::Ret(ret_stmt) => ret_stmt.add_to_ir(ir),
       Self::Compound(comp_stmt) => comp_stmt.add_to_ir(ir),
-      _ => todo!(),
     }
   }
 }
@@ -90,6 +92,33 @@ impl<'a> AddToIr<'a> for IfStatement<'a> {
       ir.update_reference(jump_index, ir.statements.len());
     } else {
       ir.update_reference(jumpfalse_index, ir.statements.len());
+    }
+
+    ir.last_ref()
+  }
+}
+
+impl<'a> AddToIr<'a> for WhileStatement<'a> {
+  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+    let condition = self.condition.add_to_ir(ir);
+
+    let jumpfalse_index = ir.statements.len();
+    ir.push(Op::Jumpfalse(condition, Arg::Reference(AtomicUsize::default())));
+
+    self.block.add_to_ir(ir);
+    ir.update_reference(jumpfalse_index, ir.statements.len());
+
+    ir.last_ref()
+  }
+}
+
+impl<'a> AddToIr<'a> for ReturnStatement<'a> {
+  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+    if let Some(expression) = &self.expression {
+      let to_return = expression.add_to_ir(ir);
+      ir.push(Op::Return(Some(to_return)));
+    } else {
+      ir.push(Op::Return(None))
     }
 
     ir.last_ref()
@@ -169,6 +198,33 @@ mod tests {
         Op::Assign(Arg::Variable(&Identifier::from("a")), Arg::Variable(&Identifier::from("max"))),
         Op::Jump(Arg::Reference(AtomicUsize::new(5))),
         Op::Assign(Arg::Variable(&Identifier::from("b")), Arg::Variable(&Identifier::from("max"))),
+      ]
+    )
+  }
+
+  #[test]
+  fn comp_stmt_to_ir() {
+    let comp_stmt = CompoundStatement::try_from(
+      "{
+      while (a > b) {
+        a = a + 1;
+      }
+      return a;
+    }",
+    )
+    .unwrap();
+
+    let mut ir = IntermediateRepresentation::default();
+    comp_stmt.add_to_ir(&mut ir);
+
+    assert_eq!(
+      ir.statements,
+      vec![
+        Op::Gt(Arg::Variable(&Identifier::from("a")), Arg::Variable(&Identifier::from("b"))),
+        Op::Jumpfalse(Arg::Reference(AtomicUsize::new(0)), Arg::Reference(AtomicUsize::new(4))),
+        Op::Plus(Arg::Variable(&Identifier::from("a")), Arg::Literal(&Literal::Int(1))),
+        Op::Assign(Arg::Reference(AtomicUsize::new(2)), Arg::Variable(&Identifier::from("a"))),
+        Op::Return(Some(Arg::Variable(&Identifier::from("a")))),
       ]
     )
   }

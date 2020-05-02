@@ -63,4 +63,5 @@ pub enum Op<'a> {
   Lor(Arg<'a>, Arg<'a>),
   Jumpfalse(Arg<'a>, Arg<'a>),
   Jump(Arg<'a>),
+  Return(Option<Arg<'a>>),
 }
