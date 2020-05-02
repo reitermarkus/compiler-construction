@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use mc_parser::ast::*;
 
 pub trait AddToIr<'a> {
@@ -9,7 +11,7 @@ impl<'a> AddToIr<'a> for Assignment<'a> {
     let arg = self.rvalue.add_to_ir(ir);
     ir.push(Op::Assign(arg, Arg::Variable(&self.identifier)));
 
-    Arg::Reference(ir.len() - 1)
+    ir.last_ref()
   }
 }
 
@@ -37,7 +39,7 @@ impl<'a> AddToIr<'a> for Expression<'a> {
           BinaryOp::Lor => Op::Lor(arg1, arg2),
         });
 
-        Arg::Reference(ir.len() - 1)
+        Arg::Reference(AtomicUsize::new(ir.statements.len() - 1))
       }
       Self::Unary { op, expression, .. } => {
         let arg = expression.add_to_ir(ir);
@@ -47,10 +49,58 @@ impl<'a> AddToIr<'a> for Expression<'a> {
           UnaryOp::Minus => Op::UnaryMinus(arg),
         });
 
-        Arg::Reference(ir.len() - 1)
+        Arg::Reference(AtomicUsize::new(ir.statements.len() - 1))
       }
       Self::FunctionCall { .. } => todo!(),
     }
+  }
+}
+
+impl<'a> AddToIr<'a> for Statement<'a> {
+  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+    match self {
+      Self::Assignment(assignment) => assignment.add_to_ir(ir),
+      Self::Expression(expression) => expression.add_to_ir(ir),
+      Self::If(if_stmt) => if_stmt.add_to_ir(ir),
+      Self::Compound(comp_stmt) => comp_stmt.add_to_ir(ir),
+      _ => todo!(),
+    }
+  }
+}
+
+impl<'a> AddToIr<'a> for IfStatement<'a> {
+  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+    let condition = self.condition.add_to_ir(ir);
+
+    let jumpfalse_index = ir.statements.len();
+    ir.push(Op::Jumpfalse(condition, Arg::Reference(AtomicUsize::default())));
+
+    self.block.add_to_ir(ir);
+
+    if let Some(else_block) = &self.else_block {
+      let jump_index = ir.statements.len();
+      ir.push(Op::Jump(Arg::Reference(AtomicUsize::default())));
+
+      ir.update_reference(jumpfalse_index, ir.statements.len());
+
+      else_block.add_to_ir(ir);
+
+      ir.update_reference(jump_index, ir.statements.len());
+    } else {
+      ir.update_reference(jumpfalse_index, ir.statements.len());
+    }
+
+    ir.last_ref()
+  }
+}
+
+impl<'a> AddToIr<'a> for CompoundStatement<'a> {
+  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+    for stmt in &self.statements {
+      stmt.add_to_ir(ir);
+    }
+
+    ir.last_ref()
   }
 }
 
@@ -68,11 +118,11 @@ mod tests {
     assignment.add_to_ir(&mut ir);
 
     assert_eq!(
-      ir,
+      ir.statements,
       vec![
         Op::Times(Arg::Literal(&Literal::Int(2)), Arg::Literal(&Literal::Int(3))),
-        Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Reference(0)),
-        Op::Assign(Arg::Reference(1), Arg::Variable(&Identifier::from("x"))),
+        Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Reference(AtomicUsize::new(0))),
+        Op::Assign(Arg::Reference(AtomicUsize::new(1)), Arg::Variable(&Identifier::from("x"))),
       ]
     );
   }
@@ -81,29 +131,88 @@ mod tests {
   fn expression_to_ir() {
     let expression = Expression::try_from("1 + 2 * 3").unwrap();
 
-    let mut ir = IntermediateRepresentation::new();
+    let mut ir = IntermediateRepresentation::default();
 
     let arg = expression.add_to_ir(&mut ir);
 
     assert_eq!(
-      ir,
+      ir.statements,
       vec![
         Op::Times(Arg::Literal(&Literal::Int(2)), Arg::Literal(&Literal::Int(3))),
-        Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Reference(0)),
+        Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Reference(AtomicUsize::new(0))),
       ]
     );
-    assert_eq!(arg, Arg::Reference(1));
+    assert_eq!(arg, Arg::Reference(AtomicUsize::new(1)));
+  }
+
+  #[test]
+  fn if_stmt_to_ir() {
+    let if_stmt = IfStatement::try_from(
+      "if (a > b) {
+      max = a;
+    } else {
+      max = b;
+    }",
+    )
+    .unwrap();
+
+    let mut ir = IntermediateRepresentation::default();
+    if_stmt.add_to_ir(&mut ir);
+
+    assert_eq!(
+      ir.statements,
+      vec![
+        Op::Gt(Arg::Variable(&Identifier::from("a")), Arg::Variable(&Identifier::from("b"))),
+        Op::Jumpfalse(Arg::Reference(AtomicUsize::new(0)), Arg::Reference(AtomicUsize::new(4))),
+        Op::Assign(Arg::Variable(&Identifier::from("a")), Arg::Variable(&Identifier::from("max"))),
+        Op::Jump(Arg::Reference(AtomicUsize::new(5))),
+        Op::Assign(Arg::Variable(&Identifier::from("b")), Arg::Variable(&Identifier::from("max"))),
+      ]
+    )
   }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Arg<'a> {
   Literal(&'a Literal),
   Variable(&'a Identifier),
-  Reference(usize),
+  Reference(AtomicUsize),
 }
 
-type IntermediateRepresentation<'a> = Vec<Op<'a>>;
+impl<'a> PartialEq for Arg<'a> {
+  fn eq(&self, other: &Self) -> bool {
+    match (self, other) {
+      (Self::Literal(l1), Self::Literal(l2)) => l1 == l2,
+      (Self::Variable(v1), Self::Variable(v2)) => v1 == v2,
+      (Self::Reference(au1), Self::Reference(au2)) => au1.load(Ordering::SeqCst) == au2.load(Ordering::SeqCst),
+      _ => false,
+    }
+  }
+}
+
+#[derive(Default)]
+pub struct IntermediateRepresentation<'a> {
+  statements: Vec<Op<'a>>,
+}
+
+impl<'a> IntermediateRepresentation<'a> {
+  fn push(&mut self, op: Op<'a>) {
+    self.statements.push(op)
+  }
+
+  fn last_ref(&self) -> Arg<'a> {
+    Arg::Reference(AtomicUsize::new(self.statements.len() - 1))
+  }
+
+  fn update_reference(&mut self, index: usize, value: usize) {
+    match self.statements.get(index) {
+      Some(Op::Jumpfalse(_, Arg::Reference(i))) | Some(Op::Jump(Arg::Reference(i))) => {
+        i.store(value, Ordering::SeqCst);
+      }
+      _ => unreachable!(),
+    }
+  }
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Op<'a> {
@@ -122,6 +231,6 @@ pub enum Op<'a> {
   Neq(Arg<'a>, Arg<'a>),
   Land(Arg<'a>, Arg<'a>),
   Lor(Arg<'a>, Arg<'a>),
-  // Jumpfalse(Arg<'a>, Arg<'a>),
-  // Jump(Arg<'a>),
+  Jumpfalse(Arg<'a>, Arg<'a>),
+  Jump(Arg<'a>),
 }
