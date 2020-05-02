@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["mc_ir",""]],"mod":[["ir",""]]});
+initSidebarItems({"fn":[["mc_ir",""]],"mod":[["add_to_ir",""],["ir",""]]});

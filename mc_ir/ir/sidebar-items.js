@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Arg",""],["Op",""]],"struct":[["IntermediateRepresentation",""]],"trait":[["AddToIr",""]]});
+initSidebarItems({"enum":[["Arg",""],["Op",""]],"struct":[["IntermediateRepresentation",""]]});
