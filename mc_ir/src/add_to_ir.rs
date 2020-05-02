@@ -53,7 +53,7 @@ impl<'a> AddToIr<'a> for Expression<'a> {
 
         Arg::Reference(AtomicUsize::new(ir.statements.len() - 1))
       }
-      Self::FunctionCall { .. } => todo!(),
+      Self::FunctionCall { identifier, arguments, .. } => Arg::FunctionCall(identifier, arguments),
     }
   }
 }
@@ -129,6 +129,28 @@ impl<'a> AddToIr<'a> for CompoundStatement<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     for stmt in &self.statements {
       stmt.add_to_ir(ir);
+    }
+
+    ir.last_ref()
+  }
+}
+
+impl<'a> AddToIr<'a> for FunctionDeclaration<'a> {
+  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+    let start_index = ir.statements.len();
+    self.body.add_to_ir(ir);
+    let end_index = ir.statements.len() - 1;
+
+    ir.add_function(&self.identifier, IrFunction::from((start_index, end_index)));
+
+    ir.last_ref()
+  }
+}
+
+impl<'a> AddToIr<'a> for Program<'a> {
+  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+    for function in &self.function_declarations {
+      function.add_to_ir(ir);
     }
 
     ir.last_ref()
@@ -227,5 +249,32 @@ mod tests {
         Op::Return(Some(Arg::Variable(&Identifier::from("a")))),
       ]
     )
+  }
+
+  #[test]
+  fn function_to_ir() {
+    let function = FunctionDeclaration::try_from(
+      "void main() {
+        x = 1 + 1;
+        y = x;
+        return;
+      }",
+    )
+    .unwrap();
+
+    let mut ir = IntermediateRepresentation::default();
+    function.add_to_ir(&mut ir);
+
+    assert_eq!(
+      ir.statements,
+      vec![
+        Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Literal(&Literal::Int(1))),
+        Op::Assign(Arg::Reference(AtomicUsize::new(0)), Arg::Variable(&Identifier::from("x"))),
+        Op::Assign(Arg::Variable(&Identifier::from("x")), Arg::Variable(&Identifier::from("y"))),
+        Op::Return(None),
+      ]
+    );
+
+    assert_eq!(ir.functions.get(&Identifier::from("main")), Some(&IrFunction { start: 0, end: 3 }),)
   }
 }

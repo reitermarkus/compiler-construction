@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use mc_parser::ast::*;
@@ -6,6 +7,7 @@ use mc_parser::ast::*;
 pub enum Arg<'a> {
   Literal(&'a Literal),
   Variable(&'a Identifier),
+  FunctionCall(&'a Identifier, &'a Vec<Expression<'a>>),
   Reference(AtomicUsize),
 }
 
@@ -20,9 +22,22 @@ impl<'a> PartialEq for Arg<'a> {
   }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, PartialEq)]
+pub struct IrFunction {
+  pub start: usize,
+  pub end: usize,
+}
+
+impl From<(usize, usize)> for IrFunction {
+  fn from(tuple: (usize, usize)) -> IrFunction {
+    Self { start: tuple.0, end: tuple.1 }
+  }
+}
+
+#[derive(Default, Debug)]
 pub struct IntermediateRepresentation<'a> {
   pub statements: Vec<Op<'a>>,
+  pub functions: HashMap<&'a Identifier, IrFunction>,
 }
 
 impl<'a> IntermediateRepresentation<'a> {
@@ -41,6 +56,10 @@ impl<'a> IntermediateRepresentation<'a> {
       }
       _ => unreachable!(),
     }
+  }
+
+  pub fn add_function(&mut self, identifier: &'a Identifier, irf: IrFunction) {
+    self.functions.insert(identifier, irf);
   }
 }
 
