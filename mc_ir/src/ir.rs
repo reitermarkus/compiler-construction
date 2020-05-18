@@ -46,7 +46,7 @@ impl<'a> IntermediateRepresentation<'a> {
   }
 
   pub fn last_ref(&self) -> Arg<'a> {
-    Arg::Reference(AtomicUsize::new(self.statements.len() - 1))
+    Arg::Reference(AtomicUsize::new(self.statements.len().wrapping_sub(1)))
   }
 
   pub fn update_reference(&mut self, index: usize, value: usize) {
@@ -82,5 +82,6 @@ pub enum Op<'a> {
   Lor(Arg<'a>, Arg<'a>),
   Jumpfalse(Arg<'a>, Arg<'a>),
   Jump(Arg<'a>),
+  Call(Arg<'a>),
   Return(Option<Arg<'a>>),
 }

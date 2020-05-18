@@ -66,7 +66,15 @@ impl<'a> AddToIr<'a> for Statement<'a> {
     match self {
       Self::Assignment(assignment) => assignment.add_to_ir(ir),
       Self::Decl(_) => ir.last_ref(),
-      Self::Expression(expression) => expression.add_to_ir(ir),
+      Self::Expression(expression) => {
+        if let Expression::FunctionCall { .. } = expression {
+          let arg = expression.add_to_ir(ir);
+          ir.push(Op::Call(arg));
+          ir.last_ref()
+        } else {
+          expression.add_to_ir(ir)
+        }
+      }
       Self::If(if_stmt) => if_stmt.add_to_ir(ir),
       Self::While(while_stmt) => while_stmt.add_to_ir(ir),
       Self::Ret(ret_stmt) => ret_stmt.add_to_ir(ir),

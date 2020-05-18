@@ -36,6 +36,7 @@ impl fmt::Display for Op<'_> {
       Self::Assign(arg1, arg2) => write!(f, "{} = {}", arg2, arg1),
       Self::Jumpfalse(arg1, arg2) => write!(f, "jumpfalse {} {}", arg1, arg2),
       Self::Jump(arg) => write!(f, "jump {}", arg),
+      Self::Call(arg) => write!(f, "{}", arg),
       Self::Return(arg) => {
         if let Some(ret_arg) = arg {
           write!(f, "return {}", ret_arg)
@@ -53,7 +54,7 @@ impl fmt::Display for IntermediateRepresentation<'_> {
       writeln!(f, "{}:", identifier)?;
       for (i, stmt) in self.statements[range.start..range.end].iter().enumerate() {
         match stmt {
-          Op::Assign(..) | Op::Jump(..) | Op::Jumpfalse(..) | Op::Return(..) => {
+          Op::Assign(..) | Op::Jump(..) | Op::Jumpfalse(..) | Op::Call(..) |  Op::Return(..) => {
             writeln!(f, "\t {}", stmt)?;
           }
           _ => writeln!(f, "\t t{} = {}", i, stmt)?,
