@@ -53,7 +53,10 @@ impl<'a> AddToIr<'a> for Expression<'a> {
 
         Arg::Reference(AtomicUsize::new(ir.statements.len() - 1))
       }
-      Self::FunctionCall { identifier, arguments, .. } => Arg::FunctionCall(identifier, arguments),
+      Self::FunctionCall { identifier, arguments, .. } => {
+        let args = arguments.iter().map(|a| a.add_to_ir(ir)).collect::<Vec<Arg<'_>>>();
+        Arg::FunctionCall(identifier, args)
+      }
     }
   }
 }

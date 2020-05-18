@@ -6,12 +6,13 @@ use crate::ir::*;
 impl fmt::Display for Arg<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::Literal(literal) => literal.to_string(),
-      Self::Variable(identifier) => identifier.to_string(),
-      Self::Reference(reference) => reference.load(Ordering::SeqCst).to_string(),
-      Self::FunctionCall(..) => "".to_owned(),
+      Self::Literal(literal) => literal.to_string().fmt(f),
+      Self::Variable(identifier) => identifier.to_string().fmt(f),
+      Self::Reference(reference) => reference.load(Ordering::SeqCst).to_string().fmt(f),
+      Self::FunctionCall(identifier, arguments) => {
+        write!(f, "{}({})", identifier, arguments.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
+      }
     }
-    .fmt(f)
   }
 }
 
@@ -32,7 +33,7 @@ impl fmt::Display for Op<'_> {
       Self::Lor(arg1, arg2) => write!(f, "{} || {}", arg1, arg2),
       Self::Not(arg) => write!(f, "!{}", arg),
       Self::UnaryMinus(arg) => write!(f, "-{}", arg),
-      Self::Assign(arg1, arg2) => write!(f, "{} = {}", arg1, arg2),
+      Self::Assign(arg1, arg2) => write!(f, "{} = {}", arg2, arg1),
       Self::Jumpfalse(arg1, arg2) => write!(f, "jumpfalse {} {}", arg1, arg2),
       Self::Jump(arg) => write!(f, "jump {}", arg),
       Self::Return(arg) => {

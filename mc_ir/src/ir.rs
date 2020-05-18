@@ -7,7 +7,7 @@ use mc_parser::ast::*;
 pub enum Arg<'a> {
   Literal(&'a Literal),
   Variable(&'a Identifier),
-  FunctionCall(&'a Identifier, &'a Vec<Expression<'a>>),
+  FunctionCall(&'a Identifier, Vec<Arg<'a>>),
   Reference(AtomicUsize),
 }
 
