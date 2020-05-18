@@ -27,3 +27,11 @@ task :symbol_tables, [:example] do |example: '*'|
     sh 'cargo', 'run', '--bin', 'mc_symbol_table', '--', '-o', txt.to_s, mc.to_s
   end
 end
+
+desc 'generate IR for all examples'
+task :ir, [:example] do |example: '*'|
+  Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
+    txt = mc.sub_ext('.ir')
+    sh 'cargo', 'run', '--bin', 'mc_ir', '--', '-o', txt.to_s, mc.to_s
+  end
+end

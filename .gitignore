@@ -1,5 +1,8 @@
+/.vscode
+
 /target
 Cargo.lock
 *.dot
 *.svg
 *.txt
+*.ir

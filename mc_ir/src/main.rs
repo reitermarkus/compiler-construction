@@ -1,9 +1,14 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
+use std::fs::File;
+use std::io::stdout;
+
 use clap::{value_t, App, Arg};
 
+use mc_ir::mc_ir;
+
 #[cfg_attr(tarpaulin, skip)]
-fn main() {
+fn main() -> std::io::Result<()> {
   let matches = App::new("mC IR Viewer")
     .set_term_width(0)
     .max_term_width(0)
@@ -12,6 +17,12 @@ fn main() {
     .arg(Arg::from_usage("<file> 'input file (use '-' to read from stdin)'"))
     .get_matches();
 
-  let _out_file = value_t!(matches, "output", String).ok();
-  let _in_file = value_t!(matches, "file", String).unwrap();
+  let out_file = value_t!(matches, "output", String).ok();
+  let in_file = value_t!(matches, "file", String).unwrap();
+
+  if let Some(out_file) = out_file.map(File::create) {
+    mc_ir(in_file, out_file?)
+  } else {
+    mc_ir(in_file, stdout())
+  }
 }

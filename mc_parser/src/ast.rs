@@ -114,6 +114,18 @@ impl<'a> FromPest<'a> for Literal {
   }
 }
 
+impl fmt::Display for Literal {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::Bool(boolean) => boolean.to_string(),
+      Self::Int(int) => int.to_string(),
+      Self::Float(float) => float.to_string(),
+      Self::String(string) => string.to_owned(),
+    }
+    .fmt(f)
+  }
+}
+
 #[derive(PartialEq, Debug)]
 pub enum UnaryOp {
   Minus,
