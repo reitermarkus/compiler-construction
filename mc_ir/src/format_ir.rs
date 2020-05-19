@@ -51,13 +51,13 @@ impl fmt::Display for Op<'_> {
 impl fmt::Display for IntermediateRepresentation<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     for (identifier, range) in &self.functions {
-      writeln!(f, "{}:", identifier)?;
+      writeln!(f, "\t {}:", identifier)?;
       for (i, stmt) in self.statements[range.start..range.end].iter().enumerate() {
         match stmt {
           Op::Assign(..) | Op::Jump(..) | Op::Jumpfalse(..) | Op::Call(..) | Op::Return(..) => {
-            writeln!(f, "\t {}", stmt)?;
+            writeln!(f, "{}:\t \t {}", range.start + i, stmt)?;
           }
-          _ => writeln!(f, "\t t{} = {}", i, stmt)?,
+          _ => writeln!(f, "{}:\t \t t{} = {}", range.start + i, i, stmt)?,
         }
       }
 
