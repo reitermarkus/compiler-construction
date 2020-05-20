@@ -324,6 +324,24 @@
 <span id="324">324</span>
 <span id="325">325</span>
 <span id="326">326</span>
+<span id="327">327</span>
+<span id="328">328</span>
+<span id="329">329</span>
+<span id="330">330</span>
+<span id="331">331</span>
+<span id="332">332</span>
+<span id="333">333</span>
+<span id="334">334</span>
+<span id="335">335</span>
+<span id="336">336</span>
+<span id="337">337</span>
+<span id="338">338</span>
+<span id="339">339</span>
+<span id="340">340</span>
+<span id="341">341</span>
+<span id="342">342</span>
+<span id="343">343</span>
+<span id="344">344</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">mc_parser</span>::<span class="ident">ast</span>::<span class="kw-2">*</span>;
 
@@ -335,18 +353,27 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">AddToIr</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Assignment</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
   <span class="kw">fn</span> <span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>, <span class="ident">ir</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">IntermediateRepresentation</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arg</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rvalue</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
-    <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Assign</span>(<span class="ident">arg</span>, <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identifier</span>)));
+    <span class="kw">let</span> <span class="ident">reference</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">lookup</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identifier</span>).<span class="ident">unwrap</span>();
 
-    <span class="kw">let</span> <span class="ident">reference</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span>;
-    <span class="kw-2">*</span><span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">lookup_mut</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identifier</span>).<span class="ident">unwrap</span>() <span class="op">=</span> <span class="ident">reference</span>;
-    <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="ident">reference</span>)
+    <span class="kw">let</span> <span class="ident">variable</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">index_expression</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">index_expression</span> {
+      <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">reference</span>, <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">index_expression</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>)))
+    } <span class="kw">else</span> {
+      <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">reference</span>, <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">0</span>))))
+    };
+
+    <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rvalue</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
+
+    <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Assign</span>(<span class="ident">arg</span>, <span class="ident">variable</span>));
+
+    <span class="ident">ir</span>.<span class="ident">last_ref</span>()
   }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">AddToIr</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Declaration</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
   <span class="kw">fn</span> <span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>, <span class="ident">ir</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">IntermediateRepresentation</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arg</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">reference</span> <span class="op">=</span> <span class="number">0</span>;
+    <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Decl</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identifier</span>, <span class="self">self</span>.<span class="ident">ty</span>, <span class="self">self</span>.<span class="ident">count</span>.<span class="ident">unwrap_or</span>(<span class="number">1</span>)));
+
+    <span class="kw">let</span> <span class="ident">reference</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span>;
     <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">push</span>(<span class="self">self</span>.<span class="ident">identifier</span>.<span class="ident">clone</span>(), <span class="ident">reference</span>);
     <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="ident">reference</span>)
   }
@@ -356,7 +383,15 @@
   <span class="kw">fn</span> <span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>, <span class="ident">ir</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">IntermediateRepresentation</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arg</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
     <span class="kw">match</span> <span class="self">self</span> {
       <span class="self">Self</span>::<span class="ident">Literal</span> { <span class="ident">literal</span>, .. } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="ident">literal</span>),
-      <span class="self">Self</span>::<span class="ident">Variable</span> { <span class="ident">identifier</span>, .. } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">identifier</span>),
+      <span class="self">Self</span>::<span class="ident">Variable</span> { <span class="ident">identifier</span>, <span class="ident">index_expression</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="kw">let</span> <span class="ident">reference</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">lookup</span>(<span class="kw-2">&amp;</span><span class="ident">identifier</span>).<span class="ident">unwrap</span>();
+
+        <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">index_expression</span>) <span class="op">=</span> <span class="ident">index_expression</span> {
+          <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">reference</span>, <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">index_expression</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>)))
+        } <span class="kw">else</span> {
+          <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">reference</span>, <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">0</span>))))
+        }
+      }
       <span class="self">Self</span>::<span class="ident">Binary</span> { <span class="ident">op</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">arg1</span> <span class="op">=</span> <span class="ident">lhs</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
         <span class="kw">let</span> <span class="ident">arg2</span> <span class="op">=</span> <span class="ident">rhs</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
@@ -514,142 +549,143 @@
   }
 }
 
-<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
-<span class="kw">mod</span> <span class="ident">tests</span> {
-  <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">convert</span>::<span class="ident">TryFrom</span>;
-
-  <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
-
-  <span class="attribute">#[<span class="ident">test</span>]</span>
-  <span class="kw">fn</span> <span class="ident">assignment_to_ir</span>() {
-    <span class="kw">let</span> <span class="ident">assignment</span> <span class="op">=</span> <span class="ident">CompoundStatement</span>::<span class="ident">try_from</span>(
-      <span class="string">&quot;{
-      int x;
-      x = 1 + 2 * 3;
-      }
-      &quot;</span>,
-    )
-    .<span class="ident">unwrap</span>();
-
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ir</span> <span class="op">=</span> <span class="ident">IntermediateRepresentation</span>::<span class="ident">default</span>();
-    <span class="ident">assignment</span>.<span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ir</span>);
-
-    <span class="macro">assert_eq</span><span class="macro">!</span>(
-      <span class="ident">ir</span>.<span class="ident">statements</span>,
-      <span class="macro">vec</span><span class="macro">!</span>[
-        <span class="ident">Op</span>::<span class="ident">Times</span>(<span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">2</span>)), <span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">3</span>))),
-        <span class="ident">Op</span>::<span class="ident">Plus</span>(<span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">1</span>)), <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">0</span>)),
-        <span class="ident">Op</span>::<span class="ident">Assign</span>(<span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">1</span>), <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;x&quot;</span>))),
-      ]
-    );
-  }
-
-  <span class="attribute">#[<span class="ident">test</span>]</span>
-  <span class="kw">fn</span> <span class="ident">expression_to_ir</span>() {
-    <span class="kw">let</span> <span class="ident">expression</span> <span class="op">=</span> <span class="ident">Expression</span>::<span class="ident">try_from</span>(<span class="string">&quot;1 + 2 * 3&quot;</span>).<span class="ident">unwrap</span>();
-
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ir</span> <span class="op">=</span> <span class="ident">IntermediateRepresentation</span>::<span class="ident">default</span>();
-
-    <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="ident">expression</span>.<span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ir</span>);
-
-    <span class="macro">assert_eq</span><span class="macro">!</span>(
-      <span class="ident">ir</span>.<span class="ident">statements</span>,
-      <span class="macro">vec</span><span class="macro">!</span>[
-        <span class="ident">Op</span>::<span class="ident">Times</span>(<span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">2</span>)), <span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">3</span>))),
-        <span class="ident">Op</span>::<span class="ident">Plus</span>(<span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">1</span>)), <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">0</span>)),
-      ]
-    );
-    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">arg</span>, <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">1</span>));
-  }
-
-  <span class="attribute">#[<span class="ident">test</span>]</span>
-  <span class="kw">fn</span> <span class="ident">if_stmt_to_ir</span>() {
-    <span class="kw">let</span> <span class="ident">if_stmt</span> <span class="op">=</span> <span class="ident">CompoundStatement</span>::<span class="ident">try_from</span>(
-      <span class="string">&quot;{
-        int a;
-        int b;
-        int max;
-        if (a &gt; b) {
-          max = a;
-        } else {
-          max = b;
-        }
-      }&quot;</span>,
-    )
-    .<span class="ident">unwrap</span>();
-
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ir</span> <span class="op">=</span> <span class="ident">IntermediateRepresentation</span>::<span class="ident">default</span>();
-    <span class="ident">if_stmt</span>.<span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ir</span>);
-
-    <span class="macro">assert_eq</span><span class="macro">!</span>(
-      <span class="ident">ir</span>.<span class="ident">statements</span>,
-      <span class="macro">vec</span><span class="macro">!</span>[
-        <span class="ident">Op</span>::<span class="ident">Gt</span>(<span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;a&quot;</span>)), <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;b&quot;</span>))),
-        <span class="ident">Op</span>::<span class="ident">Jumpfalse</span>(<span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">0</span>), <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">4</span>)),
-        <span class="ident">Op</span>::<span class="ident">Assign</span>(<span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;a&quot;</span>)), <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;max&quot;</span>))),
-        <span class="ident">Op</span>::<span class="ident">Jump</span>(<span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">5</span>)),
-        <span class="ident">Op</span>::<span class="ident">Assign</span>(<span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;b&quot;</span>)), <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;max&quot;</span>))),
-      ]
-    )
-  }
-
-  <span class="attribute">#[<span class="ident">test</span>]</span>
-  <span class="kw">fn</span> <span class="ident">comp_stmt_to_ir</span>() {
-    <span class="kw">let</span> <span class="ident">comp_stmt</span> <span class="op">=</span> <span class="ident">CompoundStatement</span>::<span class="ident">try_from</span>(
-      <span class="string">&quot;{
-      int a;
-      int b;
-      while (a &gt; b) {
-        a = a + 1;
-      }
-      return a;
-    }&quot;</span>,
-    )
-    .<span class="ident">unwrap</span>();
-
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ir</span> <span class="op">=</span> <span class="ident">IntermediateRepresentation</span>::<span class="ident">default</span>();
-    <span class="ident">comp_stmt</span>.<span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ir</span>);
-
-    <span class="macro">assert_eq</span><span class="macro">!</span>(
-      <span class="ident">ir</span>.<span class="ident">statements</span>,
-      <span class="macro">vec</span><span class="macro">!</span>[
-        <span class="ident">Op</span>::<span class="ident">Gt</span>(<span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;a&quot;</span>)), <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;b&quot;</span>))),
-        <span class="ident">Op</span>::<span class="ident">Jumpfalse</span>(<span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">0</span>), <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">4</span>)),
-        <span class="ident">Op</span>::<span class="ident">Plus</span>(<span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;a&quot;</span>)), <span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">1</span>))),
-        <span class="ident">Op</span>::<span class="ident">Assign</span>(<span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">2</span>), <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;a&quot;</span>))),
-        <span class="ident">Op</span>::<span class="ident">Return</span>(<span class="prelude-val">Some</span>(<span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;a&quot;</span>)))),
-      ]
-    )
-  }
-
-  <span class="attribute">#[<span class="ident">test</span>]</span>
-  <span class="kw">fn</span> <span class="ident">function_to_ir</span>() {
-    <span class="kw">let</span> <span class="ident">function</span> <span class="op">=</span> <span class="ident">FunctionDeclaration</span>::<span class="ident">try_from</span>(
-      <span class="string">&quot;void main() {
-        int x;
-        x = 1 + 1;
-        int y;
-        y = x;
-        return;
-      }&quot;</span>,
-    )
-    .<span class="ident">unwrap</span>();
-
-    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ir</span> <span class="op">=</span> <span class="ident">IntermediateRepresentation</span>::<span class="ident">default</span>();
-    <span class="ident">function</span>.<span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ir</span>);
-
-    <span class="macro">assert_eq</span><span class="macro">!</span>(
-      <span class="ident">ir</span>.<span class="ident">statements</span>,
-      <span class="macro">vec</span><span class="macro">!</span>[
-        <span class="ident">Op</span>::<span class="ident">Plus</span>(<span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">1</span>)), <span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">1</span>))),
-        <span class="ident">Op</span>::<span class="ident">Assign</span>(<span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">0</span>), <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;x&quot;</span>))),
-        <span class="ident">Op</span>::<span class="ident">Assign</span>(<span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;x&quot;</span>)), <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;y&quot;</span>))),
-        <span class="ident">Op</span>::<span class="ident">Return</span>(<span class="prelude-val">None</span>),
-      ]
-    );
-
-    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">ir</span>.<span class="ident">functions</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;main&quot;</span>)), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="ident">IrFunction</span> { <span class="ident">start</span>: <span class="number">0</span>, <span class="ident">end</span>: <span class="number">4</span> }),)
-  }
-}
+<span class="comment">// #[cfg(test)]</span>
+<span class="comment">// mod tests {</span>
+<span class="comment">//   use std::convert::TryFrom;</span>
+<span class="comment">//</span>
+<span class="comment">//   use super::*;</span>
+<span class="comment">//</span>
+<span class="comment">//   #[test]</span>
+<span class="comment">//   fn assignment_to_ir() {</span>
+<span class="comment">//     let assignment = CompoundStatement::try_from(</span>
+<span class="comment">//       &quot;{</span>
+<span class="comment">//       int x;</span>
+<span class="comment">//       x = 1 + 2 * 3;</span>
+<span class="comment">//       }</span>
+<span class="comment">//       &quot;,</span>
+<span class="comment">//     )</span>
+<span class="comment">//     .unwrap();</span>
+<span class="comment">//</span>
+<span class="comment">//     let mut ir = IntermediateRepresentation::default();</span>
+<span class="comment">//     assignment.add_to_ir(&amp;mut ir);</span>
+<span class="comment">//</span>
+<span class="comment">//     assert_eq!(</span>
+<span class="comment">//       ir.statements,</span>
+<span class="comment">//       vec![</span>
+<span class="comment">//         Op::Times(Arg::Literal(&amp;Literal::Int(2)), Arg::Literal(&amp;Literal::Int(3))),</span>
+<span class="comment">//         Op::Plus(Arg::Literal(&amp;Literal::Int(1)), Arg::Reference(0)),</span>
+<span class="comment">//         Op::Assign(Arg::Reference(1), Arg::Variable(&amp;Identifier::from(&quot;x&quot;))),</span>
+<span class="comment">//       ]</span>
+<span class="comment">//     );</span>
+<span class="comment">//   }</span>
+<span class="comment">//</span>
+<span class="comment">//   #[test]</span>
+<span class="comment">//   fn expression_to_ir() {</span>
+<span class="comment">//     let expression = Expression::try_from(&quot;1 + 2 * 3&quot;).unwrap();</span>
+<span class="comment">//</span>
+<span class="comment">//     let mut ir = IntermediateRepresentation::default();</span>
+<span class="comment">//</span>
+<span class="comment">//     let arg = expression.add_to_ir(&amp;mut ir);</span>
+<span class="comment">//</span>
+<span class="comment">//     assert_eq!(</span>
+<span class="comment">//       ir.statements,</span>
+<span class="comment">//       vec![</span>
+<span class="comment">//         Op::Times(Arg::Literal(&amp;Literal::Int(2)), Arg::Literal(&amp;Literal::Int(3))),</span>
+<span class="comment">//         Op::Plus(Arg::Literal(&amp;Literal::Int(1)), Arg::Reference(0)),</span>
+<span class="comment">//       ]</span>
+<span class="comment">//     );</span>
+<span class="comment">//     assert_eq!(arg, Arg::Reference(1));</span>
+<span class="comment">//   }</span>
+<span class="comment">//</span>
+<span class="comment">//   #[test]</span>
+<span class="comment">//   fn if_stmt_to_ir() {</span>
+<span class="comment">//     let if_stmt = CompoundStatement::try_from(</span>
+<span class="comment">//       &quot;{</span>
+<span class="comment">//         int a;</span>
+<span class="comment">//         int b;</span>
+<span class="comment">//         int max;</span>
+<span class="comment">//         if (a &gt; b) {</span>
+<span class="comment">//           max = a;</span>
+<span class="comment">//         } else {</span>
+<span class="comment">//           max = b;</span>
+<span class="comment">//         }</span>
+<span class="comment">//       }&quot;,</span>
+<span class="comment">//     )</span>
+<span class="comment">//     .unwrap();</span>
+<span class="comment">//</span>
+<span class="comment">//     let mut ir = IntermediateRepresentation::default();</span>
+<span class="comment">//     if_stmt.add_to_ir(&amp;mut ir);</span>
+<span class="comment">//</span>
+<span class="comment">//     assert_eq!(</span>
+<span class="comment">//       ir.statements,</span>
+<span class="comment">//       vec![</span>
+<span class="comment">//         Op::Gt(Arg::Variable(&amp;Identifier::from(&quot;a&quot;)), Arg::Variable(&amp;Identifier::from(&quot;b&quot;))),</span>
+<span class="comment">//         Op::Jumpfalse(Arg::Reference(0), Arg::Reference(4)),</span>
+<span class="comment">//         Op::Assign(Arg::Variable(&amp;Identifier::from(&quot;a&quot;)), Arg::</span>
+<span class="comment">//         &amp;Identifier::from(&quot;max&quot;))),</span>
+<span class="comment">//         Op::Jump(Arg::Reference(5)),</span>
+<span class="comment">//         Op::Assign(Arg::Variable(&amp;Identifier::from(&quot;b&quot;)), Arg::Variable(&amp;Identifier::from(&quot;max&quot;))),</span>
+<span class="comment">//       ]</span>
+<span class="comment">//     )</span>
+<span class="comment">//   }</span>
+<span class="comment">//</span>
+<span class="comment">//   #[test]</span>
+<span class="comment">//   fn comp_stmt_to_ir() {</span>
+<span class="comment">//     let comp_stmt = CompoundStatement::try_from(</span>
+<span class="comment">//       &quot;{</span>
+<span class="comment">//       int a;</span>
+<span class="comment">//       int b;</span>
+<span class="comment">//       while (a &gt; b) {</span>
+<span class="comment">//         a = a + 1;</span>
+<span class="comment">//       }</span>
+<span class="comment">//       return a;</span>
+<span class="comment">//     }&quot;,</span>
+<span class="comment">//     )</span>
+<span class="comment">//     .unwrap();</span>
+<span class="comment">//</span>
+<span class="comment">//     let mut ir = IntermediateRepresentation::default();</span>
+<span class="comment">//     comp_stmt.add_to_ir(&amp;mut ir);</span>
+<span class="comment">//</span>
+<span class="comment">//     assert_eq!(</span>
+<span class="comment">//       ir.statements,</span>
+<span class="comment">//       vec![</span>
+<span class="comment">//         Op::Gt(Arg::Variable(&amp;Identifier::from(&quot;a&quot;)), Arg::Variable(&amp;Identifier::from(&quot;b&quot;))),</span>
+<span class="comment">//         Op::Jumpfalse(Arg::Reference(0), Arg::Reference(4)),</span>
+<span class="comment">//         Op::Plus(Arg::Variable(&amp;Identifier::from(&quot;a&quot;)), Arg::Literal(&amp;Literal::Int(1))),</span>
+<span class="comment">//         Op::Assign(Arg::Reference(2), Arg::Variable(&amp;Identifier::from(&quot;a&quot;))),</span>
+<span class="comment">//         Op::Return(Some(Arg::Variable(&amp;Identifier::from(&quot;a&quot;)))),</span>
+<span class="comment">//       ]</span>
+<span class="comment">//     )</span>
+<span class="comment">//   }</span>
+<span class="comment">//</span>
+<span class="comment">//   #[test]</span>
+<span class="comment">//   fn function_to_ir() {</span>
+<span class="comment">//     let function = FunctionDeclaration::try_from(</span>
+<span class="comment">//       &quot;void main() {</span>
+<span class="comment">//         int x;</span>
+<span class="comment">//         x = 1 + 1;</span>
+<span class="comment">//         int y;</span>
+<span class="comment">//         y = x;</span>
+<span class="comment">//         return;</span>
+<span class="comment">//       }&quot;,</span>
+<span class="comment">//     )</span>
+<span class="comment">//     .unwrap();</span>
+<span class="comment">//</span>
+<span class="comment">//     let mut ir = IntermediateRepresentation::default();</span>
+<span class="comment">//     function.add_to_ir(&amp;mut ir);</span>
+<span class="comment">//</span>
+<span class="comment">//     assert_eq!(</span>
+<span class="comment">//       ir.statements,</span>
+<span class="comment">//       vec![</span>
+<span class="comment">//         Op::Plus(Arg::Literal(&amp;Literal::Int(1)), Arg::Literal(&amp;Literal::Int(1))),</span>
+<span class="comment">//         Op::Assign(Arg::Reference(0), Arg::Variable(&amp;Identifier::from(&quot;x&quot;))),</span>
+<span class="comment">//         Op::Assign(Arg::Variable(&amp;Identifier::from(&quot;x&quot;)), Arg::Variable(&amp;Identifier::from(&quot;y&quot;))),</span>
+<span class="comment">//         Op::Return(None),</span>
+<span class="comment">//       ]</span>
+<span class="comment">//     );</span>
+<span class="comment">//</span>
+<span class="comment">//     assert_eq!(ir.functions.get(&amp;Identifier::from(&quot;main&quot;)), Some(&amp;IrFunction { start: 0, end: 4 }),)</span>
+<span class="comment">//   }</span>
+<span class="comment">// }</span>
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "mc_ir";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
