@@ -6,7 +6,7 @@ impl fmt::Display for Arg<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Self::Literal(literal) => literal.to_string().fmt(f),
-      Self::Variable(identifier) => identifier.to_string().fmt(f),
+      Self::Variable(reference, offset) => write!(f, "(&{}, {})", reference, offset),
       Self::Reference(reference) => write!(f, "&{}", reference),
       Self::FunctionCall(identifier, arguments) => {
         write!(f, "{}({})", identifier, arguments.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
@@ -18,7 +18,7 @@ impl fmt::Display for Arg<'_> {
 impl fmt::Display for Op<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::Decl(arg, ty) => write!(f, "decl {} {}", arg, ty),
+      Self::Decl(arg, ty, size) => write!(f, "decl {} {} {}", arg, ty, size),
       Self::Gt(arg1, arg2) => write!(f, "{} > {}", arg1, arg2),
       Self::Gte(arg1, arg2) => write!(f, "{} >= {}", arg1, arg2),
       Self::Lt(arg1, arg2) => write!(f, "{} < {}", arg1, arg2),

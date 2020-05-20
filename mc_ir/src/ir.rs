@@ -28,7 +28,7 @@ impl HashStack {
 #[derive(Debug)]
 pub enum Arg<'a> {
   Literal(&'a Literal),
-  Variable(&'a Identifier),
+  Variable(usize, Box<Arg<'a>>),
   FunctionCall(&'a Identifier, Vec<Arg<'a>>),
   Reference(usize),
 }
@@ -37,7 +37,7 @@ impl<'a> PartialEq for Arg<'a> {
   fn eq(&self, other: &Self) -> bool {
     match (self, other) {
       (Self::Literal(l1), Self::Literal(l2)) => l1 == l2,
-      (Self::Variable(v1), Self::Variable(v2)) => v1 == v2,
+      (Self::Variable(v1, o1), Self::Variable(v2, o2)) => v1 == v2 && o1 == o2,
       (Self::Reference(au1), Self::Reference(au2)) => au1 == au2,
       _ => false,
     }
@@ -88,7 +88,7 @@ impl<'a> IntermediateRepresentation<'a> {
 
 #[derive(Debug, PartialEq)]
 pub enum Op<'a> {
-  Decl(Arg<'a>, Ty),
+  Decl(&'a Identifier, Ty, usize),
   Gt(Arg<'a>, Arg<'a>),
   Gte(Arg<'a>, Arg<'a>),
   Lt(Arg<'a>, Arg<'a>),
