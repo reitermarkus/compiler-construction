@@ -12,6 +12,10 @@ impl HashStack {
     self.stack.push((identifier, reference));
   }
 
+  pub fn lookup(&self, identifier: &Identifier) -> Option<usize> {
+    self.stack.iter().rev().find(|i| &i.0 == identifier).map(|e| e.1)
+  }
+
   pub fn lookup_mut(&mut self, identifier: &Identifier) -> Option<&mut usize> {
     self.stack.iter_mut().rev().find(|i| &i.0 == identifier).map(|e| &mut e.1)
   }
@@ -88,6 +92,7 @@ impl<'a> IntermediateRepresentation<'a> {
 
 #[derive(Debug, PartialEq)]
 pub enum Op<'a> {
+  Decl(Arg<'a>),
   Gt(Arg<'a>, Arg<'a>),
   Gte(Arg<'a>, Arg<'a>),
   Lt(Arg<'a>, Arg<'a>),

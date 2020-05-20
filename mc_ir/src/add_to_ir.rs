@@ -19,7 +19,9 @@ impl<'a> AddToIr<'a> for Assignment<'a> {
 
 impl<'a> AddToIr<'a> for Declaration<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
-    let reference = 0;
+    ir.push(Op::Decl(Arg::Variable(&self.identifier)));
+
+    let reference = ir.statements.len() - 1;
     ir.stack.push(self.identifier.clone(), reference);
     Arg::Reference(reference)
   }
@@ -29,7 +31,10 @@ impl<'a> AddToIr<'a> for Expression<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     match self {
       Self::Literal { literal, .. } => Arg::Literal(literal),
-      Self::Variable { identifier, .. } => Arg::Variable(identifier),
+      Self::Variable { identifier, .. } => {
+        let reference = ir.stack.lookup(&identifier).unwrap();
+        Arg::Reference(reference)
+      }
       Self::Binary { op, lhs, rhs, .. } => {
         let arg1 = lhs.add_to_ir(ir);
         let arg2 = rhs.add_to_ir(ir);
