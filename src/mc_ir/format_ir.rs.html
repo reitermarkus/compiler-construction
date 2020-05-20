@@ -66,10 +66,8 @@
 <span id="66">66</span>
 <span id="67">67</span>
 <span id="68">68</span>
-<span id="69">69</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">sync</span>::<span class="ident">atomic</span>::<span class="ident">Ordering</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">ir</span>::<span class="kw-2">*</span>;
 
@@ -78,7 +76,7 @@
     <span class="kw">match</span> <span class="self">self</span> {
       <span class="self">Self</span>::<span class="ident">Literal</span>(<span class="ident">literal</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">literal</span>.<span class="ident">to_string</span>().<span class="ident">fmt</span>(<span class="ident">f</span>),
       <span class="self">Self</span>::<span class="ident">Variable</span>(<span class="ident">identifier</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">identifier</span>.<span class="ident">to_string</span>().<span class="ident">fmt</span>(<span class="ident">f</span>),
-      <span class="self">Self</span>::<span class="ident">Reference</span>(<span class="ident">reference</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">reference</span>.<span class="ident">load</span>(<span class="ident">Ordering</span>::<span class="ident">SeqCst</span>).<span class="ident">to_string</span>().<span class="ident">fmt</span>(<span class="ident">f</span>),
+      <span class="self">Self</span>::<span class="ident">Reference</span>(<span class="ident">reference</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">reference</span>.<span class="ident">to_string</span>().<span class="ident">fmt</span>(<span class="ident">f</span>),
       <span class="self">Self</span>::<span class="ident">FunctionCall</span>(<span class="ident">identifier</span>, <span class="ident">arguments</span>) <span class="op">=</span><span class="op">&gt;</span> {
         <span class="macro">write</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="string">&quot;{}({})&quot;</span>, <span class="ident">identifier</span>, <span class="ident">arguments</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">to_string</span>()).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="kw">_</span><span class="op">&gt;</span><span class="op">&gt;</span>().<span class="ident">join</span>(<span class="string">&quot;, &quot;</span>))
       }

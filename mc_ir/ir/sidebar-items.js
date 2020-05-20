@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Arg",""],["Op",""]],"struct":[["IntermediateRepresentation",""],["IrFunction",""]]});
+initSidebarItems({"enum":[["Arg",""],["Op",""]],"struct":[["HashStack",""],["IntermediateRepresentation",""],["IrFunction",""]]});
