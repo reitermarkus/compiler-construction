@@ -8,18 +8,18 @@ pub trait AddToIr<'a> {
 
 impl<'a> AddToIr<'a> for Assignment<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
-    let arg = self.rvalue.add_to_ir(ir);
-    ir.push(Op::Assign(arg, Arg::Variable(&self.identifier)));
+    let reference = ir.stack.lookup(&self.identifier).unwrap();
 
-    let reference = ir.statements.len() - 1;
-    *ir.stack.lookup_mut(&self.identifier).unwrap() = reference;
-    Arg::Reference(reference)
+    let arg = self.rvalue.add_to_ir(ir);
+    ir.push(Op::Assign(arg, Arg::Reference(reference)));
+
+    ir.last_ref()
   }
 }
 
 impl<'a> AddToIr<'a> for Declaration<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
-    ir.push(Op::Decl(Arg::Variable(&self.identifier)));
+    ir.push(Op::Decl(Arg::Variable(&self.identifier), self.ty));
 
     let reference = ir.statements.len() - 1;
     ir.stack.push(self.identifier.clone(), reference);
