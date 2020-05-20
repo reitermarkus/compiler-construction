@@ -13,7 +13,17 @@ impl<'a> AddToIr<'a> for Assignment<'a> {
     let arg = self.rvalue.add_to_ir(ir);
     ir.push(Op::Assign(arg, Arg::Variable(&self.identifier)));
 
-    ir.last_ref()
+    let reference = ir.statements.len() - 1;
+    *ir.stack.lookup_mut(&self.identifier).unwrap() = reference;
+    Arg::Reference(reference)
+  }
+}
+
+impl<'a> AddToIr<'a> for Declaration<'a> {
+  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+    let reference = 0;
+    ir.stack.push(self.identifier.clone(), reference);
+    Arg::Reference(reference)
   }
 }
 
@@ -41,7 +51,7 @@ impl<'a> AddToIr<'a> for Expression<'a> {
           BinaryOp::Lor => Op::Lor(arg1, arg2),
         });
 
-        Arg::Reference(AtomicUsize::new(ir.statements.len() - 1))
+        Arg::Reference(ir.statements.len() - 1)
       }
       Self::Unary { op, expression, .. } => {
         let arg = expression.add_to_ir(ir);
@@ -51,7 +61,7 @@ impl<'a> AddToIr<'a> for Expression<'a> {
           UnaryOp::Minus => Op::UnaryMinus(arg),
         });
 
-        Arg::Reference(AtomicUsize::new(ir.statements.len() - 1))
+        Arg::Reference(ir.statements.len() - 1)
       }
       Self::FunctionCall { identifier, arguments, .. } => {
         let args = arguments.iter().map(|a| a.add_to_ir(ir)).collect::<Vec<Arg<'_>>>();
@@ -65,7 +75,7 @@ impl<'a> AddToIr<'a> for Statement<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     match self {
       Self::Assignment(assignment) => assignment.add_to_ir(ir),
-      Self::Decl(_) => ir.last_ref(),
+      Self::Decl(declaration) => declaration.add_to_ir(ir),
       Self::Expression(expression) => {
         if let Expression::FunctionCall { .. } = expression {
           let arg = expression.add_to_ir(ir);
@@ -88,13 +98,13 @@ impl<'a> AddToIr<'a> for IfStatement<'a> {
     let condition = self.condition.add_to_ir(ir);
 
     let jumpfalse_index = ir.statements.len();
-    ir.push(Op::Jumpfalse(condition, Arg::Reference(AtomicUsize::default())));
+    ir.push(Op::Jumpfalse(condition, Arg::Reference(0)));
 
     self.block.add_to_ir(ir);
 
     if let Some(else_block) = &self.else_block {
       let jump_index = ir.statements.len();
-      ir.push(Op::Jump(Arg::Reference(AtomicUsize::default())));
+      ir.push(Op::Jump(Arg::Reference(0)));
 
       ir.update_reference(jumpfalse_index, ir.statements.len());
 
@@ -114,7 +124,7 @@ impl<'a> AddToIr<'a> for WhileStatement<'a> {
     let condition = self.condition.add_to_ir(ir);
 
     let jumpfalse_index = ir.statements.len();
-    ir.push(Op::Jumpfalse(condition, Arg::Reference(AtomicUsize::default())));
+    ir.push(Op::Jumpfalse(condition, Arg::Reference(0)));
 
     self.block.add_to_ir(ir);
     ir.update_reference(jumpfalse_index, ir.statements.len());
@@ -185,8 +195,8 @@ mod tests {
       ir.statements,
       vec![
         Op::Times(Arg::Literal(&Literal::Int(2)), Arg::Literal(&Literal::Int(3))),
-        Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Reference(AtomicUsize::new(0))),
-        Op::Assign(Arg::Reference(AtomicUsize::new(1)), Arg::Variable(&Identifier::from("x"))),
+        Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Reference(0)),
+        Op::Assign(Arg::Reference(1), Arg::Variable(&Identifier::from("x"))),
       ]
     );
   }
@@ -203,20 +213,25 @@ mod tests {
       ir.statements,
       vec![
         Op::Times(Arg::Literal(&Literal::Int(2)), Arg::Literal(&Literal::Int(3))),
-        Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Reference(AtomicUsize::new(0))),
+        Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Reference(0)),
       ]
     );
-    assert_eq!(arg, Arg::Reference(AtomicUsize::new(1)));
+    assert_eq!(arg, Arg::Reference(1));
   }
 
   #[test]
   fn if_stmt_to_ir() {
-    let if_stmt = IfStatement::try_from(
-      "if (a > b) {
-      max = a;
-    } else {
-      max = b;
-    }",
+    let if_stmt = CompoundStatement::try_from(
+      "{
+        int a;
+        int b;
+        int max;
+        if (a > b) {
+          max = a;
+        } else {
+          max = b;
+        }
+      }",
     )
     .unwrap();
 
@@ -227,9 +242,9 @@ mod tests {
       ir.statements,
       vec![
         Op::Gt(Arg::Variable(&Identifier::from("a")), Arg::Variable(&Identifier::from("b"))),
-        Op::Jumpfalse(Arg::Reference(AtomicUsize::new(0)), Arg::Reference(AtomicUsize::new(4))),
+        Op::Jumpfalse(Arg::Reference(0), Arg::Reference(4)),
         Op::Assign(Arg::Variable(&Identifier::from("a")), Arg::Variable(&Identifier::from("max"))),
-        Op::Jump(Arg::Reference(AtomicUsize::new(5))),
+        Op::Jump(Arg::Reference(5)),
         Op::Assign(Arg::Variable(&Identifier::from("b")), Arg::Variable(&Identifier::from("max"))),
       ]
     )
@@ -239,6 +254,8 @@ mod tests {
   fn comp_stmt_to_ir() {
     let comp_stmt = CompoundStatement::try_from(
       "{
+      int a;
+      int b;
       while (a > b) {
         a = a + 1;
       }
@@ -254,9 +271,9 @@ mod tests {
       ir.statements,
       vec![
         Op::Gt(Arg::Variable(&Identifier::from("a")), Arg::Variable(&Identifier::from("b"))),
-        Op::Jumpfalse(Arg::Reference(AtomicUsize::new(0)), Arg::Reference(AtomicUsize::new(4))),
+        Op::Jumpfalse(Arg::Reference(0), Arg::Reference(4)),
         Op::Plus(Arg::Variable(&Identifier::from("a")), Arg::Literal(&Literal::Int(1))),
-        Op::Assign(Arg::Reference(AtomicUsize::new(2)), Arg::Variable(&Identifier::from("a"))),
+        Op::Assign(Arg::Reference(2), Arg::Variable(&Identifier::from("a"))),
         Op::Return(Some(Arg::Variable(&Identifier::from("a")))),
       ]
     )
@@ -266,7 +283,9 @@ mod tests {
   fn function_to_ir() {
     let function = FunctionDeclaration::try_from(
       "void main() {
+        int x;
         x = 1 + 1;
+        int y;
         y = x;
         return;
       }",
@@ -280,7 +299,7 @@ mod tests {
       ir.statements,
       vec![
         Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Literal(&Literal::Int(1))),
-        Op::Assign(Arg::Reference(AtomicUsize::new(0)), Arg::Variable(&Identifier::from("x"))),
+        Op::Assign(Arg::Reference(0), Arg::Variable(&Identifier::from("x"))),
         Op::Assign(Arg::Variable(&Identifier::from("x")), Arg::Variable(&Identifier::from("y"))),
         Op::Return(None),
       ]

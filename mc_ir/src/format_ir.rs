@@ -8,7 +8,7 @@ impl fmt::Display for Arg<'_> {
     match self {
       Self::Literal(literal) => literal.to_string().fmt(f),
       Self::Variable(identifier) => identifier.to_string().fmt(f),
-      Self::Reference(reference) => reference.load(Ordering::SeqCst).to_string().fmt(f),
+      Self::Reference(reference) => reference.to_string().fmt(f),
       Self::FunctionCall(identifier, arguments) => {
         write!(f, "{}({})", identifier, arguments.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
       }
