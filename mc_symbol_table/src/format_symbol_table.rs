@@ -36,8 +36,13 @@ mod tests {
         ty: Some(Ty::Int),
         identifier: Identifier::from("fib"),
         parameters: vec![
-          Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("n"), span: Span::new("", 0, 0).unwrap() },
-          Parameter {
+          Declaration {
+            ty: Ty::Int,
+            count: None,
+            identifier: Identifier::from("n"),
+            span: Span::new("", 0, 0).unwrap(),
+          },
+          Declaration {
             ty: Ty::Bool,
             count: None,
             identifier: Identifier::from("debug"),

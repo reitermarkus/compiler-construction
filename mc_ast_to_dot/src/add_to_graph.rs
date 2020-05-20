@@ -216,7 +216,7 @@ mod tests {
       function_declarations: vec![FunctionDeclaration {
         ty: Some(Ty::Int),
         identifier: Identifier::from("fib"),
-        parameters: vec![Parameter {
+        parameters: vec![Declaration {
           ty: Ty::Int,
           count: None,
           identifier: Identifier::from("n"),

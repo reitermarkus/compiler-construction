@@ -1,5 +1,3 @@
-use std::sync::atomic::AtomicUsize;
-
 use mc_parser::ast::*;
 
 use crate::ir::*;
@@ -148,22 +146,33 @@ impl<'a> AddToIr<'a> for ReturnStatement<'a> {
 
 impl<'a> AddToIr<'a> for CompoundStatement<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+    let ptr = ir.stack.ptr();
+
     for stmt in &self.statements {
       stmt.add_to_ir(ir);
     }
 
+    ir.stack.reset(ptr);
     ir.last_ref()
   }
 }
 
 impl<'a> AddToIr<'a> for FunctionDeclaration<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+    let ptr = ir.stack.ptr();
+
     let start_index = ir.statements.len();
+
+    for parameter in &self.parameters {
+      parameter.add_to_ir(ir);
+    }
+
     self.body.add_to_ir(ir);
-    let end_index = ir.statements.len() - 1;
+    let end_index = ir.statements.len();
 
     ir.add_function(&self.identifier, IrFunction::from((start_index, end_index)));
 
+    ir.stack.reset(ptr);
     ir.last_ref()
   }
 }
@@ -186,7 +195,14 @@ mod tests {
 
   #[test]
   fn assignment_to_ir() {
-    let assignment = Assignment::try_from("x = 1 + 2 * 3").unwrap();
+    let assignment = CompoundStatement::try_from(
+      "{
+      int x;
+      x = 1 + 2 * 3;
+      }
+      ",
+    )
+    .unwrap();
 
     let mut ir = IntermediateRepresentation::default();
     assignment.add_to_ir(&mut ir);
@@ -305,6 +321,6 @@ mod tests {
       ]
     );
 
-    assert_eq!(ir.functions.get(&Identifier::from("main")), Some(&IrFunction { start: 0, end: 3 }),)
+    assert_eq!(ir.functions.get(&Identifier::from("main")), Some(&IrFunction { start: 0, end: 4 }),)
   }
 }

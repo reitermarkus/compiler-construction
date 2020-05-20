@@ -358,47 +358,6 @@ impl From<&str> for Identifier {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct Parameter<'a> {
-  pub ty: Ty,
-  pub count: Option<usize>,
-  pub identifier: Identifier,
-  pub span: Span<'a>,
-}
-
-impl_try_from_str!(Parameter, Rule::declaration);
-
-impl<'a> FromPest<'a> for Parameter<'a> {
-  type Rule = Rule;
-  type FatalError = String;
-
-  fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let pair = pairs.next().ok_or(ConversionError::NoMatch)?;
-    let span = pair.as_span();
-    let mut inner = pair.into_inner();
-
-    let mut param_type = inner.next().ok_or(ConversionError::NoMatch)?.into_inner();
-    let (ty, count) = match (param_type.next(), param_type.next()) {
-      (Some(ty), Some(int)) => (
-        Ty::from_pest(&mut Pairs::single(ty))?,
-        Some(
-          int
-            .as_str()
-            .parse::<usize>()
-            .map_err(|_| ConversionError::Malformed(format!("failed to parse {:?} as {}", int.as_str(), Ty::Int)))?,
-        ),
-      ),
-      (Some(ty), None) => (Ty::from_pest(&mut Pairs::single(ty))?, None),
-      (None, None) => return Err(ConversionError::NoMatch),
-      _ => unreachable!(),
-    };
-
-    let identifier = Identifier::from_pest(&mut inner)?;
-
-    Ok(Self { ty, count, identifier, span })
-  }
-}
-
-#[derive(PartialEq, Debug)]
 pub struct Assignment<'a> {
   pub identifier: Identifier,
   pub index_expression: Option<Expression<'a>>,
@@ -611,7 +570,7 @@ impl<'a> FromPest<'a> for Statement<'a> {
 pub struct FunctionDeclaration<'a> {
   pub ty: Option<Ty>,
   pub identifier: Identifier,
-  pub parameters: Vec<Parameter<'a>>,
+  pub parameters: Vec<Declaration<'a>>,
   pub body: CompoundStatement<'a>,
   pub span: Span<'a>,
 }
@@ -633,7 +592,7 @@ impl<'a> FromPest<'a> for FunctionDeclaration<'a> {
 
     let parameters = if inner.peek().map(|p| p.as_rule()) == Some(Rule::parameters) {
       let params = inner.next().ok_or(ConversionError::NoMatch)?.into_inner();
-      params.map(|p| Parameter::from_pest(&mut Pairs::single(p))).collect::<Result<Vec<_>, _>>()?
+      params.map(|p| Declaration::from_pest(&mut Pairs::single(p))).collect::<Result<Vec<_>, _>>()?
     } else {
       vec![]
     };
@@ -902,7 +861,7 @@ mod tests {
       FunctionDeclaration {
         ty: Some(Ty::Int),
         identifier: Identifier::from("sum"),
-        parameters: vec![Parameter {
+        parameters: vec![Declaration {
           ty: Ty::Int,
           count: Some(16),
           identifier: Identifier::from("n"),

@@ -76,16 +76,6 @@ impl CheckSemantics for Declaration<'_> {
   }
 }
 
-impl CheckSemantics for Parameter<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
-    if Scope::lookup(scope, &self.identifier).is_some() {
-      Err(vec![SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() }])
-    } else {
-      Ok(())
-    }
-  }
-}
-
 impl CheckSemantics for IfStatement<'_> {
   fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
     check_condition(scope, &self.condition, &self.span)

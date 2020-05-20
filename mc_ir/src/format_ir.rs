@@ -1,5 +1,4 @@
 use std::fmt;
-use std::sync::atomic::Ordering;
 
 use crate::ir::*;
 

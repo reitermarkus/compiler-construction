@@ -212,8 +212,8 @@ mod test {
       ty: Some(Ty::Float),
       identifier: Identifier::from("sum"),
       parameters: vec![
-        Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("n"), span: Span::new("", 0, 0).unwrap() },
-        Parameter { ty: Ty::Int, count: None, identifier: Identifier::from("m"), span: Span::new("", 0, 0).unwrap() },
+        Declaration { ty: Ty::Int, count: None, identifier: Identifier::from("n"), span: Span::new("", 0, 0).unwrap() },
+        Declaration { ty: Ty::Int, count: None, identifier: Identifier::from("m"), span: Span::new("", 0, 0).unwrap() },
       ],
       body: CompoundStatement {
         statements: vec![Statement::Ret(ReturnStatement {
