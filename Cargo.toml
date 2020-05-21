@@ -4,4 +4,5 @@ members = [
   "mc_parser",
   "mc_symbol_table",
   "mc_ir",
+  "mc_asm",
 ]

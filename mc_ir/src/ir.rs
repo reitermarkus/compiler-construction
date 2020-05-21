@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::Range;
 
 use mc_parser::ast::*;
 
@@ -44,23 +45,11 @@ impl<'a> PartialEq for Arg<'a> {
   }
 }
 
-#[derive(Default, Debug, PartialEq)]
-pub struct IrFunction {
-  pub start: usize,
-  pub end: usize,
-}
-
-impl From<(usize, usize)> for IrFunction {
-  fn from(tuple: (usize, usize)) -> IrFunction {
-    Self { start: tuple.0, end: tuple.1 }
-  }
-}
-
 #[derive(Default, Debug)]
 pub struct IntermediateRepresentation<'a> {
   pub stack: HashStack,
   pub statements: Vec<Op<'a>>,
-  pub functions: HashMap<&'a Identifier, IrFunction>,
+  pub functions: HashMap<&'a Identifier, Range<usize>>,
 }
 
 impl<'a> IntermediateRepresentation<'a> {
@@ -81,8 +70,8 @@ impl<'a> IntermediateRepresentation<'a> {
     }
   }
 
-  pub fn add_function(&mut self, identifier: &'a Identifier, irf: IrFunction) {
-    self.functions.insert(identifier, irf);
+  pub fn add_function(&mut self, identifier: &'a Identifier, range: Range<usize>) {
+    self.functions.insert(identifier, range);
   }
 }
 

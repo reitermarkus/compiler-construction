@@ -4,15 +4,13 @@ use std::fs::File;
 use std::io::{prelude::*, stdin};
 use std::path::Path;
 
-mod ir;
-pub use ir::{Arg, IntermediateRepresentation, Op};
+use mc_ir::AddToIr;
+use mc_ir::IntermediateRepresentation;
 
-mod add_to_ir;
-pub use add_to_ir::AddToIr;
+mod to_asm;
+use to_asm::ToAsm;
 
-mod format_ir;
-
-pub fn mc_ir(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::Result<()> {
+pub fn mc_asm(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::Result<()> {
   let mut contents = String::new();
 
   if in_file.as_ref() == Path::new("-") {
@@ -26,5 +24,7 @@ pub fn mc_ir(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::
   let mut ir = IntermediateRepresentation::default();
   ast.add_to_ir(&mut ir);
 
-  write!(out_stream, "{}", ir)
+  let asm = ir.to_asm();
+
+  write!(out_stream, "{}", asm)
 }

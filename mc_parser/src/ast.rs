@@ -47,6 +47,17 @@ pub enum Ty {
   String,
 }
 
+impl Ty {
+  pub fn size(self) -> usize {
+    match self {
+      Ty::Bool => 1,
+      Ty::Int => 4,
+      Ty::Float => 4,
+      Ty::String => 4,
+    }
+  }
+}
+
 impl fmt::Display for Ty {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {

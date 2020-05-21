@@ -187,7 +187,7 @@ impl<'a> AddToIr<'a> for FunctionDeclaration<'a> {
     self.body.add_to_ir(ir);
     let end_index = ir.statements.len();
 
-    ir.add_function(&self.identifier, IrFunction::from((start_index, end_index)));
+    ir.add_function(&self.identifier, start_index..end_index);
 
     ir.stack.reset(ptr);
     ir.last_ref()

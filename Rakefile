@@ -31,7 +31,26 @@ end
 desc 'generate IR for all examples'
 task :ir, [:example] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
-    txt = mc.sub_ext('.ir')
-    sh 'cargo', 'run', '--bin', 'mc_ir', '--', '-o', txt.to_s, mc.to_s
+    ir = mc.sub_ext('.ir')
+    sh 'cargo', 'run', '--bin', 'mc_ir', '--', '-o', ir.to_s, mc.to_s
+  end
+end
+
+desc 'generate ASM for all examples'
+task :asm, [:example] do |example: '*'|
+  Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
+    asm = mc.sub_ext('.s')
+    sh 'cargo', 'run', '--bin', 'mc_asm', '--', '-o', asm.to_s, mc.to_s
+  end
+end
+
+desc 'compile and run all examples'
+task :run, [:example] => :asm do |example: '*'|
+  sh 'docker', 'build', '-t', 'gcc', '-f', 'Dockerfile.gcc', '.'
+
+  Pathname.glob("#{__dir__}/examples/#{example}/#{example}.s").each do |asm|
+    bin = asm.sub_ext('.bin')
+    sh 'docker', 'run', '--rm', '-it', '-v', "#{__dir__}:#{__dir__}", '-w', __dir__, 'gcc', 'gcc', '-m32', asm.to_s, '-o', bin.to_s
+    sh 'docker', 'run', '--rm', '-it', '-v', "#{__dir__}:#{__dir__}", '-w', __dir__, 'gcc', bin.to_s
   end
 end
