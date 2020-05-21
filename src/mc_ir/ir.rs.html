@@ -98,19 +98,9 @@
 <span id="98"> 98</span>
 <span id="99"> 99</span>
 <span id="100">100</span>
-<span id="101">101</span>
-<span id="102">102</span>
-<span id="103">103</span>
-<span id="104">104</span>
-<span id="105">105</span>
-<span id="106">106</span>
-<span id="107">107</span>
-<span id="108">108</span>
-<span id="109">109</span>
-<span id="110">110</span>
-<span id="111">111</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">HashMap</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">ops</span>::<span class="ident">Range</span>;
 
 <span class="kw">use</span> <span class="ident">mc_parser</span>::<span class="ident">ast</span>::<span class="kw-2">*</span>;
 
@@ -156,23 +146,11 @@
   }
 }
 
-<span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>, <span class="ident">Debug</span>, <span class="ident">PartialEq</span>)]</span>
-<span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IrFunction</span> {
-  <span class="kw">pub</span> <span class="ident">start</span>: <span class="ident">usize</span>,
-  <span class="kw">pub</span> <span class="ident">end</span>: <span class="ident">usize</span>,
-}
-
-<span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span>(<span class="ident">usize</span>, <span class="ident">usize</span>)<span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">IrFunction</span> {
-  <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">tuple</span>: (<span class="ident">usize</span>, <span class="ident">usize</span>)) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">IrFunction</span> {
-    <span class="self">Self</span> { <span class="ident">start</span>: <span class="ident">tuple</span>.<span class="number">0</span>, <span class="ident">end</span>: <span class="ident">tuple</span>.<span class="number">1</span> }
-  }
-}
-
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Default</span>, <span class="ident">Debug</span>)]</span>
 <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">IntermediateRepresentation</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
   <span class="kw">pub</span> <span class="ident">stack</span>: <span class="ident">HashStack</span>,
   <span class="kw">pub</span> <span class="ident">statements</span>: <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Op</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span><span class="op">&gt;</span>,
-  <span class="kw">pub</span> <span class="ident">functions</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Identifier</span>, <span class="ident">IrFunction</span><span class="op">&gt;</span>,
+  <span class="kw">pub</span> <span class="ident">functions</span>: <span class="ident">HashMap</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Identifier</span>, <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span><span class="op">&gt;</span>,
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">IntermediateRepresentation</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
@@ -193,8 +171,8 @@
     }
   }
 
-  <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_function</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">identifier</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Identifier</span>, <span class="ident">irf</span>: <span class="ident">IrFunction</span>) {
-    <span class="self">self</span>.<span class="ident">functions</span>.<span class="ident">insert</span>(<span class="ident">identifier</span>, <span class="ident">irf</span>);
+  <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">add_function</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">identifier</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Identifier</span>, <span class="ident">range</span>: <span class="ident">Range</span><span class="op">&lt;</span><span class="ident">usize</span><span class="op">&gt;</span>) {
+    <span class="self">self</span>.<span class="ident">functions</span>.<span class="ident">insert</span>(<span class="ident">identifier</span>, <span class="ident">range</span>);
   }
 }
 

@@ -1,4 +1,5 @@
 var N = null;var sourcesIndex = {};
+sourcesIndex["mc_asm"] = {"name":"","files":["lib.rs","to_asm.rs"]};
 sourcesIndex["mc_ast_to_dot"] = {"name":"","files":["add_to_graph.rs","lib.rs"]};
 sourcesIndex["mc_ir"] = {"name":"","files":["add_to_ir.rs","format_ir.rs","ir.rs","lib.rs"]};
 sourcesIndex["mc_parser"] = {"name":"","files":["ast.rs","lib.rs"]};

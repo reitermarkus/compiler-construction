@@ -532,7 +532,7 @@
     <span class="self">self</span>.<span class="ident">body</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
     <span class="kw">let</span> <span class="ident">end_index</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>();
 
-    <span class="ident">ir</span>.<span class="ident">add_function</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identifier</span>, <span class="ident">IrFunction</span>::<span class="ident">from</span>((<span class="ident">start_index</span>, <span class="ident">end_index</span>)));
+    <span class="ident">ir</span>.<span class="ident">add_function</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identifier</span>, <span class="ident">start_index</span>..<span class="ident">end_index</span>);
 
     <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">reset</span>(<span class="ident">ptr</span>);
     <span class="ident">ir</span>.<span class="ident">last_ref</span>()

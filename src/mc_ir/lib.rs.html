@@ -36,10 +36,10 @@
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">path</span>::<span class="ident">Path</span>;
 
 <span class="kw">mod</span> <span class="ident">ir</span>;
-<span class="kw">use</span> <span class="ident">ir</span>::<span class="ident">IntermediateRepresentation</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">ir</span>::{<span class="ident">Arg</span>, <span class="ident">IntermediateRepresentation</span>, <span class="ident">Op</span>};
 
 <span class="kw">mod</span> <span class="ident">add_to_ir</span>;
-<span class="kw">use</span> <span class="ident">add_to_ir</span>::<span class="ident">AddToIr</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">add_to_ir</span>::<span class="ident">AddToIr</span>;
 
 <span class="kw">mod</span> <span class="ident">format_ir</span>;
 
