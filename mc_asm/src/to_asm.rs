@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::fmt;
 
 use mc_ir::{Arg, IntermediateRepresentation, Op};
@@ -44,6 +45,20 @@ impl Stack {
   }
 }
 
+#[derive(Debug)]
+pub enum Temporaries {
+  EAX,
+  EBX,
+  ECX,
+  EDX,
+}
+
+impl fmt::Display for Temporaries {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{:?}", self)
+  }
+}
+
 fn index_expression_to_asm(
   stack: &Stack,
   lines: &mut Vec<String>,
@@ -76,6 +91,7 @@ fn index_expression_to_asm(
 impl<'a> ToAsm for IntermediateRepresentation<'a> {
   fn to_asm(&self) -> Asm {
     let mut lines = vec![];
+    let mut temporaries = VecDeque::<Temporaries>::new();
 
     lines.push("  .intel_syntax noprefix".to_string());
     lines.push("  .global main".to_string());
@@ -99,7 +115,13 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           }
           Op::Assign(arg, variable) => {
             if let Arg::Variable(decl_index, index_expression) = variable {
-              let value = if let Arg::Literal(Literal::Int(v)) = arg { format!("{}", v) } else { "".into() };
+              let value = match arg {
+                Arg::Literal(Literal::Int(v)) => format!("{}", v),
+                Arg::Reference(_) if temporaries.front().is_some() => {
+                  temporaries.pop_front().unwrap().to_string().to_lowercase()
+                },
+                _ => "".into()
+              };
 
               let (offset, index) = index_expression_to_asm(&stack, &mut lines, *decl_index, &**index_expression);
               lines.push(format!("  mov    DWORD PTR [ebp-{}{}], {}", offset, index, value));
@@ -114,7 +136,24 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             Some(_) => {}
             _ => {}
           },
-          Op::Plus(_lhs, _rhs) => {}
+          Op::Plus(_lhs, _rhs) => match (_lhs, _rhs) {
+            (Arg::Reference(_), Arg::Variable(decl_index_r, index_expression_r)) => {
+              let (offset_r, index_r) = index_expression_to_asm(&stack, &mut lines, *decl_index_r, &**index_expression_r);
+              lines.push("  mov    edx, eax".into());
+              lines.push(format!("  mov    eax, DWORD PTR [ebp-{}{}]", offset_r, index_r));
+              lines.push("  add    eax, edx".into());
+            },
+            (Arg::Variable(decl_index_l, index_expression_l), Arg::Variable(decl_index_r, index_expression_r)) => {
+              let (offset_l, index_l) = index_expression_to_asm(&stack, &mut lines, *decl_index_l, &**index_expression_l);
+              let (offset_r, index_r) = index_expression_to_asm(&stack, &mut lines, *decl_index_r, &**index_expression_r);
+
+              lines.push(format!("  mov    edx, DWORD PTR [ebp-{}{}]", offset_l, index_l));
+              lines.push(format!("  mov    eax, DWORD PTR [ebp-{}{}]", offset_r, index_r));
+              lines.push("  add    eax, edx".to_owned());
+              temporaries.push_back(Temporaries::EAX);
+            }
+            _ => {}
+          },
           _ => {}
         }
       }
