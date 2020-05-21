@@ -139,8 +139,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           Op::Plus(_lhs, _rhs) => match (_lhs, _rhs) {
             (Arg::Reference(_), Arg::Variable(decl_index_r, index_expression_r)) => {
               let (offset_r, index_r) = index_expression_to_asm(&stack, &mut lines, *decl_index_r, &**index_expression_r);
-              lines.push("  mov    edx, eax".into());
-              lines.push(format!("  mov    eax, DWORD PTR [ebp-{}{}]", offset_r, index_r));
+              lines.push(format!("  mov    edx, DWORD PTR [ebp-{}{}]", offset_r, index_r));
               lines.push("  add    eax, edx".into());
             },
             (Arg::Variable(decl_index_l, index_expression_l), Arg::Variable(decl_index_r, index_expression_r)) => {
@@ -149,7 +148,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
               lines.push(format!("  mov    edx, DWORD PTR [ebp-{}{}]", offset_l, index_l));
               lines.push(format!("  mov    eax, DWORD PTR [ebp-{}{}]", offset_r, index_r));
-              lines.push("  add    eax, edx".to_owned());
+              lines.push("  add    eax, edx".into());
               temporaries.push_back(Temporaries::EAX);
             }
             _ => {}
