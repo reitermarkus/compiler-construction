@@ -88,6 +88,26 @@ fn index_expression_to_asm(
   (offset, index)
 }
 
+pub struct Float {
+  long1: i32,
+  long2: i32,
+}
+
+impl From<f64> for Float {
+  fn from(f: f64) -> Self {
+    let fb = f.to_le_bytes();
+    let long1 = i32::from_le_bytes([fb[0], fb[1], fb[2], fb[3]]);
+    let long2 = i32::from_le_bytes([fb[4], fb[5], fb[6], fb[7]]);
+    Self { long1, long2 }
+  }
+}
+
+impl Float {
+  pub fn to_asm(&self) -> Vec<String> {
+    vec![format!(".long {}", self.long1), format!(".long {}", self.long2)]
+  }
+}
+
 fn lhs_rhs<'a>(
   stack: &Stack,
   ie_l: &Box<Arg<'a>>,
