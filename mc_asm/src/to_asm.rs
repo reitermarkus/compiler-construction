@@ -88,6 +88,31 @@ fn index_expression_to_asm(
   (offset, index)
 }
 
+fn lhs_rhs<'a>(
+  stack: &Stack,
+  ie_l: &Box<Arg<'a>>,
+  dec_index_l: usize,
+  ie_r: &Box<Arg<'a>>,
+  dec_index_r: usize,
+  lines: &mut Vec<String>,
+  temporaries: &mut VecDeque<Temporaries>,
+) {
+  let (offset_l, index_l) = index_expression_to_asm(&stack, lines, dec_index_l, &**ie_l);
+  let (offset_r, index_r) = index_expression_to_asm(&stack, lines, dec_index_r, &**ie_r);
+
+  lines.push(format!("  mov    edx, DWORD PTR [ebp-{}{}]", offset_l, index_l));
+  lines.push(format!("  mov    eax, DWORD PTR [ebp-{}{}]", offset_r, index_r));
+  lines.push("  add    eax, edx".into());
+  temporaries.push_back(Temporaries::EAX);
+}
+
+fn ref_rhs<'a>(stack: &Stack, ie: &Box<Arg<'a>>, dec_index: usize, lines: &mut Vec<String>) {
+  let (offset_r, index_r) = index_expression_to_asm(&stack, lines, dec_index, &**ie);
+
+  lines.push(format!("  mov    edx, DWORD PTR [ebp-{}{}]", offset_r, index_r));
+  lines.push("  add    eax, edx".into());
+}
+
 impl<'a> ToAsm for IntermediateRepresentation<'a> {
   fn to_asm(&self) -> Asm {
     let mut lines = vec![];
@@ -119,8 +144,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 Arg::Literal(Literal::Int(v)) => format!("{}", v),
                 Arg::Reference(_) if temporaries.front().is_some() => {
                   temporaries.pop_front().unwrap().to_string().to_lowercase()
-                },
-                _ => "".into()
+                }
+                _ => "".into(),
               };
 
               let (offset, index) = index_expression_to_asm(&stack, &mut lines, *decl_index, &**index_expression);
@@ -138,18 +163,18 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           },
           Op::Plus(_lhs, _rhs) => match (_lhs, _rhs) {
             (Arg::Reference(_), Arg::Variable(decl_index_r, index_expression_r)) => {
-              let (offset_r, index_r) = index_expression_to_asm(&stack, &mut lines, *decl_index_r, &**index_expression_r);
-              lines.push(format!("  mov    edx, DWORD PTR [ebp-{}{}]", offset_r, index_r));
-              lines.push("  add    eax, edx".into());
-            },
+              ref_rhs(&stack, index_expression_r, *decl_index_r, &mut lines);
+            }
             (Arg::Variable(decl_index_l, index_expression_l), Arg::Variable(decl_index_r, index_expression_r)) => {
-              let (offset_l, index_l) = index_expression_to_asm(&stack, &mut lines, *decl_index_l, &**index_expression_l);
-              let (offset_r, index_r) = index_expression_to_asm(&stack, &mut lines, *decl_index_r, &**index_expression_r);
-
-              lines.push(format!("  mov    edx, DWORD PTR [ebp-{}{}]", offset_l, index_l));
-              lines.push(format!("  mov    eax, DWORD PTR [ebp-{}{}]", offset_r, index_r));
-              lines.push("  add    eax, edx".into());
-              temporaries.push_back(Temporaries::EAX);
+              lhs_rhs(
+                &stack,
+                index_expression_l,
+                *decl_index_l,
+                index_expression_r,
+                *decl_index_r,
+                &mut lines,
+                &mut temporaries,
+              );
             }
             _ => {}
           },
