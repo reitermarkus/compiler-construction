@@ -12,7 +12,7 @@ fn main() -> std::io::Result<()> {
   let matches = App::new("mC ASM")
     .set_term_width(0)
     .max_term_width(0)
-    .about("Utility for viewing the generated intermediate representation. Errors are reported on invalid inputs.")
+    .about("Utility for printing the generated assembly code. Errors are reported on invalid inputs.")
     .arg(Arg::from_usage("-o, --output <out-file> 'output file (defaults to stdout)'").required(false))
     .arg(Arg::from_usage("<file> 'input file (use '-' to read from stdin)'"))
     .get_matches();
