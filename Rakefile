@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'pathname'
+require 'english'
 
 desc 'generate AST graphs for all examples'
 task :graphs, [:example] do |example: '*'|
@@ -51,6 +52,7 @@ task :run, [:example] => :asm do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.s").each do |asm|
     bin = asm.sub_ext('.bin')
     sh 'docker', 'run', '--rm', '-it', '-v', "#{__dir__}:#{__dir__}", '-w', __dir__, 'gcc', 'gcc', '-m32', asm.to_s, '-o', bin.to_s
-    sh 'docker', 'run', '--rm', '-it', '-v', "#{__dir__}:#{__dir__}", '-w', __dir__, 'gcc', bin.to_s
+    system 'docker', 'run', '--rm', '-it', '-v', "#{__dir__}:#{__dir__}", '-w', __dir__, 'gcc', bin.to_s
+    puts $CHILD_STATUS.exitstatus
   end
 end

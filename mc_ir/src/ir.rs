@@ -77,6 +77,7 @@ impl<'a> IntermediateRepresentation<'a> {
 
 #[derive(Debug, PartialEq)]
 pub enum Op<'a> {
+  Load(Arg<'a>),
   Decl(&'a Identifier, Ty, usize),
   Gt(Arg<'a>, Arg<'a>),
   Gte(Arg<'a>, Arg<'a>),

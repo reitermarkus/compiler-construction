@@ -42,10 +42,13 @@ impl<'a> AddToIr<'a> for Expression<'a> {
         let reference = ir.stack.lookup(&identifier).unwrap();
 
         if let Some(index_expression) = index_expression {
-          Arg::Variable(reference, Box::new(index_expression.add_to_ir(ir)))
+          let index_expression = index_expression.add_to_ir(ir);
+          ir.push(Op::Load(Arg::Variable(reference, Box::new(index_expression))));
         } else {
-          Arg::Variable(reference, Box::new(Arg::Literal(&Literal::Int(0))))
+          ir.push(Op::Load(Arg::Variable(reference, Box::new(Arg::Literal(&Literal::Int(0))))));
         }
+
+        ir.last_ref()
       }
       Self::Binary { op, lhs, rhs, .. } => {
         let arg1 = lhs.add_to_ir(ir);

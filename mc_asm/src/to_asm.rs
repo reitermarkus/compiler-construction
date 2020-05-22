@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::VecDeque;
 use std::fmt;
 
 use mc_ir::{Arg, IntermediateRepresentation, Op};
@@ -45,7 +44,7 @@ impl Stack {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Temporaries {
   EAX,
   EBX,
@@ -55,37 +54,13 @@ pub enum Temporaries {
 
 impl fmt::Display for Temporaries {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{:?}", self)
+    match self {
+      Self::EAX => write!(f, "eax"),
+      Self::EBX => write!(f, "ebx"),
+      Self::ECX => write!(f, "ecx"),
+      Self::EDX => write!(f, "edx"),
+    }
   }
-}
-
-fn index_expression_to_asm(
-  stack: &Stack,
-  lines: &mut Vec<String>,
-  decl_index: usize,
-  index_expression: &Arg<'_>,
-) -> (usize, String) {
-  let (ty, count, mut offset) = stack.lookup(decl_index);
-
-  offset += count * ty.size();
-
-  let index = match index_expression {
-    Arg::Literal(Literal::Int(index)) => {
-      offset -= *index as usize * ty.size();
-      "".into()
-    }
-    Arg::Variable(decl_index, index_expression) => {
-      {
-        let (offset, index) = index_expression_to_asm(&stack, lines, *decl_index, &**index_expression);
-        lines.push(format!("  mov    eax, DWORD PTR [ebp-{}{}]", offset, index));
-      }
-
-      format!("+eax*{}", ty.size())
-    }
-    _ => unimplemented!(),
-  };
-
-  (offset, index)
 }
 
 pub struct Float {
@@ -108,50 +83,91 @@ impl Float {
   }
 }
 
-fn lhs_rhs<'a>(
-  stack: &Stack,
-  ie_l: &Box<Arg<'a>>,
-  dec_index_l: usize,
-  ie_r: &Box<Arg<'a>>,
-  dec_index_r: usize,
-  lines: &mut Vec<String>,
-  temporaries: &mut VecDeque<Temporaries>,
-) {
-  let (offset_l, index_l) = index_expression_to_asm(&stack, lines, dec_index_l, &**ie_l);
-  let (offset_r, index_r) = index_expression_to_asm(&stack, lines, dec_index_r, &**ie_r);
+pub fn add_expression(statements: &[Op<'_>], stack: &Stack, asm: &mut Asm, reg: Temporaries, arg: &Arg<'_>) -> String {
+  match arg {
+    Arg::Variable(decl_index, index_offset) => {
+      let (ty, count, mut offset) = stack.lookup(*decl_index);
+      offset += count * ty.size();
 
-  lines.push(format!("  mov    edx, DWORD PTR [ebp-{}{}]", offset_l, index_l));
-  lines.push(format!("  mov    eax, DWORD PTR [ebp-{}{}]", offset_r, index_r));
-  lines.push("  add    eax, edx".into());
-  temporaries.push_back(Temporaries::EAX);
-}
+      let index_reg = if let Arg::Literal(Literal::Int(index_offset)) = &**index_offset {
+        offset -= *index_offset as usize * ty.size();
+        None
+      } else {
+        add_expression(statements, stack, asm, reg, &*index_offset);
+        Some(reg)
+      };
 
-fn ref_rhs<'a>(stack: &Stack, ie: &Box<Arg<'a>>, dec_index: usize, lines: &mut Vec<String>) {
-  let (offset_r, index_r) = index_expression_to_asm(&stack, lines, dec_index, &**ie);
+      let index_offset = if let Some(reg) = index_reg { format!("+{}*{}", reg, ty.size()) } else { "".into() };
 
-  lines.push(format!("  mov    edx, DWORD PTR [ebp-{}{}]", offset_r, index_r));
-  lines.push("  add    eax, edx".into());
+      match ty {
+        Ty::Int => format!("DWORD PTR [ebp-{}{}]", offset, index_offset),
+        ty => unimplemented!("{:?}", ty),
+      }
+    }
+    Arg::Reference(reference) => {
+      let temporary = &statements[*reference];
+
+      match temporary {
+        Op::Plus(lhs, rhs) => match (lhs, rhs) {
+          (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
+            add_expression(statements, stack, asm, reg, &Arg::Literal(&Literal::Int(l + r)))
+          }
+          (lhs, Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), lhs) => {
+            let lhs = add_expression(statements, stack, asm, reg, lhs);
+
+            asm.lines.push(format!("  add    {}, {}", lhs, rhs));
+
+            lhs
+          }
+          (lhs, rhs) => {
+            add_expression(statements, stack, asm, Temporaries::EDX, lhs);
+            add_expression(statements, stack, asm, Temporaries::EAX, rhs);
+
+            if reg == Temporaries::EAX {
+              asm.lines.push(format!("  add    {}, {}", reg, Temporaries::EDX));
+            } else {
+              asm.lines.push(format!("  add    {}, {}", reg, Temporaries::EAX));
+            }
+
+            reg.to_string()
+          }
+        },
+        Op::Load(variable) => {
+          let variable = add_expression(statements, stack, asm, reg, variable);
+
+          asm.lines.push(format!("  mov    {}, {}", reg, variable));
+
+          reg.to_string()
+        }
+        op => unimplemented!("{:?}", op),
+      }
+    }
+    Arg::Literal(literal) => match literal {
+      Literal::Int(integer) => integer.to_string(),
+      literal => unimplemented!("{:?}", literal),
+    },
+    arg => unimplemented!("{:?}", arg),
+  }
 }
 
 impl<'a> ToAsm for IntermediateRepresentation<'a> {
   fn to_asm(&self) -> Asm {
-    let mut lines = vec![];
-    let mut temporaries = VecDeque::<Temporaries>::new();
+    let mut asm = Asm { lines: vec![] };
 
-    lines.push("  .intel_syntax noprefix".to_string());
-    lines.push("  .global main".to_string());
+    asm.lines.push("  .intel_syntax noprefix".to_string());
+    asm.lines.push("  .global main".to_string());
 
     for (&name, range) in &self.functions {
       let is_main = name == &Identifier::from("main");
 
       let mut stack = Stack::default();
 
-      lines.push(format!("{}:", name));
+      asm.lines.push(format!("{}:", name));
 
-      lines.push("  push   ebp".to_string());
-      lines.push("  mov    ebp, esp".to_string());
+      asm.lines.push("  push   ebp".to_string());
+      asm.lines.push("  mov    ebp, esp".to_string());
 
-      let stack_size_index = lines.len();
+      let stack_size_index = asm.lines.len();
 
       for (i, statement) in self.statements.iter().enumerate().skip(range.start).take(range.end) {
         match statement {
@@ -159,60 +175,35 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             stack.push(i, *ty, *count);
           }
           Op::Assign(arg, variable) => {
-            if let Arg::Variable(decl_index, index_expression) = variable {
-              let value = match arg {
-                Arg::Literal(Literal::Int(v)) => format!("{}", v),
-                Arg::Reference(_) if temporaries.front().is_some() => {
-                  temporaries.pop_front().unwrap().to_string().to_lowercase()
-                }
-                _ => "".into(),
-              };
-
-              let (offset, index) = index_expression_to_asm(&stack, &mut lines, *decl_index, &**index_expression);
-              lines.push(format!("  mov    DWORD PTR [ebp-{}{}], {}", offset, index, value));
-            } else {
-              unimplemented!()
-            }
+            let variable = add_expression(&self.statements, &stack, &mut asm, Temporaries::EAX, variable);
+            let value = add_expression(&self.statements, &stack, &mut asm, Temporaries::EDX, arg);
+            asm.lines.push(format!("  mov    {}, {}", variable, value));
           }
           Op::Return(arg) => match arg {
-            Some(Arg::Literal(Literal::Int(v))) => {
-              lines.push(format!("  mov    eax, {}", v));
+            Some(arg) => {
+              let value = add_expression(&self.statements, &stack, &mut asm, Temporaries::EAX, arg);
+
+              if value != Temporaries::EAX.to_string() {
+                asm.lines.push(format!("  mov    {}, {}", Temporaries::EAX, value));
+              }
             }
-            Some(_) => {}
-            _ => {}
-          },
-          Op::Plus(_lhs, _rhs) => match (_lhs, _rhs) {
-            (Arg::Reference(_), Arg::Variable(decl_index_r, index_expression_r)) => {
-              ref_rhs(&stack, index_expression_r, *decl_index_r, &mut lines);
-            }
-            (Arg::Variable(decl_index_l, index_expression_l), Arg::Variable(decl_index_r, index_expression_r)) => {
-              lhs_rhs(
-                &stack,
-                index_expression_l,
-                *decl_index_l,
-                index_expression_r,
-                *decl_index_r,
-                &mut lines,
-                &mut temporaries,
-              );
-            }
-            _ => {}
+            _ => todo!(),
           },
           _ => {}
         }
       }
 
       if is_main {
-        lines.push("  leave".to_string());
+        asm.lines.push("  leave".to_string());
       } else {
-        lines.push("  pop    ebp".to_string());
+        asm.lines.push("  pop    ebp".to_string());
       }
 
-      lines.push("  ret".to_string());
+      asm.lines.push("  ret".to_string());
 
-      lines.insert(stack_size_index, format!("  sub    esp, {}", ((stack.size + 15) / 16) * 16));
+      asm.lines.insert(stack_size_index, format!("  sub    esp, {}", ((stack.size + 15) / 16) * 16));
     }
 
-    Asm { lines }
+    asm
   }
 }
