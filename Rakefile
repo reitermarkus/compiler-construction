@@ -50,9 +50,11 @@ task :run, [:example] => :asm do |example: '*'|
   sh 'docker', 'build', '-t', 'gcc', '-f', 'Dockerfile.gcc', '.'
 
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.s").each do |asm|
-    bin = asm.sub_ext('.bin')
-    sh 'docker', 'run', '--rm', '-it', '-v', "#{__dir__}:#{__dir__}", '-w', __dir__, 'gcc', 'gcc', '-m32', asm.to_s, '-o', bin.to_s
-    system 'docker', 'run', '--rm', '-it', '-v', "#{__dir__}:#{__dir__}", '-w', __dir__, 'gcc', bin.to_s
+    bin = "examples/#{example}/#{File.basename asm.sub_ext('.bin')}"
+    asm = "examples/#{example}/#{File.basename asm}"
+
+    sh 'docker', 'run', '--rm', '-it', '-v', "#{__dir__}:/root", 'gcc', 'gcc', '-m32', asm.to_s, '-o', bin.to_s
+    system 'docker', 'run', '--rm', '-it', '-v', "#{__dir__}:/root", 'gcc', bin.to_s
     puts $CHILD_STATUS.exitstatus
   end
 end

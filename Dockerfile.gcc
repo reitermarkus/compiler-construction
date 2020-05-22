@@ -1,4 +1,6 @@
 FROM ubuntu
 
+WORKDIR /root
+
 RUN apt-get update
 RUN apt-get install --assume-yes --no-install-recommends gcc-multilib
