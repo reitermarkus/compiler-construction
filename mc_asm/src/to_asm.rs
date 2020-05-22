@@ -132,6 +132,54 @@ pub fn add_expression(statements: &[Op<'_>], stack: &Stack, asm: &mut Asm, reg: 
             reg.to_string()
           }
         },
+        Op::Minus(lhs, rhs) => match (lhs, rhs) {
+          (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
+            add_expression(statements, stack, asm, reg, &Arg::Literal(&Literal::Int(l - r)))
+          }
+          (lhs, Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), lhs) => {
+            let lhs = add_expression(statements, stack, asm, reg, lhs);
+
+            asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
+
+            lhs
+          }
+          (lhs, rhs) => {
+            add_expression(statements, stack, asm, Temporaries::EAX, lhs);
+            add_expression(statements, stack, asm, Temporaries::EDX, rhs);
+
+            if reg == Temporaries::EAX {
+              asm.lines.push(format!("  sub    {}, {}", reg, Temporaries::EDX));
+            } else {
+              asm.lines.push(format!("  sub    {}, {}", reg, Temporaries::EAX));
+            }
+
+            reg.to_string()
+          }
+        },
+        Op::Times(lhs, rhs) => match (lhs, rhs) {
+          (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
+            add_expression(statements, stack, asm, reg, &Arg::Literal(&Literal::Int(l * r)))
+          }
+          (lhs, Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), lhs) => {
+            let lhs = add_expression(statements, stack, asm, reg, lhs);
+
+            asm.lines.push(format!("  imul   {}, {}, {}", lhs, lhs, rhs));
+
+            lhs
+          }
+          (lhs, rhs) => {
+            add_expression(statements, stack, asm, Temporaries::EDX, lhs);
+            add_expression(statements, stack, asm, Temporaries::EAX, rhs);
+
+            if reg == Temporaries::EAX {
+              asm.lines.push(format!("  imul   {}, {}", reg, Temporaries::EDX));
+            } else {
+              asm.lines.push(format!("  imul   {}, {}", reg, Temporaries::EAX));
+            }
+
+            reg.to_string()
+          }
+        },
         Op::Load(variable) => {
           let variable = add_expression(statements, stack, asm, reg, variable);
 
