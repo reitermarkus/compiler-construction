@@ -21,6 +21,8 @@ pub fn mc_asm(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io:
 
   let ast = mc_parser::parse(&contents).expect("failed to parse program");
 
+  mc_symbol_table::mc_check_semantics(&ast).expect("semantic checks failed");
+
   let mut ir = IntermediateRepresentation::default();
   ast.add_to_ir(&mut ir);
 
