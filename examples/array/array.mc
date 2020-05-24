@@ -3,8 +3,14 @@ int main() {
   int y;
   y = 0;
 
-  x[y] = 14;
+  int q;
+  q = 2;
+
+  int z;
+  z = 3;
+
+  x[y] = 4;
   x[1] = 2;
 
-  return 2 * x[0] - x[1];
+  return (x[0] * x[1] * q * z)- (y + z);
 }

@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::collections::BTreeMap;
 use std::fmt;
 
 use mc_ir::{Arg, IntermediateRepresentation, Op};
@@ -7,6 +9,8 @@ use mc_parser::ast::*;
 #[derive(Debug)]
 pub struct Asm {
   lines: Vec<String>,
+  temporary_register: BTreeMap<usize, Temporaries>,
+  temporaries: VecDeque<Temporaries>
 }
 
 impl fmt::Display for Asm {
@@ -89,12 +93,18 @@ pub fn add_expression(statements: &[Op<'_>], stack: &Stack, asm: &mut Asm, reg: 
       let (ty, count, mut offset) = stack.lookup(*decl_index);
       offset += count * ty.size();
 
-      let index_reg = if let Arg::Literal(Literal::Int(index_offset)) = &**index_offset {
-        offset -= *index_offset as usize * ty.size();
-        None
-      } else {
-        add_expression(statements, stack, asm, reg, &*index_offset);
-        Some(reg)
+      let index_reg = match &**index_offset {
+        Arg::Literal(Literal::Int(index_offset)) => {
+          offset -= *index_offset as usize * ty.size();
+          None
+        },
+        Arg::Reference(decl_index) => {
+          add_expression(statements, stack, asm, reg, &*index_offset);
+          asm.temporary_register.remove(decl_index);
+          asm.temporaries.push_front(reg);
+          Some(reg)
+        },
+        _ => None
       };
 
       let index_offset = if let Some(reg) = index_reg { format!("+{}*{}", reg, ty.size()) } else { "".into() };
@@ -112,78 +122,109 @@ pub fn add_expression(statements: &[Op<'_>], stack: &Stack, asm: &mut Asm, reg: 
           (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
             add_expression(statements, stack, asm, reg, &Arg::Literal(&Literal::Int(l + r)))
           }
-          (lhs, Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), lhs) => {
-            let lhs = add_expression(statements, stack, asm, reg, lhs);
+          (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
+            add_expression(statements, stack, asm, reg, lhs);
+            let temp_l = asm.temporary_register.get(ref_l).unwrap();
 
-            asm.lines.push(format!("  add    {}, {}", lhs, rhs));
+            asm.lines.push(format!("  add    {}, {}", temp_l, rhs));
 
-            lhs
+            temp_l.to_string()
           }
-          (lhs, rhs) => {
+          (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
             add_expression(statements, stack, asm, Temporaries::EDX, lhs);
             add_expression(statements, stack, asm, Temporaries::EAX, rhs);
 
-            if reg == Temporaries::EAX {
-              asm.lines.push(format!("  add    {}, {}", reg, Temporaries::EDX));
-            } else {
-              asm.lines.push(format!("  add    {}, {}", reg, Temporaries::EAX));
-            }
+            let temp_l = asm.temporary_register.get(ref_l).unwrap();
+            let temp_r = asm.temporary_register.get(ref_r).unwrap();
+
+            asm.lines.push(format!("  add    {}, {}", temp_l, temp_r));
+
+            asm.temporaries.push_front(*temp_r);
+            asm.temporary_register.insert(*reference, *temp_l);
+            asm.temporary_register.remove(ref_r);
+            asm.temporary_register.remove(ref_l);
 
             reg.to_string()
-          }
+          },
+          _ => unimplemented!()
         },
         Op::Minus(lhs, rhs) => match (lhs, rhs) {
           (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
             add_expression(statements, stack, asm, reg, &Arg::Literal(&Literal::Int(l - r)))
           }
-          (lhs, Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), lhs) => {
+          (lhs, Arg::Literal(Literal::Int(rhs))) => {
             let lhs = add_expression(statements, stack, asm, reg, lhs);
 
             asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
 
             lhs
           }
-          (lhs, rhs) => {
-            add_expression(statements, stack, asm, Temporaries::EAX, lhs);
-            add_expression(statements, stack, asm, Temporaries::EDX, rhs);
+          (Arg::Literal(Literal::Int(lhs)), Arg::Reference(ref_r)) => {
+            let rhs = add_expression(statements, stack, asm, reg, rhs);
+            let front_reg = asm.temporaries.pop_front().unwrap();
 
-            if reg == Temporaries::EAX {
-              asm.lines.push(format!("  sub    {}, {}", reg, Temporaries::EDX));
-            } else {
-              asm.lines.push(format!("  sub    {}, {}", reg, Temporaries::EAX));
-            }
+            asm.lines.push(format!("  mov    {}, {}", front_reg, lhs));
+            asm.lines.push(format!("  sub    {}, {}", front_reg, rhs));
+
+            asm.temporary_register.remove(ref_r);
+            asm.temporary_register.insert(*reference, front_reg);
+            rhs
+          }
+          (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
+            add_expression(statements, stack, asm, Temporaries::EDX, lhs);
+            add_expression(statements, stack, asm, Temporaries::EAX, rhs);
+
+            let temp_l = asm.temporary_register.get(ref_l).unwrap();
+            let temp_r = asm.temporary_register.get(ref_r).unwrap();
+
+            asm.lines.push(format!("  sub    {}, {}", temp_l, temp_r));
+
+            asm.temporaries.push_front(*temp_r);
+            asm.temporary_register.insert(*reference, *temp_l);
+            asm.temporary_register.remove(ref_r);
+            asm.temporary_register.remove(ref_l);
 
             reg.to_string()
-          }
+          },
+          _ => unimplemented!()
         },
         Op::Times(lhs, rhs) => match (lhs, rhs) {
           (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
             add_expression(statements, stack, asm, reg, &Arg::Literal(&Literal::Int(l * r)))
           }
-          (lhs, Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), lhs) => {
-            let lhs = add_expression(statements, stack, asm, reg, lhs);
+          (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
+            add_expression(statements, stack, asm, reg, lhs);
+            let temp_l = asm.temporary_register.get(ref_l).unwrap();
 
-            asm.lines.push(format!("  imul   {}, {}, {}", lhs, lhs, rhs));
+            asm.lines.push(format!("  imul   {}, {}, {}", temp_l, temp_l, rhs));
 
-            lhs
+            temp_l.to_string()
           }
-          (lhs, rhs) => {
+          (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
             add_expression(statements, stack, asm, Temporaries::EDX, lhs);
             add_expression(statements, stack, asm, Temporaries::EAX, rhs);
 
-            if reg == Temporaries::EAX {
-              asm.lines.push(format!("  imul   {}, {}", reg, Temporaries::EDX));
-            } else {
-              asm.lines.push(format!("  imul   {}, {}", reg, Temporaries::EAX));
-            }
+            let temp_l = asm.temporary_register.get(ref_l).unwrap();
+            let temp_r = asm.temporary_register.get(ref_r).unwrap();
+
+            asm.lines.push(format!("  imul   {}, {}", temp_l, temp_r));
+
+            asm.temporaries.push_front(*temp_r);
+            asm.temporary_register.insert(*reference, *temp_l);
+            asm.temporary_register.remove(ref_r);
+            asm.temporary_register.remove(ref_l);
 
             reg.to_string()
-          }
+          },
+          _ => unimplemented!()
         },
         Op::Load(variable) => {
-          let variable = add_expression(statements, stack, asm, reg, variable);
+          let front_reg = asm.temporaries.pop_front().unwrap();
 
-          asm.lines.push(format!("  mov    {}, {}", reg, variable));
+          asm.temporary_register.insert(*reference, front_reg);
+
+          let var = add_expression(statements, stack, asm, front_reg, variable);
+          asm.lines.push(format!("  mov    {}, {}", front_reg, var));
 
           reg.to_string()
         }
@@ -200,7 +241,11 @@ pub fn add_expression(statements: &[Op<'_>], stack: &Stack, asm: &mut Asm, reg: 
 
 impl<'a> ToAsm for IntermediateRepresentation<'a> {
   fn to_asm(&self) -> Asm {
-    let mut asm = Asm { lines: vec![] };
+    let mut asm = Asm {
+        lines: vec![],
+        temporary_register: BTreeMap::new(),
+        temporaries: VecDeque::from(vec![Temporaries::EAX, Temporaries::EDX, Temporaries::ECX])
+     };
 
     asm.lines.push("  .intel_syntax noprefix".to_string());
     asm.lines.push("  .global main".to_string());
@@ -229,10 +274,9 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           }
           Op::Return(arg) => match arg {
             Some(arg) => {
-              let value = add_expression(&self.statements, &stack, &mut asm, Temporaries::EAX, arg);
-
-              if value != Temporaries::EAX.to_string() {
-                asm.lines.push(format!("  mov    {}, {}", Temporaries::EAX, value));
+              add_expression(&self.statements, &stack, &mut asm, Temporaries::EAX, arg);
+              if !asm.temporary_register.values().any(|v| v == &Temporaries::EAX) {
+                asm.lines.push(format!("  mov    {}, {}", Temporaries::EAX, asm.temporary_register.get(asm.temporary_register.keys().last().unwrap()).unwrap()));
               }
             }
             _ => todo!(),
