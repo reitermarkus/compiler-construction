@@ -87,156 +87,41 @@ impl Float {
   }
 }
 
-pub fn add_expression(statements: &[Op<'_>], stack: &Stack, asm: &mut Asm, reg: Temporaries, arg: &Arg<'_>) -> String {
-  match arg {
-    Arg::Variable(decl_index, index_offset) => {
-      let (ty, count, mut offset) = stack.lookup(*decl_index);
-      offset += count * ty.size();
+fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Temporaries, arg: &Arg<'_>) -> String {
+    match arg {
+      Arg::Variable(decl_index, index_offset) => {
+        let (ty, count, mut offset) = stack.lookup(*decl_index);
+        offset += count * ty.size();
 
-      let index_reg = match &**index_offset {
-        Arg::Literal(Literal::Int(index_offset)) => {
-          offset -= *index_offset as usize * ty.size();
-          None
-        },
-        Arg::Reference(decl_index) => {
-          add_expression(statements, stack, asm, reg, &*index_offset);
-          asm.temporary_register.remove(decl_index);
-          asm.temporaries.push_front(reg);
-          Some(reg)
-        },
-        _ => None
-      };
-
-      let index_offset = if let Some(reg) = index_reg { format!("+{}*{}", reg, ty.size()) } else { "".into() };
-
-      match ty {
-        Ty::Int => format!("DWORD PTR [ebp-{}{}]", offset, index_offset),
-        ty => unimplemented!("{:?}", ty),
-      }
-    }
-    Arg::Reference(reference) => {
-      let temporary = &statements[*reference];
-
-      match temporary {
-        Op::Plus(lhs, rhs) => match (lhs, rhs) {
-          (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-            add_expression(statements, stack, asm, reg, &Arg::Literal(&Literal::Int(l + r)))
-          }
-          (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
-            add_expression(statements, stack, asm, reg, lhs);
-            let temp_l = asm.temporary_register.get(ref_l).unwrap();
-
-            asm.lines.push(format!("  add    {}, {}", temp_l, rhs));
-
-            temp_l.to_string()
-          }
-          (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
-            add_expression(statements, stack, asm, Temporaries::EDX, lhs);
-            add_expression(statements, stack, asm, Temporaries::EAX, rhs);
-
-            let temp_l = asm.temporary_register.get(ref_l).unwrap();
-            let temp_r = asm.temporary_register.get(ref_r).unwrap();
-
-            asm.lines.push(format!("  add    {}, {}", temp_l, temp_r));
-
-            asm.temporaries.push_front(*temp_r);
-            asm.temporary_register.insert(*reference, *temp_l);
-            asm.temporary_register.remove(ref_r);
-            asm.temporary_register.remove(ref_l);
-
-            reg.to_string()
+        let index_reg = match &**index_offset {
+          Arg::Literal(Literal::Int(index_offset)) => {
+            offset -= *index_offset as usize * ty.size();
+            None
           },
-          _ => unimplemented!()
-        },
-        Op::Minus(lhs, rhs) => match (lhs, rhs) {
-          (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-            add_expression(statements, stack, asm, reg, &Arg::Literal(&Literal::Int(l - r)))
-          }
-          (lhs, Arg::Literal(Literal::Int(rhs))) => {
-            let lhs = add_expression(statements, stack, asm, reg, lhs);
-
-            asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
-
-            lhs
-          }
-          (Arg::Literal(Literal::Int(lhs)), Arg::Reference(ref_r)) => {
-            let rhs = add_expression(statements, stack, asm, reg, rhs);
-            let front_reg = asm.temporaries.pop_front().unwrap();
-
-            asm.lines.push(format!("  mov    {}, {}", front_reg, lhs));
-            asm.lines.push(format!("  sub    {}, {}", front_reg, rhs));
-
-            asm.temporary_register.remove(ref_r);
-            asm.temporary_register.insert(*reference, front_reg);
-            rhs
-          }
-          (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
-            add_expression(statements, stack, asm, Temporaries::EDX, lhs);
-            add_expression(statements, stack, asm, Temporaries::EAX, rhs);
-
-            let temp_l = asm.temporary_register.get(ref_l).unwrap();
-            let temp_r = asm.temporary_register.get(ref_r).unwrap();
-
-            asm.lines.push(format!("  sub    {}, {}", temp_l, temp_r));
-
-            asm.temporaries.push_front(*temp_r);
-            asm.temporary_register.insert(*reference, *temp_l);
-            asm.temporary_register.remove(ref_r);
-            asm.temporary_register.remove(ref_l);
-
-            reg.to_string()
+          Arg::Reference(decl_index) => {
+            let temp_re = asm.temporary_register.remove(decl_index).unwrap();
+            asm.temporaries.push_front(temp_re);
+            Some(temp_re)
           },
-          _ => unimplemented!()
-        },
-        Op::Times(lhs, rhs) => match (lhs, rhs) {
-          (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-            add_expression(statements, stack, asm, reg, &Arg::Literal(&Literal::Int(l * r)))
-          }
-          (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
-            add_expression(statements, stack, asm, reg, lhs);
-            let temp_l = asm.temporary_register.get(ref_l).unwrap();
+          _ => None
+        };
 
-            asm.lines.push(format!("  imul   {}, {}, {}", temp_l, temp_l, rhs));
+        let index_offset = if let Some(reg) = index_reg { format!("+{}*{}", reg, ty.size()) } else { "".into() };
 
-            temp_l.to_string()
-          }
-          (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
-            add_expression(statements, stack, asm, Temporaries::EDX, lhs);
-            add_expression(statements, stack, asm, Temporaries::EAX, rhs);
-
-            let temp_l = asm.temporary_register.get(ref_l).unwrap();
-            let temp_r = asm.temporary_register.get(ref_r).unwrap();
-
-            asm.lines.push(format!("  imul   {}, {}", temp_l, temp_r));
-
-            asm.temporaries.push_front(*temp_r);
-            asm.temporary_register.insert(*reference, *temp_l);
-            asm.temporary_register.remove(ref_r);
-            asm.temporary_register.remove(ref_l);
-
-            reg.to_string()
-          },
-          _ => unimplemented!()
-        },
-        Op::Load(variable) => {
-          let front_reg = asm.temporaries.pop_front().unwrap();
-
-          asm.temporary_register.insert(*reference, front_reg);
-
-          let var = add_expression(statements, stack, asm, front_reg, variable);
-          asm.lines.push(format!("  mov    {}, {}", front_reg, var));
-
-          reg.to_string()
+        match ty {
+          Ty::Int => format!("DWORD PTR [ebp-{}{}]", offset, index_offset),
+          ty => unimplemented!("{:?}", ty),
         }
-        op => unimplemented!("{:?}", op),
-      }
+      },
+      Arg::Literal(literal) => {
+        asm.temporaries.push_front(reg);
+        match literal {
+          Literal::Int(integer) => integer.to_string(),
+          literal => unimplemented!("{:?}", literal),
+        }
+      },
+      _ => unimplemented!("{:?}", arg)
     }
-    Arg::Literal(literal) => match literal {
-      Literal::Int(integer) => integer.to_string(),
-      literal => unimplemented!("{:?}", literal),
-    },
-    arg => unimplemented!("{:?}", arg),
-  }
 }
 
 impl<'a> ToAsm for IntermediateRepresentation<'a> {
@@ -268,34 +153,116 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             stack.push(i, *ty, *count);
           }
           Op::Assign(arg, variable) => {
-            let variable = add_expression(&self.statements, &stack, &mut asm, Temporaries::EAX, variable);
-            let value = add_expression(&self.statements, &stack, &mut asm, Temporaries::EDX, arg);
+            let temp_var = asm.temporaries.pop_front().unwrap();
+            let variable = calc_index_offset(&stack, &mut asm, temp_var, variable);
+            let value = calc_index_offset(&stack, &mut asm, temp_var, arg);
             asm.lines.push(format!("  mov    {}, {}", variable, value));
           }
           Op::Return(arg) => match arg {
-            Some(arg) => {
-              add_expression(&self.statements, &stack, &mut asm, Temporaries::EAX, arg);
+            Some(_) => {
               if !asm.temporary_register.values().any(|v| v == &Temporaries::EAX) {
                 asm.lines.push(format!("  mov    {}, {}", Temporaries::EAX, asm.temporary_register.get(asm.temporary_register.keys().last().unwrap()).unwrap()));
               }
             }
             _ => todo!(),
           },
-          _ => {}
+          Op::Plus(lhs, rhs) => match (lhs, rhs) {
+            (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
+              todo!()
+            }
+            (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
+              let temp_l = asm.temporary_register.get(ref_l).unwrap();
+
+              asm.lines.push(format!("  add    {}, {}", temp_l, rhs));
+            }
+            (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
+              let temp_l = *asm.temporary_register.get(ref_l).unwrap();
+              let temp_r = *asm.temporary_register.get(ref_r).unwrap();
+
+              asm.lines.push(format!("  add    {}, {}", temp_l, temp_r));
+
+              asm.temporaries.push_front(temp_r);
+              asm.temporary_register.insert(i, temp_l);
+              asm.temporary_register.remove(ref_r);
+              asm.temporary_register.remove(ref_l);
+            },
+            _ => unimplemented!()
+          },
+          Op::Minus(lhs, rhs) => match (lhs, rhs) {
+            (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
+              todo!()
+            }
+            (lhs, Arg::Literal(Literal::Int(rhs))) => {
+              asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
+            }
+            (Arg::Literal(Literal::Int(lhs)), Arg::Reference(ref_r)) => {
+              let front_reg = asm.temporaries.pop_front().unwrap();
+
+              asm.lines.push(format!("  mov    {}, {}", front_reg, lhs));
+              asm.lines.push(format!("  sub    {}, {}", front_reg, rhs));
+
+              asm.temporary_register.remove(ref_r);
+              asm.temporary_register.insert(i, front_reg);
+            }
+            (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
+              let temp_l = *asm.temporary_register.get(ref_l).unwrap();
+              let temp_r = *asm.temporary_register.get(ref_r).unwrap();
+
+              asm.lines.push(format!("  sub    {}, {}", temp_l, temp_r));
+
+              asm.temporaries.push_front(temp_r);
+              asm.temporary_register.insert(i, temp_l);
+              asm.temporary_register.remove(ref_r);
+              asm.temporary_register.remove(ref_l);
+            },
+            _ => unimplemented!()
+          },
+          Op::Times(lhs, rhs) => match (lhs, rhs) {
+            (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
+
+            }
+            (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
+              let temp_l = *asm.temporary_register.get(ref_l).unwrap();
+              asm.lines.push(format!("  imul   {}, {}, {}", temp_l, temp_l, rhs));
+              asm.temporary_register.insert(i, temp_l);
+              asm.temporary_register.remove(ref_l);
+            }
+            (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
+              let temp_l = *asm.temporary_register.get(ref_l).unwrap();
+              let temp_r = *asm.temporary_register.get(ref_r).unwrap();
+
+              asm.lines.push(format!("  imul   {}, {}", temp_l, temp_r));
+
+              asm.temporaries.push_front(temp_r);
+              asm.temporary_register.insert(i, temp_l);
+              asm.temporary_register.remove(ref_r);
+              asm.temporary_register.remove(ref_l);
+            },
+            _ => unimplemented!()
+          },
+          Op::Load(variable) => {
+            if let Arg::Variable(..) = variable {
+              let front_reg = asm.temporaries.pop_front().unwrap();
+              asm.temporary_register.insert(i, front_reg);
+              let var = calc_index_offset(&stack, &mut asm, front_reg, variable);
+              asm.lines.push(format!("  mov    {}, {}", front_reg, var));
+            }
+          }
+          op => unimplemented!("{:?}", op),
         }
       }
 
-      if is_main {
-        asm.lines.push("  leave".to_string());
-      } else {
-        asm.lines.push("  pop    ebp".to_string());
+        if is_main {
+          asm.lines.push("  leave".to_string());
+        } else {
+          asm.lines.push("  pop    ebp".to_string());
+        }
+
+        asm.lines.push("  ret".to_string());
+
+        asm.lines.insert(stack_size_index, format!("  sub    esp, {}", ((stack.size + 15) / 16) * 16));
       }
 
-      asm.lines.push("  ret".to_string());
-
-      asm.lines.insert(stack_size_index, format!("  sub    esp, {}", ((stack.size + 15) / 16) * 16));
-    }
-
-    asm
+      asm
   }
 }
