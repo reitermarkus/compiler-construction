@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -54,6 +55,8 @@ pub enum Temporaries {
   EBX,
   ECX,
   EDX,
+  EDI,
+  ESI
 }
 
 impl fmt::Display for Temporaries {
@@ -63,6 +66,8 @@ impl fmt::Display for Temporaries {
       Self::EBX => write!(f, "ebx"),
       Self::ECX => write!(f, "ecx"),
       Self::EDX => write!(f, "edx"),
+      Self::EDI => write!(f, "edi"),
+      Self::ESI => write!(f, "esi"),
     }
   }
 }
@@ -87,6 +92,14 @@ impl Float {
   }
 }
 
+fn push_temporary(temporary: Temporaries, temporaries: &mut VecDeque<Temporaries>) {
+  if temporary == Temporaries::EAX || temporary == Temporaries::EDX || temporary == Temporaries::ECX {
+    temporaries.push_front(temporary);
+  } else {
+    temporaries.push_back(temporary);
+  }
+}
+
 macro_rules! stack_hygiene {
   ($asm:expr, $closure:expr) => (
     let temp_var = $asm.temporaries.pop_front().unwrap();
@@ -106,7 +119,7 @@ macro_rules! stack_hygiene {
 
     $closure(temp_l, temp_r);
 
-    $asm.temporaries.push_front(temp_r);
+    push_temporary(temp_r, &mut $asm.temporaries);
     $asm.temporary_register.insert($i, temp_l);
     $asm.temporary_register.remove($ref_r);
     $asm.temporary_register.remove($ref_l);
@@ -126,7 +139,7 @@ fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Temporaries, arg: &Arg<'_
           },
           Arg::Reference(decl_index) => {
             let temp = asm.temporary_register.remove(decl_index).unwrap();
-            asm.temporaries.push_front(temp);
+            push_temporary(temp, &mut asm.temporaries);
             Some(temp)
           },
           _ => None
@@ -140,7 +153,8 @@ fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Temporaries, arg: &Arg<'_
         }
       },
       Arg::Literal(literal) => {
-        asm.temporaries.push_front(reg);
+        push_temporary(reg, &mut asm.temporaries);
+
         match literal {
           Literal::Int(integer) => integer.to_string(),
           literal => unimplemented!("{:?}", literal),
@@ -155,7 +169,14 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
     let mut asm = Asm {
         lines: vec![],
         temporary_register: BTreeMap::new(),
-        temporaries: VecDeque::from(vec![Temporaries::EAX, Temporaries::EDX, Temporaries::ECX])
+        temporaries: VecDeque::from(vec![
+          Temporaries::EAX,
+          Temporaries::EDX,
+          Temporaries::ECX,
+          Temporaries::EBX,
+          Temporaries::EDI,
+          Temporaries::ESI
+        ])
      };
 
     asm.lines.push("  .intel_syntax noprefix".to_string());
@@ -216,7 +237,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               asm.lines.push(format!("  mov    {}, {}", front_reg, lhs));
               asm.lines.push(format!("  sub    {}, {}", temp_r, front_reg));
 
-              asm.temporaries.push_front(front_reg);
+              push_temporary(front_reg, &mut asm.temporaries);
               asm.temporary_register.remove(ref_r);
               asm.temporary_register.insert(i, temp_r);
             }
@@ -248,17 +269,35 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
         }
       }
 
-        if is_main {
-          asm.lines.push("  leave".to_string());
-        } else {
-          asm.lines.push("  pop    ebp".to_string());
+      let pop_lines = asm.lines.iter().filter_map(|line| {
+        if line.contains("ebx") {
+          return Some("  pop    ebx".into());
         }
 
-        asm.lines.push("  ret".to_string());
+        if line.contains("edi") {
+          return Some("  pop    edi".into());
+        }
 
-        asm.lines.insert(stack_size_index, format!("  sub    esp, {}", ((stack.size + 15) / 16) * 16));
+        if line.contains("esi") {
+          return Some("  pop    esi".into());
+        }
+
+        return None;
+      }).collect::<HashSet<_>>();
+
+      asm.lines.extend(pop_lines);
+
+      if is_main {
+        asm.lines.push("  leave".to_string());
+      } else {
+        asm.lines.push("  pop    ebp".to_string());
       }
 
-      asm
+      asm.lines.push("  ret".to_string());
+
+      asm.lines.insert(stack_size_index, format!("  sub    esp, {}", ((stack.size + 15) / 16) * 16));
+    }
+
+    asm
   }
 }
