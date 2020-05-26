@@ -54,22 +54,36 @@ impl<'a> AddToIr<'a> for Expression<'a> {
         let arg1 = lhs.add_to_ir(ir);
         let arg2 = rhs.add_to_ir(ir);
 
-        ir.push(match op {
-          BinaryOp::Gt => Op::Gt(arg1, arg2),
-          BinaryOp::Gte => Op::Gte(arg1, arg2),
-          BinaryOp::Lt => Op::Lt(arg1, arg2),
-          BinaryOp::Lte => Op::Lte(arg1, arg2),
-          BinaryOp::Plus => Op::Plus(arg1, arg2),
-          BinaryOp::Minus => Op::Minus(arg1, arg2),
-          BinaryOp::Divide => Op::Divide(arg1, arg2),
-          BinaryOp::Times => Op::Times(arg1, arg2),
-          BinaryOp::Eq => Op::Eq(arg1, arg2),
-          BinaryOp::Neq => Op::Neq(arg1, arg2),
-          BinaryOp::Land => Op::Land(arg1, arg2),
-          BinaryOp::Lor => Op::Lor(arg1, arg2),
-        });
+        match (&arg1, &arg2) {
+          (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) if op == &BinaryOp::Plus || op == &BinaryOp::Minus || op == &BinaryOp::Times => {
+            let boxed = Box::new(Literal::Int(match op {
+              BinaryOp::Plus => l + r,
+              BinaryOp::Minus => l - r,
+              BinaryOp::Times => l * r,
+              _ => 0
+            }));
 
-        Arg::Reference(ir.statements.len() - 1)
+            Arg::Literal(&*Box::leak(boxed))
+          },
+          _ => {
+            ir.push(match op {
+              BinaryOp::Gt => Op::Gt(arg1, arg2),
+              BinaryOp::Gte => Op::Gte(arg1, arg2),
+              BinaryOp::Lt => Op::Lt(arg1, arg2),
+              BinaryOp::Lte => Op::Lte(arg1, arg2),
+              BinaryOp::Plus => Op::Plus(arg1, arg2),
+              BinaryOp::Minus => Op::Minus(arg1, arg2),
+              BinaryOp::Divide => Op::Divide(arg1, arg2),
+              BinaryOp::Times => Op::Times(arg1, arg2),
+              BinaryOp::Eq => Op::Eq(arg1, arg2),
+              BinaryOp::Neq => Op::Neq(arg1, arg2),
+              BinaryOp::Land => Op::Land(arg1, arg2),
+              BinaryOp::Lor => Op::Lor(arg1, arg2),
+            });
+
+            Arg::Reference(ir.statements.len() - 1)
+          }
+        }
       }
       Self::Unary { op, expression, .. } => {
         let arg = expression.add_to_ir(ir);

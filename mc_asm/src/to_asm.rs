@@ -192,7 +192,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           }
           Op::Plus(lhs, rhs) => match (lhs, rhs) {
             (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-              todo!()
+              calc_index_offset(&stack, &mut asm, Temporaries::EAX, &Arg::Literal(&Literal::Int(l + r)));
             }
             (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
               stack_hygiene!(ref_l, i, &mut asm, |temp_l: Temporaries| asm.lines.push(format!("  add    {}, {}", temp_l, rhs)));
@@ -204,7 +204,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           },
           Op::Minus(lhs, rhs) => match (lhs, rhs) {
             (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-              todo!()
+              calc_index_offset(&stack, &mut asm, Temporaries::EAX, &Arg::Literal(&Literal::Int(l - r)));
             }
             (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) => {
               stack_hygiene!(ref_l, i, &mut asm, |temp_l: Temporaries| asm.lines.push(format!("  sub    {}, {}", temp_l, rhs)));
@@ -227,7 +227,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           },
           Op::Times(lhs, rhs) => match (lhs, rhs) {
             (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-              todo!()
+              calc_index_offset(&stack, &mut asm, Temporaries::EAX, &Arg::Literal(&Literal::Int(l * r)));
             }
             (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
               stack_hygiene!(ref_l, i, &mut asm, |temp_l: Temporaries| asm.lines.push(format!("  imul   {}, {}, {}", temp_l, temp_l, rhs)));
