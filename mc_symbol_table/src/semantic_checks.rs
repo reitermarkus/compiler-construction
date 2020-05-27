@@ -62,6 +62,10 @@ impl CheckSemantics for Assignment<'_> {
       None => push_error!(res, SemanticError::NotDeclared { span: &self.span, identifier: self.identifier.clone() }),
     };
 
+    extend_errors!(res, check_variable(scope, &self.identifier, &self.span, &self.index_expression));
+
+    extend_errors!(res, self.rvalue.check_semantics(scope));
+
     res
   }
 }
@@ -240,12 +244,15 @@ pub fn get_expression_type<'a>(scope: &Rc<RefCell<Scope>>, expression: &'a Expre
   }
 }
 
-pub fn check_variable<'a>(
+pub fn check_variable<'a, E>(
   scope: &Rc<RefCell<Scope>>,
   identifier: &Identifier,
   span: &'a Span<'_>,
-  index_expression: &'a Option<Box<Expression<'a>>>,
-) -> Result<(), Vec<SemanticError<'a>>> {
+  index_expression: &'a Option<E>,
+) -> Result<(), Vec<SemanticError<'a>>>
+where
+  E: AsRef<Expression<'a>>
+{
   match Scope::lookup(scope, identifier) {
     Some(Symbol::Function(..)) => Err(vec![SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() }]),
     Some(Symbol::Variable(.., size)) => check_variable_boxed_index(identifier, span, size, index_expression),
@@ -266,15 +273,18 @@ pub fn index_bounds_check<'a>(
   }
 }
 
-pub fn check_variable_boxed_index<'a>(
+pub fn check_variable_boxed_index<'a, E>(
   identifier: &Identifier,
   span: &'a Span<'_>,
   size: Option<usize>,
-  index_expression: &'a Option<Box<Expression<'a>>>,
-) -> Result<(), Vec<SemanticError<'a>>> {
+  index_expression: &'a Option<E>,
+) -> Result<(), Vec<SemanticError<'a>>>
+where
+  E: AsRef<Expression<'a>>
+{
   match (size, index_expression) {
     (Some(size), Some(index_expression)) => {
-      if let Expression::Literal { literal: Literal::Int(index), span } = &**index_expression {
+      if let Expression::Literal { literal: Literal::Int(index), span } = index_expression.as_ref() {
         index_bounds_check(*index as usize, size, identifier, span)
       } else {
         Ok(())

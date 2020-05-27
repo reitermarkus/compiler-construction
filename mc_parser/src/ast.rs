@@ -238,6 +238,12 @@ pub enum Expression<'a> {
   Binary { op: BinaryOp, lhs: Box<Expression<'a>>, rhs: Box<Expression<'a>>, span: Span<'a> },
 }
 
+impl<'a> AsRef<Expression<'a>> for Expression<'a> {
+  fn as_ref(&self) -> &Expression<'a> {
+    &self
+  }
+}
+
 impl<'a> Expression<'a> {
   fn consume(
     pair: Pair<'a, Rule>,
