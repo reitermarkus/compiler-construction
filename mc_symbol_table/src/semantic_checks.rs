@@ -137,7 +137,7 @@ fn check_main_return_type<'a>(function_declaration: &'a FunctionDeclaration<'a>)
   res
 }
 
-trait FindReturnStatement {
+pub trait FindReturnStatement {
   fn find_return_statement(&self) -> bool;
 }
 

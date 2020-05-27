@@ -21,7 +21,7 @@ use add_to_scope::AddToScope;
 mod semantic_error;
 use semantic_error::SemanticError;
 
-mod semantic_checks;
+pub mod semantic_checks;
 
 #[macro_export]
 macro_rules! push_error {

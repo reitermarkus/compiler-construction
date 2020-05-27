@@ -1,6 +1,7 @@
 use mc_parser::ast::*;
 
 use crate::ir::*;
+use mc_symbol_table::semantic_checks::FindReturnStatement;
 
 pub trait AddToIr<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a>;
@@ -132,17 +133,23 @@ impl<'a> AddToIr<'a> for IfStatement<'a> {
     let jumpfalse_index = ir.statements.len();
     ir.push(Op::Jumpfalse(condition, Arg::Reference(0)));
 
+    let block_always_returns = self.block.find_return_statement();
     self.block.add_to_ir(ir);
 
     if let Some(else_block) = &self.else_block {
       let jump_index = ir.statements.len();
-      ir.push(Op::Jump(Arg::Reference(0)));
+
+      if !block_always_returns {
+        ir.push(Op::Jump(Arg::Reference(0)));
+      }
 
       ir.update_reference(jumpfalse_index, ir.statements.len());
 
       else_block.add_to_ir(ir);
 
-      ir.update_reference(jump_index, ir.statements.len());
+      if !block_always_returns {
+        ir.update_reference(jump_index, ir.statements.len());
+      }
     } else {
       ir.update_reference(jumpfalse_index, ir.statements.len());
     }
@@ -184,6 +191,10 @@ impl<'a> AddToIr<'a> for CompoundStatement<'a> {
 
     for stmt in &self.statements {
       stmt.add_to_ir(ir);
+
+      if stmt.find_return_statement() {
+        break
+      }
     }
 
     ir.stack.reset(ptr);
