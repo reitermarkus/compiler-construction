@@ -209,6 +209,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           Op::Return(arg) => if let Some(_) = arg {
             if !asm.temporary_register.values().any(|v| v == &Temporaries::EAX) {
               asm.lines.push(format!("  mov    {}, {}", Temporaries::EAX, asm.temporary_register.get(asm.temporary_register.keys().last().unwrap()).unwrap()));
+
+              asm.lines.push(format!("  jmp    .AWAY_{}", name));
             }
           }
           Op::Plus(lhs, rhs) => match (lhs, rhs) {
@@ -265,6 +267,20 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               asm.lines.push(format!("  mov    {}, {}", temp, var));
             });
           }
+          Op::Gt(lhs, rhs) | Op::Lte(rhs, lhs) => match (lhs, rhs) {
+            (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
+              calc_index_offset(&stack, &mut asm, Temporaries::EAX, &Arg::Literal(&Literal::Bool(l > r)));
+            }
+            (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
+              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Temporaries| {
+                asm.lines.push(format!("  cmp   {}, {}", temp_l, rhs));
+              });
+            }
+            (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
+              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Temporaries, temp_r: Temporaries| asm.lines.push(format!("  cmp   {}, {}", temp_l, temp_r)));
+            },
+            _ => unimplemented!()
+          },
           op => unimplemented!("{:?}", op),
         }
       }
@@ -286,6 +302,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       }).collect::<HashSet<_>>();
 
       asm.lines.extend(pop_lines);
+
+      asm.lines.push(format!(".AWAY_{}:", name));
 
       if is_main {
         asm.lines.push("  leave".to_string());

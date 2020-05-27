@@ -56,16 +56,18 @@ impl<'a> AddToIr<'a> for Expression<'a> {
         let arg2 = rhs.add_to_ir(ir);
 
         match (&arg1, &arg2) {
-          (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) if op == &BinaryOp::Plus || op == &BinaryOp::Minus || op == &BinaryOp::Times => {
+          (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r)))
+            if op == &BinaryOp::Plus || op == &BinaryOp::Minus || op == &BinaryOp::Times =>
+          {
             let boxed = Box::new(Literal::Int(match op {
               BinaryOp::Plus => l + r,
               BinaryOp::Minus => l - r,
               BinaryOp::Times => l * r,
-              _ => 0
+              _ => 0,
             }));
 
             Arg::Literal(&*Box::leak(boxed))
-          },
+          }
           _ => {
             ir.push(match op {
               BinaryOp::Gt => Op::Gt(arg1, arg2),
@@ -193,7 +195,7 @@ impl<'a> AddToIr<'a> for CompoundStatement<'a> {
       stmt.add_to_ir(ir);
 
       if stmt.find_return_statement() {
-        break
+        break;
       }
     }
 
