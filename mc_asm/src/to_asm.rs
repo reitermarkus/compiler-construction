@@ -11,7 +11,8 @@ use mc_parser::ast::*;
 pub struct Asm {
   lines: Vec<String>,
   temporary_register: BTreeMap<usize, Temporaries>,
-  temporaries: VecDeque<Temporaries>
+  temporaries: VecDeque<Temporaries>,
+  labels: BTreeMap<usize, String>,
 }
 
 impl fmt::Display for Asm {
@@ -176,7 +177,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           Temporaries::EBX,
           Temporaries::EDI,
           Temporaries::ESI
-        ])
+        ]),
+        labels: Default::default(),
      };
 
     asm.lines.push("  .intel_syntax noprefix".to_string());
@@ -195,6 +197,10 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       let stack_size_index = asm.lines.len();
 
       for (i, statement) in self.statements.iter().enumerate().skip(range.start).take(range.end) {
+        if let Some(label) = asm.labels.get(&i) {
+          asm.lines.push(format!("{}:", label));
+        }
+
         match statement {
           Op::Decl(_, ty, count) => {
             stack.push(i, *ty, *count);
@@ -206,12 +212,22 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               asm.lines.push(format!("  mov    {}, {}", variable, value));
             });
           }
-          Op::Return(arg) => if let Some(_) = arg {
-            if !asm.temporary_register.values().any(|v| v == &Temporaries::EAX) {
-              asm.lines.push(format!("  mov    {}, {}", Temporaries::EAX, asm.temporary_register.get(asm.temporary_register.keys().last().unwrap()).unwrap()));
+          Op::Return(arg) => {
+            if let Some(arg) = arg {
+              match arg {
+                Arg::Literal(literal) => asm.lines.push(format!("  mov    eax, {}", literal)),
+                Arg::Reference(reference) => {
+                  let result_register = asm.temporary_register.get(reference).unwrap();
 
-              asm.lines.push(format!("  jmp    .AWAY_{}", name));
+                  if result_register != &Temporaries::EAX {
+                    asm.lines.push(format!("  mov    {}, {}", Temporaries::EAX, result_register));
+                  }
+                }
+                _ => unimplemented!()
+              }
             }
+
+            asm.lines.push(format!("  jmp    .AWAY_{}", name));
           }
           Op::Plus(lhs, rhs) => match (lhs, rhs) {
             (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
@@ -273,13 +289,31 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             }
             (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
               stack_hygiene!(ref_l, i, &mut asm, |temp_l: Temporaries| {
-                asm.lines.push(format!("  cmp   {}, {}", temp_l, rhs));
+                asm.lines.push(format!("  cmp    {}, {}", temp_l, rhs));
               });
             }
             (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
               stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Temporaries, temp_r: Temporaries| asm.lines.push(format!("  cmp   {}, {}", temp_l, temp_r)));
             },
             _ => unimplemented!()
+          },
+          Op::Jumpfalse(_, Arg::Reference(reference))  => {
+            if !asm.labels.contains_key(reference) {
+              let label_number = asm.labels.len();
+              asm.labels.insert(*reference, format!(".L{}", label_number));
+            }
+          },
+          Op::Jump(Arg::Reference(reference)) => {
+            let label = if let Some(label) = asm.labels.get(reference) {
+              label
+            } else {
+              let label_number = asm.labels.len();
+              let label = format!(".L{}", label_number);
+              asm.labels.insert(*reference, label);
+              asm.labels.get(reference).unwrap()
+            };
+
+            asm.lines.push(format!("  jmp    {}", label));
           },
           op => unimplemented!("{:?}", op),
         }
