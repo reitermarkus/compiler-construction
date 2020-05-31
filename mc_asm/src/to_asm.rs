@@ -281,7 +281,7 @@ macro_rules! operation_to_asm {
 macro_rules! condition_to_asm {
   ($asm:expr, $lhs:expr, $rhs:expr, $op:expr) => {
     $asm.lines.push(format!("  cmp    {}, {}", $lhs, $rhs));
-    $asm.lines.push(format!("  {}    {}", $op, $lhs.as_reg8().0));
+    $asm.lines.push(format!("  {}   {}", $op, $lhs.as_reg8().0));
   };
 }
 
@@ -456,7 +456,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             });
           }
           Op::Gt(lhs, rhs) | Op::Lte(rhs, lhs) => {
-            fn condition_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) { 
+            fn condition_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
               condition_to_asm!(asm, lhs, rhs, ConditionalSet::SETG);
             };
 
@@ -464,24 +464,24 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             //match_args!(&stack, &mut asm, (lhs, rhs), >, i, ConditionalSet::SETG, Int, Bool);
           },
           Op::Lt(lhs, rhs) | Op::Gte(rhs, lhs) => {
-            fn condition_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) { 
+            fn condition_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
               condition_to_asm!(asm, lhs, rhs, ConditionalSet::SETL);
             };
 
             operation_to_asm!(<: Int -> Bool, i, &stack, &mut asm, (lhs, rhs), condition_to_asm, condition_to_asm);
           },
           Op::Eq(lhs, rhs) => {
-            fn condition_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) { 
+            fn condition_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
               condition_to_asm!(asm, lhs, rhs, ConditionalSet::SETE);
             };
-            
+
             operation_to_asm!(==: Int -> Bool, i, &stack, &mut asm, (lhs, rhs), condition_to_asm, condition_to_asm);
           },
           Op::Neq(lhs, rhs) => {
-            fn condition_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) { 
+            fn condition_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
               condition_to_asm!(asm, lhs, rhs, ConditionalSet::SETNE);
             };
-            
+
             operation_to_asm!(!=: Int -> Bool, i, &stack, &mut asm, (lhs, rhs), condition_to_asm, condition_to_asm);
           },
           Op::Land(lhs, rhs) => match (lhs, rhs) {
