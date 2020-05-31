@@ -74,6 +74,18 @@ impl fmt::Display for Temporaries {
   }
 }
 
+impl Temporaries {
+  pub fn as_8bit(&self) -> &str {
+    match self {
+      Self::EAX => "al",
+      Self::EBX => "bl",
+      Self::ECX => "cl",
+      Self::EDX => "dl",
+      _ => unimplemented!(),
+    }
+  }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ConditionalJump {
   JL,
@@ -93,6 +105,29 @@ impl fmt::Display for ConditionalJump {
       Self::JGE => write!(f, "jge"),
       Self::JE => write!(f, "je"),
       Self::JNE => write!(f, "jne"),
+    }
+  }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ConditionalSet {
+  SETL,
+  SETLE,
+  SETG,
+  SETGE,
+  SETE,
+  SETNE
+}
+
+impl fmt::Display for ConditionalSet {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::SETL => write!(f, "setl"),
+      Self::SETLE => write!(f, "setle"),
+      Self::SETG => write!(f, "setg"),
+      Self::SETGE => write!(f, "setge"),
+      Self::SETE => write!(f, "sete"),
+      Self::SETNE => write!(f, "setne"),
     }
   }
 }
@@ -149,6 +184,46 @@ macro_rules! stack_hygiene {
     $asm.temporary_register.remove($ref_r);
     $asm.temporary_register.remove($ref_l);
   }
+}
+
+macro_rules! condition_to_asm {
+  ($asm:expr, $lhs:expr, $rhs:expr, $op:expr, $index:expr) => {
+    $asm.lines.push(format!("  cmp    {}, {}", $lhs, $rhs));
+    $asm.lines.push(format!("  {}    {}", $op, $lhs.as_8bit()));
+    $asm.temporary_register.insert($index, $lhs);
+  };
+}
+
+macro_rules! match_args {
+  ($stack:expr, $asm:expr, $args:expr, $op:tt, $index:expr, $instruction:expr) => {
+    match $args {
+      (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
+        calc_index_offset($stack, $asm, Temporaries::EAX, &Arg::Literal(&Literal::Bool(l $op r)));
+      }
+      (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
+        stack_hygiene!(ref_l, $index, $asm, |temp_l: Temporaries| {
+          condition_to_asm!($asm, temp_l, rhs, $instruction, $index);
+        });
+      }
+      (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
+        stack_hygiene!(ref_l, ref_r, $index, $asm, |temp_l: Temporaries, temp_r: Temporaries| $asm.lines.push(format!("  cmp   {}, {}", temp_l, temp_r)));
+      },
+      _ => unimplemented!()
+    }
+  };
+}
+
+macro_rules! generate_label {
+  ($asm:expr, $reference:expr) => {
+    if let Some(label) = $asm.labels.get($reference) {
+      label
+    } else {
+      let label_number = $asm.labels.len();
+      let label = format!(".L{}", label_number);
+      $asm.labels.insert(*$reference, label);
+      $asm.labels.get($reference).unwrap()
+    }
+  };
 }
 
 fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Temporaries, arg: &Arg<'_>) -> String {
@@ -309,43 +384,19 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             });
           }
           Op::Gt(lhs, rhs) | Op::Lte(rhs, lhs) => {
-            match (lhs, rhs) {
-              (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-                calc_index_offset(&stack, &mut asm, Temporaries::EAX, &Arg::Literal(&Literal::Bool(l > r)));
-              }
-              (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
-                stack_hygiene!(ref_l, i, &mut asm, |temp_l: Temporaries| {
-                  asm.lines.push(format!("  cmp    {}, {}", temp_l, rhs));
-                });
-              }
-              (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
-                stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Temporaries, temp_r: Temporaries| asm.lines.push(format!("  cmp   {}, {}", temp_l, temp_r)));
-              },
-              _ => unimplemented!()
-            }
+            match_args!(&stack, &mut asm, (lhs, rhs), >, i, ConditionalSet::SETG);
             asm.last_cmp = Some((i, ConditionalJump::JLE))
           },
-          Op::Jumpfalse(Arg::Reference(cond), Arg::Reference(reference))  => {
-            if !asm.labels.contains_key(reference) {
-              let label_number = asm.labels.len();
-              asm.labels.insert(*reference, format!(".L{}", label_number));
-            }
+          Op::Jumpfalse(Arg::Reference(cond), Arg::Reference(reference)) => {
+            let label = generate_label!(asm, reference);
 
-            if let Some((cond_ref, cond_op)) = asm.last_cmp {
-              if cond_ref == *cond {
-                asm.lines.push(format!("  {}    {}", cond_op, asm.labels.get(reference).unwrap()))
-              }
-            }
+            let register = asm.temporary_register.get(cond).unwrap();
+
+            asm.lines.push(format!("  cmp    {}, 0", register.as_8bit()));
+            asm.lines.push(format!("  je     {}", label));
           },
           Op::Jump(Arg::Reference(reference)) => {
-            let label = if let Some(label) = asm.labels.get(reference) {
-              label
-            } else {
-              let label_number = asm.labels.len();
-              let label = format!(".L{}", label_number);
-              asm.labels.insert(*reference, label);
-              asm.labels.get(reference).unwrap()
-            };
+            let label = generate_label!(asm, reference);
 
             asm.lines.push(format!("  jmp    {}", label));
           },
@@ -366,7 +417,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           return Some("  pop    esi".into());
         }
 
-        return None;
+        None
       }).collect::<HashSet<_>>();
 
       asm.lines.extend(pop_lines);
