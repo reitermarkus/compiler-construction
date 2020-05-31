@@ -13,7 +13,7 @@ pub struct Asm {
   temporary_register: BTreeMap<usize, Temporaries>,
   temporaries: VecDeque<Temporaries>,
   labels: BTreeMap<usize, String>,
-  last_cmp: Option<ConditionalJump>
+  last_cmp: Option<(usize, ConditionalJump)>
 }
 
 impl fmt::Display for Asm {
@@ -308,24 +308,33 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               asm.lines.push(format!("  mov    {}, {}", temp, var));
             });
           }
-          Op::Gt(lhs, rhs) | Op::Lte(rhs, lhs) => match (lhs, rhs) {
-            (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-              calc_index_offset(&stack, &mut asm, Temporaries::EAX, &Arg::Literal(&Literal::Bool(l > r)));
+          Op::Gt(lhs, rhs) | Op::Lte(rhs, lhs) => {
+            match (lhs, rhs) {
+              (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
+                calc_index_offset(&stack, &mut asm, Temporaries::EAX, &Arg::Literal(&Literal::Bool(l > r)));
+              }
+              (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
+                stack_hygiene!(ref_l, i, &mut asm, |temp_l: Temporaries| {
+                  asm.lines.push(format!("  cmp    {}, {}", temp_l, rhs));
+                });
+              }
+              (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
+                stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Temporaries, temp_r: Temporaries| asm.lines.push(format!("  cmp   {}, {}", temp_l, temp_r)));
+              },
+              _ => unimplemented!()
             }
-            (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
-              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Temporaries| {
-                asm.lines.push(format!("  cmp    {}, {}", temp_l, rhs));
-              });
-            }
-            (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
-              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Temporaries, temp_r: Temporaries| asm.lines.push(format!("  cmp   {}, {}", temp_l, temp_r)));
-            },
-            _ => unimplemented!()
+            asm.last_cmp = Some((i, ConditionalJump::JLE))
           },
-          Op::Jumpfalse(_, Arg::Reference(reference))  => {
+          Op::Jumpfalse(Arg::Reference(cond), Arg::Reference(reference))  => {
             if !asm.labels.contains_key(reference) {
               let label_number = asm.labels.len();
               asm.labels.insert(*reference, format!(".L{}", label_number));
+            }
+
+            if let Some((cond_ref, cond_op)) = asm.last_cmp {
+              if cond_ref == *cond {
+                asm.lines.push(format!("  {}    {}", cond_op, asm.labels.get(reference).unwrap()))
+              }
             }
           },
           Op::Jump(Arg::Reference(reference)) => {
