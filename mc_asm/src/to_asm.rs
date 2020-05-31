@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fmt::Display;
 
 use mc_ir::{Arg, IntermediateRepresentation, Op};
 use mc_parser::ast::*;
@@ -200,6 +201,7 @@ impl fmt::Display for ConditionalSet {
   }
 }
 
+#[allow(dead_code)]
 pub struct Float {
   long1: i32,
   long2: i32,
@@ -214,6 +216,7 @@ impl From<f64> for Float {
   }
 }
 
+#[allow(dead_code)]
 impl Float {
   pub fn to_asm(&self) -> Vec<String> {
     vec![format!(".long {}", self.long1), format!(".long {}", self.long2)]
@@ -254,30 +257,31 @@ macro_rules! stack_hygiene {
   }
 }
 
-macro_rules! condition_to_asm {
-  ($asm:expr, $lhs:expr, $rhs:expr, $op:expr, $index:expr) => {
-    $asm.lines.push(format!("  cmp    {}, {}", $lhs, $rhs));
-    $asm.lines.push(format!("  {}    {}", $op, $lhs.as_reg8().0));
-    $asm.temporary_register.insert($index, $lhs);
-  };
-}
-
-macro_rules! match_args {
-  ($stack:expr, $asm:expr, $args:expr, $op:tt, $index:expr, $instruction:expr) => {
+macro_rules! operation_to_asm {
+  ($op:tt: $from:ident -> $to:ident, $index:expr, $stack:expr, $asm:expr, $args:expr, $reflit_closure:expr, $reference_closure:expr) => {
     match $args {
-      (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-        calc_index_offset($stack, $asm, Reg32::EAX, &Arg::Literal(&Literal::Bool(l $op r)));
+      (Arg::Literal(Literal::$from(l)), Arg::Literal(Literal::$from(r))) => {
+        calc_index_offset($stack, $asm, Reg32::EAX, &Arg::Literal(&Literal::$to(l $op r)));
       }
-      (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
+      (Arg::Reference(ref_l), Arg::Literal(Literal::$from(rhs))) | (Arg::Literal(Literal::$from(rhs)), Arg::Reference(ref_l)) => {
         stack_hygiene!(ref_l, $index, $asm, |temp_l: Reg32| {
-          condition_to_asm!($asm, temp_l, rhs, $instruction, $index);
+          $reflit_closure($asm, temp_l, rhs)
         });
       }
       (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
-        stack_hygiene!(ref_l, ref_r, $index, $asm, |temp_l: Reg32, temp_r: Reg32| $asm.lines.push(format!("  cmp   {}, {}", temp_l, temp_r)));
+        stack_hygiene!(ref_l, ref_r, $index, $asm, |temp_l: Reg32, temp_r: Reg32| {
+          $reference_closure($asm, temp_l, temp_r)
+        });
       },
       _ => unimplemented!()
     }
+  };
+}
+
+macro_rules! condition_to_asm {
+  ($asm:expr, $lhs:expr, $rhs:expr, $op:expr) => {
+    $asm.lines.push(format!("  cmp    {}, {}", $lhs, $rhs));
+    $asm.lines.push(format!("  {}    {}", $op, $lhs.as_reg8().0));
   };
 }
 
@@ -452,16 +456,33 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             });
           }
           Op::Gt(lhs, rhs) | Op::Lte(rhs, lhs) => {
-            match_args!(&stack, &mut asm, (lhs, rhs), >, i, ConditionalSet::SETG);
+            fn condition_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) { 
+              condition_to_asm!(asm, lhs, rhs, ConditionalSet::SETG);
+            };
+
+            operation_to_asm!(>: Int -> Bool, i, &stack, &mut asm, (lhs, rhs), condition_to_asm, condition_to_asm);
+            //match_args!(&stack, &mut asm, (lhs, rhs), >, i, ConditionalSet::SETG, Int, Bool);
           },
           Op::Lt(lhs, rhs) | Op::Gte(rhs, lhs) => {
-            match_args!(&stack, &mut asm, (lhs, rhs), <, i, ConditionalSet::SETL);
+            fn condition_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) { 
+              condition_to_asm!(asm, lhs, rhs, ConditionalSet::SETL);
+            };
+
+            operation_to_asm!(<: Int -> Bool, i, &stack, &mut asm, (lhs, rhs), condition_to_asm, condition_to_asm);
           },
           Op::Eq(lhs, rhs) => {
-            match_args!(&stack, &mut asm, (lhs, rhs), ==, i, ConditionalSet::SETE);
+            fn condition_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) { 
+              condition_to_asm!(asm, lhs, rhs, ConditionalSet::SETE);
+            };
+            
+            operation_to_asm!(==: Int -> Bool, i, &stack, &mut asm, (lhs, rhs), condition_to_asm, condition_to_asm);
           },
           Op::Neq(lhs, rhs) => {
-            match_args!(&stack, &mut asm, (lhs, rhs), !=, i, ConditionalSet::SETNE);
+            fn condition_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) { 
+              condition_to_asm!(asm, lhs, rhs, ConditionalSet::SETNE);
+            };
+            
+            operation_to_asm!(!=: Int -> Bool, i, &stack, &mut asm, (lhs, rhs), condition_to_asm, condition_to_asm);
           },
           Op::Land(lhs, rhs) => match (lhs, rhs) {
             (Arg::Literal(Literal::Bool(l)), Arg::Literal(Literal::Bool(r))) => {

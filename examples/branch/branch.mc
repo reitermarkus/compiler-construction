@@ -2,7 +2,7 @@ int main() {
   int y;
   y = 2;
 
-  if (y > 4) {
+  if ((y > 1) && (y < 4)) {
     y = 0;
   } else {
     y = 1;
