@@ -6,9 +6,9 @@ impl fmt::Display for Arg<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Self::Literal(literal) => literal.to_string().fmt(f),
-      Self::Variable(reference, offset) => write!(f, "(&{}, {})", reference, offset),
-      Self::Reference(reference) => write!(f, "t{}", reference),
-      Self::FunctionCall(identifier, arguments) => {
+      Self::Variable(_, reference, offset) => write!(f, "(&{}, {})", reference, offset),
+      Self::Reference(_, reference) => write!(f, "t{}", reference),
+      Self::FunctionCall(_, identifier, arguments) => {
         write!(f, "{}({})", identifier, arguments.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
       }
     }
@@ -51,7 +51,7 @@ impl fmt::Display for Op<'_> {
 
 impl fmt::Display for IntermediateRepresentation<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    for (identifier, range) in &self.functions {
+    for (identifier, (range, ty)) in &self.functions {
       writeln!(f, "\t {}:", identifier)?;
       for (i, stmt) in self.statements[range.start..range.end].iter().enumerate() {
         match stmt {

@@ -9,12 +9,12 @@ pub trait AddToIr<'a> {
 
 impl<'a> AddToIr<'a> for Assignment<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
-    let reference = ir.stack.lookup(&self.identifier).unwrap();
+    let (reference, ty) = ir.stack.lookup(&self.identifier).unwrap();
 
     let variable = if let Some(index_expression) = &self.index_expression {
-      Arg::Variable(reference, Box::new(index_expression.add_to_ir(ir)))
+      Arg::Variable(ty, reference, Box::new(index_expression.add_to_ir(ir)))
     } else {
-      Arg::Variable(reference, Box::new(Arg::Literal(&Literal::Int(0))))
+      Arg::Variable(ty, reference, Box::new(Arg::Literal(&Literal::Int(0))))
     };
 
     let arg = self.rvalue.add_to_ir(ir);
@@ -30,8 +30,8 @@ impl<'a> AddToIr<'a> for Declaration<'a> {
     ir.push(Op::Decl(&self.identifier, self.ty, self.count.unwrap_or(1)));
 
     let reference = ir.statements.len() - 1;
-    ir.stack.push(self.identifier.clone(), reference);
-    Arg::Reference(reference)
+    ir.stack.push(self.identifier.clone(), reference, self.ty);
+    Arg::Reference(Some(self.ty), reference)
   }
 }
 
@@ -40,13 +40,13 @@ impl<'a> AddToIr<'a> for Expression<'a> {
     match self {
       Self::Literal { literal, .. } => Arg::Literal(literal),
       Self::Variable { identifier, index_expression, .. } => {
-        let reference = ir.stack.lookup(&identifier).unwrap();
+        let (reference, ty) = ir.stack.lookup(identifier).unwrap();
 
         if let Some(index_expression) = index_expression {
           let index_expression = index_expression.add_to_ir(ir);
-          ir.push(Op::Load(Arg::Variable(reference, Box::new(index_expression))));
+          ir.push(Op::Load(Arg::Variable(ty, reference, Box::new(index_expression))));
         } else {
-          ir.push(Op::Load(Arg::Variable(reference, Box::new(Arg::Literal(&Literal::Int(0))))));
+          ir.push(Op::Load(Arg::Variable(ty, reference, Box::new(Arg::Literal(&Literal::Int(0))))));
         }
 
         ir.last_ref()
@@ -66,6 +66,8 @@ impl<'a> AddToIr<'a> for Expression<'a> {
               _ => 0,
             }));
 
+            // TODO
+
             Arg::Literal(&*Box::leak(boxed))
           }
           _ => {
@@ -84,7 +86,7 @@ impl<'a> AddToIr<'a> for Expression<'a> {
               BinaryOp::Lor => Op::Lor(arg1, arg2),
             });
 
-            Arg::Reference(ir.statements.len() - 1)
+            ir.last_ref()
           }
         }
       }
@@ -96,11 +98,12 @@ impl<'a> AddToIr<'a> for Expression<'a> {
           UnaryOp::Minus => Op::UnaryMinus(arg),
         });
 
-        Arg::Reference(ir.statements.len() - 1)
+        ir.last_ref()
       }
       Self::FunctionCall { identifier, arguments, .. } => {
         let args = arguments.iter().map(|a| a.add_to_ir(ir)).collect::<Vec<Arg<'_>>>();
-        Arg::FunctionCall(identifier, args)
+        let ty = ir.functions.get(identifier).and_then(|&(_, ty)| ty);
+        Arg::FunctionCall(ty, identifier, args)
       }
     }
   }
@@ -133,7 +136,7 @@ impl<'a> AddToIr<'a> for IfStatement<'a> {
     let condition = self.condition.add_to_ir(ir);
 
     let jumpfalse_index = ir.statements.len();
-    ir.push(Op::Jumpfalse(condition, Arg::Reference(0)));
+    ir.push(Op::Jumpfalse(condition, Arg::Reference(None, 0)));
 
     let block_always_returns = self.block.find_return_statement();
     self.block.add_to_ir(ir);
@@ -142,7 +145,7 @@ impl<'a> AddToIr<'a> for IfStatement<'a> {
       let jump_index = ir.statements.len();
 
       if !block_always_returns {
-        ir.push(Op::Jump(Arg::Reference(0)));
+        ir.push(Op::Jump(Arg::Reference(None, 0)));
       }
 
       ir.update_reference(jumpfalse_index, ir.statements.len());
@@ -165,7 +168,7 @@ impl<'a> AddToIr<'a> for WhileStatement<'a> {
     let condition = self.condition.add_to_ir(ir);
 
     let jumpfalse_index = ir.statements.len();
-    ir.push(Op::Jumpfalse(condition, Arg::Reference(0)));
+    ir.push(Op::Jumpfalse(condition, Arg::Reference(None, 0)));
 
     self.block.add_to_ir(ir);
     ir.update_reference(jumpfalse_index, ir.statements.len());
@@ -217,7 +220,7 @@ impl<'a> AddToIr<'a> for FunctionDeclaration<'a> {
     self.body.add_to_ir(ir);
     let end_index = ir.statements.len();
 
-    ir.add_function(&self.identifier, start_index..end_index);
+    ir.add_function(&self.identifier, start_index..end_index, self.ty);
 
     ir.stack.reset(ptr);
     ir.last_ref()
