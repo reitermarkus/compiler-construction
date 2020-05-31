@@ -78,16 +78,13 @@ impl fmt::Display for Reg32 {
 }
 
 impl Reg32 {
-  pub fn as_reg8(&self) -> Reg8 {
+  pub fn as_reg8(&self) -> (Reg8, Reg8) {
     match self {
-      Self::EAX => Reg8::AL,
-      Self::ECX => Reg8::CL,
-      Self::EDX => Reg8::DL,
-      Self::EBX => Reg8::BL,
-      Self::ESP => Reg8::AH,
-      Self::EBP => Reg8::CH,
-      Self::ESI => Reg8::DH,
-      Self::EDI => Reg8::BH,
+      Self::EAX => (Reg8::AL, Reg8::AH),
+      Self::ECX => (Reg8::CL, Reg8::CH),
+      Self::EDX => (Reg8::DL, Reg8::DH),
+      Self::EBX => (Reg8::BL, Reg8::BH),
+      _ => unreachable!(),
     }
   }
 
@@ -260,7 +257,7 @@ macro_rules! stack_hygiene {
 macro_rules! condition_to_asm {
   ($asm:expr, $lhs:expr, $rhs:expr, $op:expr, $index:expr) => {
     $asm.lines.push(format!("  cmp    {}, {}", $lhs, $rhs));
-    $asm.lines.push(format!("  {}    {}", $op, $lhs.as_reg8()));
+    $asm.lines.push(format!("  {}    {}", $op, $lhs.as_reg8().0));
     $asm.temporary_register.insert($index, $lhs);
   };
 }
@@ -328,6 +325,7 @@ fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> 
 
         match literal {
           Literal::Int(integer) => integer.to_string(),
+          Literal::Bool(boolean) => if *boolean { 1 } else { 0 }.to_string(),
           literal => unimplemented!("{:?}", literal),
         }
       },
@@ -456,12 +454,45 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           Op::Gt(lhs, rhs) | Op::Lte(rhs, lhs) => {
             match_args!(&stack, &mut asm, (lhs, rhs), >, i, ConditionalSet::SETG);
           },
+          Op::Lt(lhs, rhs) | Op::Gte(rhs, lhs) => {
+            match_args!(&stack, &mut asm, (lhs, rhs), <, i, ConditionalSet::SETL);
+          },
+          Op::Eq(lhs, rhs) => {
+            match_args!(&stack, &mut asm, (lhs, rhs), ==, i, ConditionalSet::SETE);
+          },
+          Op::Neq(lhs, rhs) => {
+            match_args!(&stack, &mut asm, (lhs, rhs), !=, i, ConditionalSet::SETNE);
+          },
+          Op::Land(lhs, rhs) => match (lhs, rhs) {
+            (Arg::Literal(Literal::Bool(l)), Arg::Literal(Literal::Bool(r))) => {
+              calc_index_offset(&stack, &mut asm, Reg32::EAX, &Arg::Literal(&Literal::Bool(*l && *r)));
+            }
+            (Arg::Reference(ref_l), Arg::Literal(Literal::Bool(rhs))) | (Arg::Literal(Literal::Bool(rhs)), Arg::Reference(ref_l)) => {
+              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Reg32| asm.lines.push(format!("  and   {}, {}, {}", temp_l, temp_l, rhs)));
+            }
+            (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
+              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Reg32, temp_r: Reg32| asm.lines.push(format!("  and   {}, {}", temp_l, temp_r)));
+            },
+            _ => unimplemented!()
+          },
+          Op::Lor(lhs, rhs) => match (lhs, rhs) {
+            (Arg::Literal(Literal::Bool(l)), Arg::Literal(Literal::Bool(r))) => {
+              calc_index_offset(&stack, &mut asm, Reg32::EAX, &Arg::Literal(&Literal::Bool(*l || *r)));
+            }
+            (Arg::Reference(ref_l), Arg::Literal(Literal::Bool(rhs))) | (Arg::Literal(Literal::Bool(rhs)), Arg::Reference(ref_l)) => {
+              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Reg32| asm.lines.push(format!("  or   {}, {}, {}", temp_l, temp_l, rhs)));
+            }
+            (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
+              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Reg32, temp_r: Reg32| asm.lines.push(format!("  or   {}, {}", temp_l, temp_r)));
+            },
+            _ => unimplemented!()
+          }
           Op::Jumpfalse(Arg::Reference(cond), Arg::Reference(reference)) => {
             let label = generate_label!(asm, reference);
 
             let register = asm.temporary_register.get(cond).unwrap();
 
-            asm.lines.push(format!("  cmp    {}, 0", register.as_reg8()));
+            asm.lines.push(format!("  cmp    {}, 0", register.as_reg8().0));
             asm.lines.push(format!("  je     {}", label));
           },
           Op::Jump(Arg::Reference(reference)) => {
