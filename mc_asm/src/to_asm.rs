@@ -10,10 +10,9 @@ use mc_parser::ast::*;
 #[derive(Debug)]
 pub struct Asm {
   lines: Vec<String>,
-  temporary_register: BTreeMap<usize, Temporaries>,
-  temporaries: VecDeque<Temporaries>,
+  temporary_register: BTreeMap<usize, Reg32>,
+  temporaries: VecDeque<Reg32>,
   labels: BTreeMap<usize, String>,
-  last_cmp: Option<(usize, ConditionalJump)>
 }
 
 impl fmt::Display for Asm {
@@ -52,37 +51,109 @@ impl Stack {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Temporaries {
+pub enum Reg32 {
   EAX,
-  EBX,
   ECX,
   EDX,
+  EBX,
+  ESP,
+  EBP,
+  ESI,
   EDI,
-  ESI
 }
 
-impl fmt::Display for Temporaries {
+impl fmt::Display for Reg32 {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::EAX => write!(f, "eax"),
-      Self::EBX => write!(f, "ebx"),
-      Self::ECX => write!(f, "ecx"),
-      Self::EDX => write!(f, "edx"),
-      Self::EDI => write!(f, "edi"),
-      Self::ESI => write!(f, "esi"),
+      Self::EAX => "eax",
+      Self::EBX => "ebx",
+      Self::ECX => "ecx",
+      Self::EDX => "edx",
+      Self::ESP => "ebp",
+      Self::EBP => "ebp",
+      Self::EDI => "edi",
+      Self::ESI => "esi",
+    }.fmt(f)
+  }
+}
+
+impl Reg32 {
+  pub fn as_reg8(&self) -> Reg8 {
+    match self {
+      Self::EAX => Reg8::AL,
+      Self::ECX => Reg8::CL,
+      Self::EDX => Reg8::DL,
+      Self::EBX => Reg8::BL,
+      Self::ESP => Reg8::AH,
+      Self::EBP => Reg8::CH,
+      Self::ESI => Reg8::DH,
+      Self::EDI => Reg8::BH,
+    }
+  }
+
+  pub fn as_reg16(&self) -> Reg16 {
+    match self {
+      Self::EAX => Reg16::AX,
+      Self::ECX => Reg16::CX,
+      Self::EDX => Reg16::DX,
+      Self::EBX => Reg16::BX,
+      Self::ESP => Reg16::SP,
+      Self::EBP => Reg16::BP,
+      Self::ESI => Reg16::SI,
+      Self::EDI => Reg16::DI,
     }
   }
 }
 
-impl Temporaries {
-  pub fn as_8bit(&self) -> &str {
+pub enum Reg16 {
+  AX,
+  CX,
+  DX,
+  BX,
+  SP,
+  BP,
+  SI,
+  DI,
+}
+
+impl fmt::Display for Reg16 {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::EAX => "al",
-      Self::EBX => "bl",
-      Self::ECX => "cl",
-      Self::EDX => "dl",
-      _ => unimplemented!(),
-    }
+      Self::AX => "ax",
+      Self::CX => "cx",
+      Self::DX => "dx",
+      Self::BX => "bx",
+      Self::SP => "sp",
+      Self::BP => "bp",
+      Self::SI => "si",
+      Self::DI => "di",
+    }.fmt(f)
+  }
+}
+
+pub enum Reg8 {
+  AL,
+  CL,
+  DL,
+  BL,
+  AH,
+  CH,
+  DH,
+  BH,
+}
+
+impl fmt::Display for Reg8 {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::AL => "al",
+      Self::CL => "cl",
+      Self::DL => "dl",
+      Self::BL => "bl",
+      Self::AH => "ah",
+      Self::CH => "ch",
+      Self::DH => "dh",
+      Self::BH => "bh",
+    }.fmt(f)
   }
 }
 
@@ -152,8 +223,8 @@ impl Float {
   }
 }
 
-fn push_temporary(temporary: Temporaries, temporaries: &mut VecDeque<Temporaries>) {
-  if temporary == Temporaries::EAX || temporary == Temporaries::EDX || temporary == Temporaries::ECX {
+fn push_temporary(temporary: Reg32, temporaries: &mut VecDeque<Reg32>) {
+  if temporary == Reg32::EAX || temporary == Reg32::EDX || temporary == Reg32::ECX {
     temporaries.push_front(temporary);
   } else {
     temporaries.push_back(temporary);
@@ -189,7 +260,7 @@ macro_rules! stack_hygiene {
 macro_rules! condition_to_asm {
   ($asm:expr, $lhs:expr, $rhs:expr, $op:expr, $index:expr) => {
     $asm.lines.push(format!("  cmp    {}, {}", $lhs, $rhs));
-    $asm.lines.push(format!("  {}    {}", $op, $lhs.as_8bit()));
+    $asm.lines.push(format!("  {}    {}", $op, $lhs.as_reg8()));
     $asm.temporary_register.insert($index, $lhs);
   };
 }
@@ -198,15 +269,15 @@ macro_rules! match_args {
   ($stack:expr, $asm:expr, $args:expr, $op:tt, $index:expr, $instruction:expr) => {
     match $args {
       (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-        calc_index_offset($stack, $asm, Temporaries::EAX, &Arg::Literal(&Literal::Bool(l $op r)));
+        calc_index_offset($stack, $asm, Reg32::EAX, &Arg::Literal(&Literal::Bool(l $op r)));
       }
       (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
-        stack_hygiene!(ref_l, $index, $asm, |temp_l: Temporaries| {
+        stack_hygiene!(ref_l, $index, $asm, |temp_l: Reg32| {
           condition_to_asm!($asm, temp_l, rhs, $instruction, $index);
         });
       }
       (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
-        stack_hygiene!(ref_l, ref_r, $index, $asm, |temp_l: Temporaries, temp_r: Temporaries| $asm.lines.push(format!("  cmp   {}, {}", temp_l, temp_r)));
+        stack_hygiene!(ref_l, ref_r, $index, $asm, |temp_l: Reg32, temp_r: Reg32| $asm.lines.push(format!("  cmp   {}, {}", temp_l, temp_r)));
       },
       _ => unimplemented!()
     }
@@ -226,7 +297,7 @@ macro_rules! generate_label {
   };
 }
 
-fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Temporaries, arg: &Arg<'_>) -> String {
+fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> String {
     match arg {
       Arg::Variable(decl_index, index_offset) => {
         let (ty, count, mut offset) = stack.lookup(*decl_index);
@@ -270,15 +341,14 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
         lines: vec![],
         temporary_register: BTreeMap::new(),
         temporaries: VecDeque::from(vec![
-          Temporaries::EAX,
-          Temporaries::EDX,
-          Temporaries::ECX,
-          Temporaries::EBX,
-          Temporaries::EDI,
-          Temporaries::ESI
+          Reg32::EAX,
+          Reg32::EDX,
+          Reg32::ECX,
+          Reg32::EBX,
+          Reg32::EDI,
+          Reg32::ESI,
         ]),
         labels: Default::default(),
-        last_cmp: None
      };
 
     asm.lines.push("  .intel_syntax noprefix".to_string());
@@ -306,7 +376,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             stack.push(i, *ty, *count);
           }
           Op::Assign(arg, variable) => {
-            stack_hygiene!(&mut asm, |temp: Temporaries| {
+            stack_hygiene!(&mut asm, |temp: Reg32| {
               let variable = calc_index_offset(&stack, &mut asm, temp, variable);
               let value = calc_index_offset(&stack, &mut asm, temp, arg);
               asm.lines.push(format!("  mov    {}, {}", variable, value));
@@ -319,8 +389,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 Arg::Reference(reference) => {
                   let result_register = asm.temporary_register.get(reference).unwrap();
 
-                  if result_register != &Temporaries::EAX {
-                    asm.lines.push(format!("  mov    {}, {}", Temporaries::EAX, result_register));
+                  if result_register != &Reg32::EAX {
+                    asm.lines.push(format!("  mov    {}, {}", Reg32::EAX, result_register));
                   }
                 }
                 _ => unimplemented!()
@@ -331,22 +401,22 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           }
           Op::Plus(lhs, rhs) => match (lhs, rhs) {
             (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-              calc_index_offset(&stack, &mut asm, Temporaries::EAX, &Arg::Literal(&Literal::Int(l + r)));
+              calc_index_offset(&stack, &mut asm, Reg32::EAX, &Arg::Literal(&Literal::Int(l + r)));
             }
             (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
-              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Temporaries| asm.lines.push(format!("  add    {}, {}", temp_l, rhs)));
+              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Reg32| asm.lines.push(format!("  add    {}, {}", temp_l, rhs)));
             }
             (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
-              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Temporaries, temp_r: Temporaries| asm.lines.push(format!("  add    {}, {}", temp_l, temp_r)));
+              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Reg32, temp_r: Reg32| asm.lines.push(format!("  add    {}, {}", temp_l, temp_r)));
             },
             _ => unimplemented!()
           },
           Op::Minus(lhs, rhs) => match (lhs, rhs) {
             (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-              calc_index_offset(&stack, &mut asm, Temporaries::EAX, &Arg::Literal(&Literal::Int(l - r)));
+              calc_index_offset(&stack, &mut asm, Reg32::EAX, &Arg::Literal(&Literal::Int(l - r)));
             }
             (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) => {
-              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Temporaries| asm.lines.push(format!("  sub    {}, {}", temp_l, rhs)));
+              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Reg32| asm.lines.push(format!("  sub    {}, {}", temp_l, rhs)));
             }
             (Arg::Literal(Literal::Int(lhs)), Arg::Reference(ref_r)) => {
               let front_reg = asm.temporaries.pop_front().unwrap();
@@ -360,24 +430,24 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               asm.temporary_register.insert(i, temp_r);
             }
             (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
-              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Temporaries, temp_r: Temporaries|asm.lines.push(format!("  sub    {}, {}", temp_l, temp_r)));
+              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Reg32, temp_r: Reg32|asm.lines.push(format!("  sub    {}, {}", temp_l, temp_r)));
             },
             _ => unimplemented!()
           },
           Op::Times(lhs, rhs) => match (lhs, rhs) {
             (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-              calc_index_offset(&stack, &mut asm, Temporaries::EAX, &Arg::Literal(&Literal::Int(l * r)));
+              calc_index_offset(&stack, &mut asm, Reg32::EAX, &Arg::Literal(&Literal::Int(l * r)));
             }
             (Arg::Reference(ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ref_l)) => {
-              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Temporaries| asm.lines.push(format!("  imul   {}, {}, {}", temp_l, temp_l, rhs)));
+              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Reg32| asm.lines.push(format!("  imul   {}, {}, {}", temp_l, temp_l, rhs)));
             }
             (Arg::Reference(ref_l), Arg::Reference(ref_r)) => {
-              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Temporaries, temp_r: Temporaries| asm.lines.push(format!("  imul   {}, {}", temp_l, temp_r)));
+              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Reg32, temp_r: Reg32| asm.lines.push(format!("  imul   {}, {}", temp_l, temp_r)));
             },
             _ => unimplemented!()
           },
           Op::Load(variable) => {
-            stack_hygiene!(&mut asm, |temp: Temporaries| {
+            stack_hygiene!(&mut asm, |temp: Reg32| {
               asm.temporary_register.insert(i, temp);
               let var = calc_index_offset(&stack, &mut asm, temp, variable);
               asm.lines.push(format!("  mov    {}, {}", temp, var));
@@ -385,14 +455,13 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           }
           Op::Gt(lhs, rhs) | Op::Lte(rhs, lhs) => {
             match_args!(&stack, &mut asm, (lhs, rhs), >, i, ConditionalSet::SETG);
-            asm.last_cmp = Some((i, ConditionalJump::JLE))
           },
           Op::Jumpfalse(Arg::Reference(cond), Arg::Reference(reference)) => {
             let label = generate_label!(asm, reference);
 
             let register = asm.temporary_register.get(cond).unwrap();
 
-            asm.lines.push(format!("  cmp    {}, 0", register.as_8bit()));
+            asm.lines.push(format!("  cmp    {}, 0", register.as_reg8()));
             asm.lines.push(format!("  je     {}", label));
           },
           Op::Jump(Arg::Reference(reference)) => {
