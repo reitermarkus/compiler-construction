@@ -13,6 +13,7 @@ pub struct Asm {
   temporary_register: BTreeMap<usize, Temporaries>,
   temporaries: VecDeque<Temporaries>,
   labels: BTreeMap<usize, String>,
+  last_cmp: Option<ConditionalJump>
 }
 
 impl fmt::Display for Asm {
@@ -69,6 +70,29 @@ impl fmt::Display for Temporaries {
       Self::EDX => write!(f, "edx"),
       Self::EDI => write!(f, "edi"),
       Self::ESI => write!(f, "esi"),
+    }
+  }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ConditionalJump {
+  JL,
+  JLE,
+  JG,
+  JGE,
+  JE,
+  JNE
+}
+
+impl fmt::Display for ConditionalJump {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::JL => write!(f, "jl"),
+      Self::JLE => write!(f, "jle"),
+      Self::JG => write!(f, "jg"),
+      Self::JGE => write!(f, "jge"),
+      Self::JE => write!(f, "je"),
+      Self::JNE => write!(f, "jne"),
     }
   }
 }
@@ -179,6 +203,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           Temporaries::ESI
         ]),
         labels: Default::default(),
+        last_cmp: None
      };
 
     asm.lines.push("  .intel_syntax noprefix".to_string());
