@@ -2,11 +2,9 @@ int main() {
   int x;
   x = 1;
 
-  int y;
-  y = x;
-
   int z;
-  z = x * x + y;
+  z = x * x + x;
+  z = 3 - z;
 
-  return 0;
+  return z;
 }

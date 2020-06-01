@@ -258,22 +258,30 @@ macro_rules! stack_hygiene {
 }
 
 macro_rules! operation_to_asm {
-  ($op:tt: $from:ident -> $to:ident, $index:expr, $stack:expr, $asm:expr, $args:expr, $reflit_closure:expr, $reference_closure:expr) => {
+  ($index:expr, $stack:expr, $asm:expr, $args:expr, $op:tt: $from:ident -> $to:ident, $reflit_closure:expr, $reference_closure:expr) => {
+    operation_to_asm!($index, $stack, $asm, $args, $op: $from -> $to, $reflit_closure, $reflit_closure, $reference_closure)
+  };
+  ($index:expr, $stack:expr, $asm:expr, $args:expr, $op:tt: $from:ident -> $to:ident, $reflit_closure:expr, $litref_closure:expr, $reference_closure:expr) => {
     match $args {
       (Arg::Literal(Literal::$from(l)), Arg::Literal(Literal::$from(r))) => {
-        calc_index_offset($stack, $asm, Reg32::EAX, &Arg::Literal(&Literal::$to(l $op r)));
+        calc_index_offset($stack, $asm, Reg32::EAX, &Arg::Literal(&Literal::$to(*l $op *r)));
       }
-      (Arg::Reference(ty, ref_l), Arg::Literal(Literal::$from(rhs))) | (Arg::Literal(Literal::$from(rhs)), Arg::Reference(ty, ref_l)) => {
+      (Arg::Reference(Some(ty), ref_l), Arg::Literal(Literal::$from(rhs))) if ty == &Ty::$from => {
         stack_hygiene!(ref_l, $index, $asm, |temp_l: Reg32| {
           $reflit_closure($asm, temp_l, rhs)
         });
       }
-      (Arg::Reference(tyl, ref_l), Arg::Reference(tyr, ref_r)) => {
+      (Arg::Literal(Literal::$from(lhs)), Arg::Reference(Some(ty), ref_r)) if ty == &Ty::$from => {
+        stack_hygiene!(ref_r, $index, $asm, |temp_r: Reg32| {
+          $litref_closure($asm, temp_r, lhs)
+        });
+      }
+      (Arg::Reference(Some(ty_l), ref_l), Arg::Reference(Some(ty_r), ref_r)) if ty_l == &Ty::$from && ty_r == &Ty::$from => {
         stack_hygiene!(ref_l, ref_r, $index, $asm, |temp_l: Reg32, temp_r: Reg32| {
           $reference_closure($asm, temp_l, temp_r)
         });
       },
-      _ => unimplemented!()
+      (lhs, rhs) => unreachable!("LHS = {:?}, RHS = {:?}", lhs, rhs)
     }
   };
 }
@@ -325,6 +333,9 @@ fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> 
           Ty::Int => format!("DWORD PTR [ebp-{}{}]", offset, index_offset),
           ty => unimplemented!("{:?}", ty),
         }
+      },
+      Arg::Reference(_, reference) => {
+        asm.temporary_register.get(reference).unwrap().to_string()
       },
       Arg::Literal(literal) => {
         push_temporary(reg, &mut asm.temporaries);
@@ -415,40 +426,51 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             },
             _ => unimplemented!()
           },
-          Op::Minus(lhs, rhs) => match (lhs, rhs) {
-            (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-              calc_index_offset(&stack, &mut asm, Reg32::EAX, &Arg::Literal(&Literal::Int(l - r)));
-            }
-            (Arg::Reference(ty, ref_l), Arg::Literal(Literal::Int(rhs))) => {
-              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Reg32| asm.lines.push(format!("  sub    {}, {}", temp_l, rhs)));
-            }
-            (Arg::Literal(Literal::Int(lhs)), Arg::Reference(ty, ref_r)) => {
-              let front_reg = asm.temporaries.pop_front().unwrap();
-              let temp_r = *asm.temporary_register.get(ref_r).unwrap();
+          Op::Minus(lhs, rhs) => {
+            match lhs.ty() {
+              Some(Ty::Int) => {
+                fn sub_reflit_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+                  asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
+                }
 
-              asm.lines.push(format!("  mov    {}, {}", front_reg, lhs));
-              asm.lines.push(format!("  sub    {}, {}", temp_r, front_reg));
+                fn sub_litref_to_asm<T: Display>(asm: &mut Asm, rhs: Reg32, lhs: T) {
+                  asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
+                }
 
-              push_temporary(front_reg, &mut asm.temporaries);
-              asm.temporary_register.remove(ref_r);
-              asm.temporary_register.insert(i, temp_r);
+                fn sub_reference_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+                  asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
+                }
+
+                operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), -: Int -> Int, sub_reflit_to_asm, sub_litref_to_asm, sub_reference_to_asm);
+              },
+              _ => unimplemented!(),
             }
-            (Arg::Reference(ty_l, ref_l), Arg::Reference(ty_r, ref_r)) => {
-              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Reg32, temp_r: Reg32|asm.lines.push(format!("  sub    {}, {}", temp_l, temp_r)));
-            },
-            _ => unimplemented!()
+
+            //let front_reg = asm.temporaries.pop_front().unwrap();
+            //  let temp_r = *asm.temporary_register.get(ref_r).unwrap();
+
+            //  asm.lines.push(format!("  mov    {}, {}", front_reg, lhs));
+            //  asm.lines.push(format!("  sub    {}, {}", temp_r, front_reg));
+
+            //  push_temporary(front_reg, &mut asm.temporaries);
+            //  asm.temporary_register.remove(ref_r);
+            //  asm.temporary_register.insert(i, temp_r);
           },
-          Op::Times(lhs, rhs) => match (lhs, rhs) {
-            (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-              calc_index_offset(&stack, &mut asm, Reg32::EAX, &Arg::Literal(&Literal::Int(l * r)));
+          Op::Times(lhs, rhs) => {
+            match lhs.ty() {
+              Some(Ty::Int) => {
+                fn imul_reflit_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+                  asm.lines.push(format!("  imul    {}, {}, {}", lhs, lhs, rhs));
+                }
+
+                fn imul_reference_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+                  asm.lines.push(format!("  imul    {}, {}", lhs, rhs));
+                }
+
+                operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), *: Int -> Int, imul_reflit_to_asm, imul_reference_to_asm);
+              },
+              _ => unimplemented!(),
             }
-            (Arg::Reference(ty, ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ty, ref_l)) => {
-              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Reg32| asm.lines.push(format!("  imul   {}, {}, {}", temp_l, temp_l, rhs)));
-            }
-            (Arg::Reference(ty_l, ref_l), Arg::Reference(ty_r, ref_r)) => {
-              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Reg32, temp_r: Reg32| asm.lines.push(format!("  imul   {}, {}", temp_l, temp_r)));
-            },
-            _ => unimplemented!()
           },
           Op::Load(variable) => {
             stack_hygiene!(&mut asm, |temp: Reg32| {
@@ -459,43 +481,49 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           }
           Op::Gt(lhs, rhs) | Op::Lte(rhs, lhs) => {
             comparison_to_asm!(ConditionalSet::SETG);
-            operation_to_asm!(>: Int -> Bool, i, &stack, &mut asm, (lhs, rhs), comparison_to_asm, comparison_to_asm);
+
+            match lhs.ty() {
+              Some(Ty::Int) => operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), >: Int -> Bool, comparison_to_asm, comparison_to_asm),
+              _ => unimplemented!(),
+            }
           },
           Op::Lt(lhs, rhs) | Op::Gte(rhs, lhs) => {
             comparison_to_asm!(ConditionalSet::SETL);
-            operation_to_asm!(<: Int -> Bool, i, &stack, &mut asm, (lhs, rhs), comparison_to_asm, comparison_to_asm);
+
+            match lhs.ty() {
+              Some(Ty::Int) => operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), <: Int -> Bool, comparison_to_asm, comparison_to_asm),
+              _ => unimplemented!(),
+            }
           },
           Op::Eq(lhs, rhs) => {
             comparison_to_asm!(ConditionalSet::SETE);
-            operation_to_asm!(==: Int -> Bool, i, &stack, &mut asm, (lhs, rhs), comparison_to_asm, comparison_to_asm);
+
+            match lhs.ty() {
+              Some(Ty::Int) => operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), ==: Int -> Bool, comparison_to_asm, comparison_to_asm),
+              _ => unimplemented!(),
+            }
           },
           Op::Neq(lhs, rhs) => {
             comparison_to_asm!(ConditionalSet::SETNE);
-            operation_to_asm!(!=: Int -> Bool, i, &stack, &mut asm, (lhs, rhs), comparison_to_asm, comparison_to_asm);
+
+            match lhs.ty() {
+              Some(Ty::Int) => operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), !=: Int -> Bool, comparison_to_asm, comparison_to_asm),
+              _ => unimplemented!(),
+            }
           },
-          Op::Land(lhs, rhs) => match (lhs, rhs) {
-            (Arg::Literal(Literal::Bool(l)), Arg::Literal(Literal::Bool(r))) => {
-              calc_index_offset(&stack, &mut asm, Reg32::EAX, &Arg::Literal(&Literal::Bool(*l && *r)));
+          Op::Land(lhs, rhs) => {
+            fn and_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+              asm.lines.push(format!("  and    {}, {}", lhs, rhs));
             }
-            (Arg::Reference(ty, ref_l), Arg::Literal(Literal::Bool(rhs))) | (Arg::Literal(Literal::Bool(rhs)), Arg::Reference(ty, ref_l)) => {
-              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Reg32| asm.lines.push(format!("  and   {}, {}, {}", temp_l, temp_l, rhs)));
-            }
-            (Arg::Reference(ty_l, ref_l), Arg::Reference(ty_r, ref_r)) => {
-              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Reg32, temp_r: Reg32| asm.lines.push(format!("  and   {}, {}", temp_l, temp_r)));
-            },
-            _ => unimplemented!()
+
+            operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), &&: Bool -> Bool, and_to_asm, and_to_asm)
           },
-          Op::Lor(lhs, rhs) => match (lhs, rhs) {
-            (Arg::Literal(Literal::Bool(l)), Arg::Literal(Literal::Bool(r))) => {
-              calc_index_offset(&stack, &mut asm, Reg32::EAX, &Arg::Literal(&Literal::Bool(*l || *r)));
+          Op::Lor(lhs, rhs) => {
+            fn or_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+              asm.lines.push(format!("  or    {}, {}", lhs, rhs));
             }
-            (Arg::Reference(ty, ref_l), Arg::Literal(Literal::Bool(rhs))) | (Arg::Literal(Literal::Bool(rhs)), Arg::Reference(ty, ref_l)) => {
-              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Reg32| asm.lines.push(format!("  or   {}, {}, {}", temp_l, temp_l, rhs)));
-            }
-            (Arg::Reference(ty_l, ref_l), Arg::Reference(ty_r, ref_r)) => {
-              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Reg32, temp_r: Reg32| asm.lines.push(format!("  or   {}, {}", temp_l, temp_r)));
-            },
-            _ => unimplemented!()
+
+            operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), ||: Bool -> Bool, or_to_asm, or_to_asm)
           }
           Op::Jumpfalse(Arg::Reference(ty_l, cond), Arg::Reference(ty_r, reference)) => {
             let label = generate_label!(asm, reference);
