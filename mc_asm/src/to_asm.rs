@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fmt::Display;
+use std::cmp::Ordering;
 
 use mc_ir::{Arg, IntermediateRepresentation, Op};
 use mc_parser::ast::*;
@@ -14,6 +15,7 @@ pub struct Asm {
   temporary_register: BTreeMap<usize, Reg32>,
   temporaries: VecDeque<Reg32>,
   labels: BTreeMap<usize, String>,
+  floats: BTreeMap<Float, String>,
 }
 
 impl fmt::Display for Asm {
@@ -201,7 +203,7 @@ impl fmt::Display for ConditionalSet {
   }
 }
 
-#[allow(dead_code)]
+#[derive(Clone, PartialEq, Debug, Eq, PartialOrd, Copy)]
 pub struct Float {
   long1: i32,
   long2: i32,
@@ -216,10 +218,9 @@ impl From<f64> for Float {
   }
 }
 
-#[allow(dead_code)]
-impl Float {
-  pub fn to_asm(&self) -> Vec<String> {
-    vec![format!(".long {}", self.long1), format!(".long {}", self.long2)]
+impl Ord for Float {
+  fn cmp(&self, other: &Self) -> Ordering {
+      self.long1.cmp(&other.long1).then(self.long2.cmp(&other.long2))
   }
 }
 
@@ -303,27 +304,37 @@ macro_rules! comparison_to_asm {
 }
 
 pub enum Pointer {
+  Qword { offset: usize, index_offset: Option<Reg32> },
   Dword { offset: usize, index_offset: Option<Reg32> },
   Byte { offset: usize, index_offset: Option<Reg32> },
+}
+
+impl Pointer {
+  fn name(&self) -> &'static str {
+    match self {
+      Self::Qword { .. } => "QWORD PTR",
+      Self::Dword { .. } => "DWORD PTR",
+      Self::Byte { .. } => "BYTE PTR",
+    }
+  }
+
+  fn size(&self) -> usize {
+    match self {
+      Self::Qword { .. } => 8,
+      Self::Dword { .. } => 4,
+      Self::Byte { .. } => 1,
+    }
+  }
 }
 
 impl fmt::Display for Pointer {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::Dword { offset, index_offset } => {
-        write!(f, "DWORD PTR [ebp-{}", offset)?;
+      Self::Qword { offset, index_offset } | Self::Dword { offset, index_offset } | Self::Byte { offset, index_offset } => {
+        write!(f, "{} [ebp-{}", self.name(), offset)?;
 
         if let Some(index_offset) = index_offset {
-          write!(f, "+{}*{}", index_offset, 4)?;
-        }
-
-        write!(f, "]")
-      },
-      Self::Byte { offset, index_offset } => {
-        write!(f, "BYTE PTR [ebp-{}", offset)?;
-
-        if let Some(index_offset) = index_offset {
-          write!(f, "+{}*{}", index_offset, 1)?;
+          write!(f, "+{}*{}", index_offset, self.size())?;
         }
 
         write!(f, "]")
@@ -381,6 +392,7 @@ fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> 
         Storage::Pointer(match ty {
           Ty::Int => Pointer::Dword { offset, index_offset: index_reg },
           Ty::Bool => Pointer::Byte { offset, index_offset: index_reg },
+          Ty::Float => Pointer::Qword { offset, index_offset: index_reg },
           ty => unimplemented!("{:?}", ty),
         })
       },
@@ -414,6 +426,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           Reg32::ESI,
         ]),
         labels: Default::default(),
+        floats: BTreeMap::new(),
      };
 
     asm.lines.push("  .intel_syntax noprefix".to_string());
@@ -452,11 +465,42 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             stack.push(i, *ty, *count);
           }
           Op::Assign(arg, variable) => {
-            stack_hygiene!(&mut asm, |temp: Reg32| {
-              let variable = calc_index_offset(&stack, &mut asm, temp, variable);
-              let value = calc_index_offset(&stack, &mut asm, temp, arg);
-              asm.lines.push(format!("  mov    {}, {}", variable, value));
-            });
+            match variable {
+              Arg::Variable(Ty::Float, ..) => {
+                if let Arg::Literal(Literal::Float(float)) = arg {
+                  stack_hygiene!(&mut asm, |temp: Reg32| {
+                    let variable = calc_index_offset(&stack, &mut asm, temp, variable);
+
+                    let float = Float::from(*float);
+
+                    let label = if let Some(label) = asm.floats.get(&float) {
+                      label
+                    } else {
+                      let float_number = asm.floats.len();
+                      asm.floats.insert(float, format!(".LC{}", float_number));
+                      asm.floats.get(&float).unwrap()
+                    };
+
+                    match variable {
+                      Storage::Pointer(pointer) => {
+                        asm.lines.push(format!("  fld   {} {}", pointer.name(), label));
+                        asm.lines.push(format!("  fstp  {}", pointer));
+                      },
+                      _ => unreachable!(),
+                    }
+                  });
+                } else {
+                  unimplemented!()
+                }
+              },
+              variable => {
+                stack_hygiene!(&mut asm, |temp: Reg32| {
+                  let variable = calc_index_offset(&stack, &mut asm, temp, variable);
+                  let value = calc_index_offset(&stack, &mut asm, temp, arg);
+                  asm.lines.push(format!("  mov    {}, {}", variable, value));
+                });
+              }
+            }
           }
           Op::Load(variable) => {
             stack_hygiene!(&mut asm, |temp: Reg32| {
@@ -665,6 +709,12 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       asm.lines.push("  ret".to_string());
 
       asm.lines.insert(stack_size_index, format!("  sub    esp, {}", ((stack.size + 15) / 16) * 16));
+    }
+
+    for (float, label) in asm.floats.iter() {
+      asm.lines.push(format!("{}:", label));
+      asm.lines.push(format!("  .long {}", float.long1));
+      asm.lines.push(format!("  .long {}", float.long2));
     }
 
     asm

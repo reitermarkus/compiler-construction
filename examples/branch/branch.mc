@@ -2,12 +2,12 @@ int main() {
   int y;
   y = 2;
 
-  if ((y > 4) || (y < 4)) {
-    y = 0;
-  } else {
-    y = 1;
-    return 1;
+  bool b;
+  b = false;
+
+  while (b) {
+    y = y - 1;
   }
 
-  return 3;
+  return y;
 }

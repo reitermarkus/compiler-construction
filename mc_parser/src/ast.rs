@@ -52,7 +52,7 @@ impl Ty {
     match self {
       Ty::Bool => 1,
       Ty::Int => 4,
-      Ty::Float => 4,
+      Ty::Float => 8,
       Ty::String => 4,
     }
   }
