@@ -4,7 +4,7 @@ int main() {
 
   int z;
   z = x * x + x;
-  z = 9 - z;
+  z = z / x + z / 2 + 12 / z;
 
   return z;
 }

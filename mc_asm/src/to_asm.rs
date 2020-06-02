@@ -423,42 +423,42 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
             asm.lines.push(format!("  jmp    .AWAY_{}", name));
           }
-          Op::Plus(lhs, rhs) => match (lhs, rhs) {
-            (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r))) => {
-              calc_index_offset(&stack, &mut asm, Reg32::EAX, &Arg::Literal(&Literal::Int(l + r)));
-            }
-            (Arg::Reference(ty, ref_l), Arg::Literal(Literal::Int(rhs))) | (Arg::Literal(Literal::Int(rhs)), Arg::Reference(ty, ref_l)) => {
-              stack_hygiene!(ref_l, i, &mut asm, |temp_l: Reg32| asm.lines.push(format!("  add    {}, {}", temp_l, rhs)));
-            }
-            (Arg::Reference(ty_l, ref_l), Arg::Reference(ty_r, ref_r)) => {
-              stack_hygiene!(ref_l, ref_r, i, &mut asm, |temp_l: Reg32, temp_r: Reg32| asm.lines.push(format!("  add    {}, {}", temp_l, temp_r)));
+          Op::Plus(lhs, rhs) => match lhs.ty() {
+            Some(Ty::Int) => {
+              fn add_reflit_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+                asm.lines.push(format!("  add    {}, {}", lhs, rhs));
+              }
+
+              fn add_reference_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+                asm.lines.push(format!("  add    {}, {}", lhs, rhs));
+              }
+
+              operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), -: Int -> Int, add_reflit_to_asm, add_reference_to_asm);
             },
-            _ => unimplemented!()
+            _ => unimplemented!(),
           },
-          Op::Minus(lhs, rhs) => {
-            match lhs.ty() {
-              Some(Ty::Int) => {
-                fn sub_reflit_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
-                  asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
-                }
+          Op::Minus(lhs, rhs) => match lhs.ty() {
+            Some(Ty::Int) => {
+              fn sub_reflit_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+                asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
+              }
 
-                fn sub_litref_to_asm<T: Display>(index: usize, asm: &mut Asm, rhs: Reg32, lhs: T) {
-                  let temp_l = asm.temporaries.pop_front().unwrap();
+              fn sub_litref_to_asm<T: Display>(index: usize, asm: &mut Asm, rhs: Reg32, lhs: T) {
+                let temp_l = asm.temporaries.pop_front().unwrap();
 
-                  asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
-                  asm.lines.push(format!("  sub    {}, {}", temp_l, rhs));
+                asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
+                asm.lines.push(format!("  sub    {}, {}", temp_l, rhs));
 
-                  asm.temporary_register.insert(index, temp_l);
-                }
+                asm.temporary_register.insert(index, temp_l);
+              }
 
-                fn sub_reference_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
-                  asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
-                }
+              fn sub_reference_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+                asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
+              }
 
-                operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), -: Int -> Int, sub_reflit_to_asm, sub_litref_to_asm, sub_reference_to_asm);
-              },
-              _ => unimplemented!(),
-            }
+              operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), -: Int -> Int, sub_reflit_to_asm, sub_litref_to_asm, sub_reference_to_asm);
+            },
+            _ => unimplemented!(),
           },
           Op::Times(lhs, rhs) => {
             match lhs.ty() {
@@ -475,6 +475,58 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               },
               _ => unimplemented!(),
             }
+          },
+          Op::Divide(lhs, rhs) => match lhs.ty() {
+            Some(Ty::Int) => {
+              fn div_reflit_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+                if lhs != Reg32::EAX {
+                  asm.lines.push(format!("  mov    eax, {}", lhs));
+                }
+
+                let temp_r = asm.temporaries.pop_front().unwrap();
+
+                asm.lines.push(format!("  mov    {}, {}", temp_r, rhs));
+
+                asm.lines.push(format!("  cdq"));
+                asm.lines.push(format!("  idiv    {}", temp_r));
+                asm.lines.push(format!("  mov    {}, eax", lhs));
+
+                push_temporary(temp_r, &mut asm.temporaries);
+              }
+
+              fn div_litref_to_asm<T: Display>(index: usize, asm: &mut Asm, rhs: Reg32, lhs: T) {
+                let temp_l = asm.temporaries.pop_front().unwrap();
+
+                if temp_l != Reg32::EAX {
+                  asm.lines.push(format!("  mov    eax, {}", lhs));
+                }
+
+                asm.lines.push(format!("  cdq"));
+                asm.lines.push(format!("  idiv    {}", rhs));
+
+                if temp_l != Reg32::EAX {
+                  asm.lines.push(format!("  mov    {}, eax", temp_l));
+                }
+
+                asm.temporary_register.insert(index, temp_l);
+              }
+
+              fn div_reference_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+                if lhs != Reg32::EAX {
+                  asm.lines.push(format!("  mov    eax, {}", lhs));
+                }
+
+                asm.lines.push(format!("  cdq"));
+                asm.lines.push(format!("  idiv    {}", rhs));
+
+                if lhs != Reg32::EAX {
+                  asm.lines.push(format!("  mov    {}, eax", lhs));
+                }
+              }
+
+              operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), -: Int -> Int, div_reflit_to_asm, div_litref_to_asm, div_reference_to_asm);
+            },
+            _ => unimplemented!(),
           },
           Op::Load(variable) => {
             stack_hygiene!(&mut asm, |temp: Reg32| {
