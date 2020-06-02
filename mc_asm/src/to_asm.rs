@@ -412,6 +412,18 @@ fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> 
     }
 }
 
+fn add_float(asm: &mut Asm, float: f64) -> String {
+  let float = Float::from(float);
+
+  if let Some(label) = asm.floats.get(&float) {
+    label
+  } else {
+    let float_number = asm.floats.len();
+    asm.floats.insert(float, format!(".LC{}", float_number));
+    asm.floats.get(&float).unwrap()
+  }.to_owned()
+}
+
 impl<'a> ToAsm for IntermediateRepresentation<'a> {
   fn to_asm(&self) -> Asm {
     let mut asm = Asm {
@@ -467,30 +479,28 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           Op::Assign(arg, variable) => {
             match variable {
               Arg::Variable(Ty::Float, ..) => {
-                if let Arg::Literal(Literal::Float(float)) = arg {
-                  stack_hygiene!(&mut asm, |temp: Reg32| {
-                    let variable = calc_index_offset(&stack, &mut asm, temp, variable);
+                match arg {
+                  Arg::Literal(Literal::Float(float)) => {
+                    stack_hygiene!(&mut asm, |temp: Reg32| {
+                      let variable = calc_index_offset(&stack, &mut asm, temp, variable);
+                      let label = add_float(&mut asm, *float);
 
-                    let float = Float::from(*float);
-
-                    let label = if let Some(label) = asm.floats.get(&float) {
-                      label
-                    } else {
-                      let float_number = asm.floats.len();
-                      asm.floats.insert(float, format!(".LC{}", float_number));
-                      asm.floats.get(&float).unwrap()
-                    };
-
-                    match variable {
-                      Storage::Pointer(pointer) => {
-                        asm.lines.push(format!("  fld   {} {}", pointer.name(), label));
-                        asm.lines.push(format!("  fstp  {}", pointer));
-                      },
-                      _ => unreachable!(),
-                    }
-                  });
-                } else {
-                  unimplemented!()
+                      match variable {
+                        Storage::Pointer(pointer) => {
+                          asm.lines.push(format!("  fld    {} {}", pointer.name(), label));
+                          asm.lines.push(format!("  fstp   {}", pointer));
+                        },
+                        _ => unreachable!(),
+                      }
+                    });
+                  },
+                  Arg::Reference(_, reference) => {
+                    stack_hygiene!(&mut asm, |temp: Reg32| {
+                      let variable = calc_index_offset(&stack, &mut asm, temp, variable);
+                      asm.lines.push(format!("  fstp   {}", variable));
+                    });
+                  },
+                  _ => unreachable!(),
                 }
               },
               variable => {
@@ -503,12 +513,22 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             }
           }
           Op::Load(variable) => {
-            stack_hygiene!(&mut asm, |temp: Reg32| {
-              asm.temporary_register.insert(i, temp);
-              let var = calc_index_offset(&stack, &mut asm, temp, variable);
-              let reg = var.map_register(&temp);
-              asm.lines.push(format!("  mov    {}, {}", reg, var));
-            });
+            match variable {
+              Arg::Variable(Ty::Float, ..) => {
+                stack_hygiene!(&mut asm, |temp: Reg32| {
+                  let var = calc_index_offset(&stack, &mut asm, temp, variable);
+                  asm.lines.push(format!("  fld    {}", var));
+                });
+              },
+              variable => {
+                stack_hygiene!(&mut asm, |temp: Reg32| {
+                  asm.temporary_register.insert(i, temp);
+                  let var = calc_index_offset(&stack, &mut asm, temp, variable);
+                  let reg = var.map_register(&temp);
+                  asm.lines.push(format!("  mov    {}, {}", reg, var));
+                });
+              }
+            }
           }
           Op::Return(arg) => {
             if let Some(arg) = arg {
@@ -537,7 +557,24 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 asm.lines.push(format!("  add    {}, {}", lhs, rhs));
               }
 
-              operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), -: Int -> Int, add_reflit_to_asm, add_reference_to_asm);
+              operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), +: Int -> Int, add_reflit_to_asm, add_reference_to_asm);
+            },
+            Some(Ty::Float) => {
+              match (lhs, rhs) {
+                (Arg::Literal(Literal::Float(lhs)), Arg::Literal(Literal::Float(rhs))) => {
+                  let pointer = add_float(&mut asm, lhs + rhs);
+                  asm.lines.push(format!("  fld    QWORD PTR {}", pointer));
+                },
+                (Arg::Reference(Some(ty), ref_l), Arg::Literal(Literal::Float(rhs))) | (Arg::Literal(Literal::Float(rhs)), Arg::Reference(Some(ty), ref_l)) if ty == &Ty::Float => {
+                  let pointer = add_float(&mut asm, *rhs);
+                  asm.lines.push(format!("  fld    QWORD PTR {}", pointer));
+                  asm.lines.push(format!("  faddp  st(1), st"));
+                }
+                (Arg::Reference(Some(ty_l), ref_l), Arg::Reference(Some(ty_r), ref_r)) if ty_l == &Ty::Float && ty_r == &Ty::Float => {
+                  asm.lines.push(format!("  faddp  st(1), st"));
+                },
+                (lhs, rhs) => unreachable!("LHS = {:?}, RHS = {:?}", lhs, rhs)
+              }
             },
             _ => unimplemented!(),
           },
