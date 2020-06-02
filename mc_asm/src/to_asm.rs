@@ -302,7 +302,64 @@ macro_rules! comparison_to_asm {
   };
 }
 
-fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> String {
+pub enum Pointer {
+  Dword { offset: usize, index_offset: Option<Reg32> },
+  Byte { offset: usize, index_offset: Option<Reg32> },
+}
+
+impl fmt::Display for Pointer {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::Dword { offset, index_offset } => {
+        write!(f, "DWORD PTR [ebp-{}", offset)?;
+
+        if let Some(index_offset) = index_offset {
+          write!(f, "+{}*{}", index_offset, 4)?;
+        }
+
+        write!(f, "]")
+      },
+      Self::Byte { offset, index_offset } => {
+        write!(f, "BYTE PTR [ebp-{}", offset)?;
+
+        if let Some(index_offset) = index_offset {
+          write!(f, "+{}*{}", index_offset, 1)?;
+        }
+
+        write!(f, "]")
+      }
+    }
+  }
+}
+
+pub enum Storage {
+  Pointer(Pointer),
+  Register(Reg32),
+  Literal(String),
+}
+
+impl fmt::Display for Storage {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::Pointer(pointer) => write!(f, "{}", pointer),
+      Self::Register(reg) => write!(f, "{}", reg),
+      Self::Literal(string) => write!(f, "{}", string)
+    }
+  }
+}
+
+impl Storage {
+  fn map_register(&self, reg: &Reg32) -> String {
+    match self {
+      Self::Pointer(Pointer::Dword { .. }) => reg.to_string(),
+      Self::Pointer(Pointer::Byte { .. }) => reg.as_reg8().0.to_string(),
+      Self::Register(_) => reg.to_string(),
+      _ => unreachable!(),
+    }
+  }
+}
+
+fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> Storage {
     match arg {
       Arg::Variable(ty, decl_index, index_offset) => {
         let (ty, count, mut offset) = stack.lookup(*decl_index);
@@ -321,25 +378,23 @@ fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> 
           _ => None
         };
 
-        let index_offset = if let Some(reg) = index_reg { format!("+{}*{}", reg, ty.size()) } else { "".into() };
-
-        match ty {
-          Ty::Int => format!("DWORD PTR [ebp-{}{}]", offset, index_offset),
-          Ty::Bool => format!("BYTE PTR [ebp-{}{}]", offset, index_offset),
+        Storage::Pointer(match ty {
+          Ty::Int => Pointer::Dword { offset, index_offset: index_reg },
+          Ty::Bool => Pointer::Byte { offset, index_offset: index_reg },
           ty => unimplemented!("{:?}", ty),
-        }
+        })
       },
       Arg::Reference(_, reference) => {
-        asm.temporary_register.get(reference).unwrap().to_string()
+        Storage::Register(*asm.temporary_register.get(reference).unwrap())
       },
       Arg::Literal(literal) => {
         push_temporary(reg, &mut asm.temporaries);
 
-        match literal {
+        Storage::Literal(match literal {
           Literal::Int(integer) => integer.to_string(),
           Literal::Bool(boolean) => if *boolean { 1 } else { 0 }.to_string(),
           literal => unimplemented!("{:?}", literal),
-        }
+        })
       },
       _ => unimplemented!("{:?}", arg)
     }
@@ -401,6 +456,14 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               let variable = calc_index_offset(&stack, &mut asm, temp, variable);
               let value = calc_index_offset(&stack, &mut asm, temp, arg);
               asm.lines.push(format!("  mov    {}, {}", variable, value));
+            });
+          }
+          Op::Load(variable) => {
+            stack_hygiene!(&mut asm, |temp: Reg32| {
+              asm.temporary_register.insert(i, temp);
+              let var = calc_index_offset(&stack, &mut asm, temp, variable);
+              let reg = var.map_register(&temp);
+              asm.lines.push(format!("  mov    {}, {}", reg, var));
             });
           }
           Op::Return(arg) => {
@@ -525,13 +588,6 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             },
             _ => unimplemented!(),
           },
-          Op::Load(variable) => {
-            stack_hygiene!(&mut asm, |temp: Reg32| {
-              asm.temporary_register.insert(i, temp);
-              let var = calc_index_offset(&stack, &mut asm, temp, variable);
-              asm.lines.push(format!("  mov    {}, {}", temp, var));
-            });
-          }
           Op::Gt(lhs, rhs) | Op::Lte(rhs, lhs) => {
             comparison_to_asm!(ConditionalSet::SETG);
 
