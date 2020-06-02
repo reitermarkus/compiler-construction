@@ -241,11 +241,11 @@ macro_rules! stack_hygiene {
 
     $closure(temp_l);
 
+    $asm.temporary_register.remove($ref_l);
+
     if !$asm.temporary_register.contains_key(&$i) {
       $asm.temporary_register.insert($i, temp_l);
     }
-
-    $asm.temporary_register.remove($ref_l);
   };
   ($ref_l:expr, $ref_r:expr, $i:expr, $asm:expr, $closure:expr) => {
     let temp_l = *$asm.temporary_register.get($ref_l).unwrap();
@@ -254,9 +254,13 @@ macro_rules! stack_hygiene {
     $closure(temp_l, temp_r);
 
     push_temporary(temp_r, &mut $asm.temporaries);
-    $asm.temporary_register.insert($i, temp_l);
+
     $asm.temporary_register.remove($ref_r);
     $asm.temporary_register.remove($ref_l);
+
+    if !$asm.temporary_register.contains_key(&$i) {
+      $asm.temporary_register.insert($i, temp_l);
+    }
   }
 }
 
