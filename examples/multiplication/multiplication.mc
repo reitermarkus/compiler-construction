@@ -1,10 +1,10 @@
 int main() {
   int x;
-  x = 1;
+  x = 2;
 
   int z;
   z = x * x + x;
-  z = 3 - z;
+  z = 9 - z;
 
   return z;
 }

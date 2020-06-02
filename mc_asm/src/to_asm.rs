@@ -241,7 +241,10 @@ macro_rules! stack_hygiene {
 
     $closure(temp_l);
 
-    $asm.temporary_register.insert($i, temp_l);
+    if !$asm.temporary_register.contains_key(&$i) {
+      $asm.temporary_register.insert($i, temp_l);
+    }
+
     $asm.temporary_register.remove($ref_l);
   };
   ($ref_l:expr, $ref_r:expr, $i:expr, $asm:expr, $closure:expr) => {
@@ -268,17 +271,17 @@ macro_rules! operation_to_asm {
       }
       (Arg::Reference(Some(ty), ref_l), Arg::Literal(Literal::$from(rhs))) if ty == &Ty::$from => {
         stack_hygiene!(ref_l, $index, $asm, |temp_l: Reg32| {
-          $reflit_closure($asm, temp_l, rhs)
+          $reflit_closure($index, $asm, temp_l, rhs)
         });
       }
       (Arg::Literal(Literal::$from(lhs)), Arg::Reference(Some(ty), ref_r)) if ty == &Ty::$from => {
         stack_hygiene!(ref_r, $index, $asm, |temp_r: Reg32| {
-          $litref_closure($asm, temp_r, lhs)
+          $litref_closure($index, $asm, temp_r, lhs)
         });
       }
       (Arg::Reference(Some(ty_l), ref_l), Arg::Reference(Some(ty_r), ref_r)) if ty_l == &Ty::$from && ty_r == &Ty::$from => {
         stack_hygiene!(ref_l, ref_r, $index, $asm, |temp_l: Reg32, temp_r: Reg32| {
-          $reference_closure($asm, temp_l, temp_r)
+          $reference_closure($index, $asm, temp_l, temp_r)
         });
       },
       (lhs, rhs) => unreachable!("LHS = {:?}, RHS = {:?}", lhs, rhs)
@@ -288,7 +291,7 @@ macro_rules! operation_to_asm {
 
 macro_rules! comparison_to_asm {
   ($op:expr) => {
-    fn comparison_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+    fn comparison_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
       asm.lines.push(format!("  cmp    {}, {}", lhs, rhs));
       asm.lines.push(format!("  {}   {}", $op, lhs.as_reg8().0));
     }
@@ -386,6 +389,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           asm.lines.push(format!("{}:", label));
         }
 
+        dbg!(&asm.temporary_register);
+
         match statement {
           Op::Decl(_, ty, count) => {
             stack.push(i, *ty, *count);
@@ -429,15 +434,20 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           Op::Minus(lhs, rhs) => {
             match lhs.ty() {
               Some(Ty::Int) => {
-                fn sub_reflit_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+                fn sub_reflit_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
                   asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
                 }
 
-                fn sub_litref_to_asm<T: Display>(asm: &mut Asm, rhs: Reg32, lhs: T) {
-                  asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
+                fn sub_litref_to_asm<T: Display>(index: usize, asm: &mut Asm, rhs: Reg32, lhs: T) {
+                  let temp_l = asm.temporaries.pop_front().unwrap();
+
+                  asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
+                  asm.lines.push(format!("  sub    {}, {}", temp_l, rhs));
+
+                  asm.temporary_register.insert(index, temp_l);
                 }
 
-                fn sub_reference_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+                fn sub_reference_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
                   asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
                 }
 
@@ -445,25 +455,15 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               },
               _ => unimplemented!(),
             }
-
-            //let front_reg = asm.temporaries.pop_front().unwrap();
-            //  let temp_r = *asm.temporary_register.get(ref_r).unwrap();
-
-            //  asm.lines.push(format!("  mov    {}, {}", front_reg, lhs));
-            //  asm.lines.push(format!("  sub    {}, {}", temp_r, front_reg));
-
-            //  push_temporary(front_reg, &mut asm.temporaries);
-            //  asm.temporary_register.remove(ref_r);
-            //  asm.temporary_register.insert(i, temp_r);
           },
           Op::Times(lhs, rhs) => {
             match lhs.ty() {
               Some(Ty::Int) => {
-                fn imul_reflit_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+                fn imul_reflit_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
                   asm.lines.push(format!("  imul    {}, {}, {}", lhs, lhs, rhs));
                 }
 
-                fn imul_reference_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+                fn imul_reference_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
                   asm.lines.push(format!("  imul    {}, {}", lhs, rhs));
                 }
 
@@ -512,14 +512,14 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             }
           },
           Op::Land(lhs, rhs) => {
-            fn and_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+            fn and_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
               asm.lines.push(format!("  and    {}, {}", lhs, rhs));
             }
 
             operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), &&: Bool -> Bool, and_to_asm, and_to_asm)
           },
           Op::Lor(lhs, rhs) => {
-            fn or_to_asm<T: Display>(asm: &mut Asm, lhs: Reg32, rhs: T) {
+            fn or_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
               asm.lines.push(format!("  or    {}, {}", lhs, rhs));
             }
 
