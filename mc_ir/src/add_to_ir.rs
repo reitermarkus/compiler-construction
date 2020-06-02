@@ -165,12 +165,15 @@ impl<'a> AddToIr<'a> for IfStatement<'a> {
 
 impl<'a> AddToIr<'a> for WhileStatement<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+    let condition_ref = Arg::Reference(None, ir.statements.len());
     let condition = self.condition.add_to_ir(ir);
 
     let jumpfalse_index = ir.statements.len();
     ir.push(Op::Jumpfalse(condition, Arg::Reference(None, 0)));
 
     self.block.add_to_ir(ir);
+    ir.push(Op::Jump(condition_ref));
+
     ir.update_reference(jumpfalse_index, ir.statements.len());
 
     ir.last_ref()

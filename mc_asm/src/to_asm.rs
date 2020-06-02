@@ -302,19 +302,6 @@ macro_rules! comparison_to_asm {
   };
 }
 
-macro_rules! generate_label {
-  ($asm:expr, $reference:expr) => {
-    if let Some(label) = $asm.labels.get($reference) {
-      label
-    } else {
-      let label_number = $asm.labels.len();
-      let label = format!(".L{}", label_number);
-      $asm.labels.insert(*$reference, label);
-      $asm.labels.get($reference).unwrap()
-    }
-  };
-}
-
 fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> String {
     match arg {
       Arg::Variable(ty, decl_index, index_offset) => {
@@ -338,6 +325,7 @@ fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> 
 
         match ty {
           Ty::Int => format!("DWORD PTR [ebp-{}{}]", offset, index_offset),
+          Ty::Bool => format!("BYTE PTR [ebp-{}{}]", offset, index_offset),
           ty => unimplemented!("{:?}", ty),
         }
       },
@@ -376,6 +364,17 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
     asm.lines.push("  .intel_syntax noprefix".to_string());
     asm.lines.push("  .global main".to_string());
 
+    for (i, statement) in self.statements.iter().enumerate() {
+      match statement {
+        Op::Jumpfalse(_, Arg::Reference(_, reference)) | Op::Jump(Arg::Reference(_, reference)) => {
+          let label_number = asm.labels.len();
+          let label = format!(".L{}", label_number);
+          asm.labels.insert(*reference, label);
+        },
+        _ => {}
+      }
+    }
+
     for (&name, (range, _)) in &self.functions {
       let is_main = name == &Identifier::from("main");
 
@@ -392,8 +391,6 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
         if let Some(label) = asm.labels.get(&i) {
           asm.lines.push(format!("{}:", label));
         }
-
-        dbg!(&asm.temporary_register);
 
         match statement {
           Op::Decl(_, ty, count) => {
@@ -464,11 +461,11 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             match lhs.ty() {
               Some(Ty::Int) => {
                 fn imul_reflit_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
-                  asm.lines.push(format!("  imul    {}, {}, {}", lhs, lhs, rhs));
+                  asm.lines.push(format!("  imul   {}, {}, {}", lhs, lhs, rhs));
                 }
 
                 fn imul_reference_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
-                  asm.lines.push(format!("  imul    {}, {}", lhs, rhs));
+                  asm.lines.push(format!("  imul   {}, {}", lhs, rhs));
                 }
 
                 operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), *: Int -> Int, imul_reflit_to_asm, imul_reference_to_asm);
@@ -488,7 +485,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 asm.lines.push(format!("  mov    {}, {}", temp_r, rhs));
 
                 asm.lines.push(format!("  cdq"));
-                asm.lines.push(format!("  idiv    {}", temp_r));
+                asm.lines.push(format!("  idiv   {}", temp_r));
                 asm.lines.push(format!("  mov    {}, eax", lhs));
 
                 push_temporary(temp_r, &mut asm.temporaries);
@@ -502,7 +499,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 }
 
                 asm.lines.push(format!("  cdq"));
-                asm.lines.push(format!("  idiv    {}", rhs));
+                asm.lines.push(format!("  idiv   {}", rhs));
 
                 if temp_l != Reg32::EAX {
                   asm.lines.push(format!("  mov    {}, eax", temp_l));
@@ -517,7 +514,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 }
 
                 asm.lines.push(format!("  cdq"));
-                asm.lines.push(format!("  idiv    {}", rhs));
+                asm.lines.push(format!("  idiv   {}", rhs));
 
                 if lhs != Reg32::EAX {
                   asm.lines.push(format!("  mov    {}, eax", lhs));
@@ -581,40 +578,25 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
             operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), ||: Bool -> Bool, or_to_asm, or_to_asm)
           }
-          Op::Jumpfalse(Arg::Reference(ty_l, cond), Arg::Reference(ty_r, reference)) => {
-            let label = generate_label!(asm, reference);
+          Op::Jumpfalse(cond, Arg::Reference(ty_r, reference)) => match cond {
+            Arg::Reference(ty_l, cond) => {
+              let register = asm.temporary_register.get(cond).unwrap();
 
-            let register = asm.temporary_register.get(cond).unwrap();
-
-            asm.lines.push(format!("  cmp    {}, 0", register.as_reg8().0));
-            asm.lines.push(format!("  je     {}", label));
+              asm.lines.push(format!("  cmp    {}, 0", register.as_reg8().0));
+              asm.lines.push(format!("  je     {}", asm.labels.get(reference).unwrap()));
+            },
+            Arg::Literal(Literal::Bool(true)) => (),
+            Arg::Literal(Literal::Bool(false)) => {
+              asm.lines.push(format!("  jmp    {}", asm.labels.get(reference).unwrap()));
+            },
+            _ => unimplemented!(),
           },
           Op::Jump(Arg::Reference(ty, reference)) => {
-            let label = generate_label!(asm, reference);
-
-            asm.lines.push(format!("  jmp    {}", label));
+            asm.lines.push(format!("  jmp    {}", asm.labels.get(reference).unwrap()));
           },
           op => unimplemented!("{:?}", op),
         }
       }
-
-      let pop_lines = asm.lines.iter().filter_map(|line| {
-        if line.contains("ebx") {
-          return Some("  pop    ebx".into());
-        }
-
-        if line.contains("edi") {
-          return Some("  pop    edi".into());
-        }
-
-        if line.contains("esi") {
-          return Some("  pop    esi".into());
-        }
-
-        None
-      }).collect::<HashSet<_>>();
-
-      asm.lines.extend(pop_lines);
 
       asm.lines.push(format!(".AWAY_{}:", name));
 
