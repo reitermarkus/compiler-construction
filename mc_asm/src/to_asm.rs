@@ -599,6 +599,28 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
               operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), -: Int -> Int, sub_reflit_to_asm, sub_litref_to_asm, sub_reference_to_asm);
             },
+            Some(Ty::Float) => {
+              match (lhs, rhs) {
+                (Arg::Literal(Literal::Float(lhs)), Arg::Literal(Literal::Float(rhs))) => {
+                  let pointer = add_float(&mut asm, lhs - rhs);
+                  asm.lines.push(format!("  fld    QWORD PTR {}", pointer));
+                },
+                (Arg::Reference(Some(ty), ref_l), Arg::Literal(Literal::Float(rhs))) if ty == &Ty::Float => {
+                  let pointer = add_float(&mut asm, *rhs);
+                  asm.lines.push(format!("  fld    QWORD PTR {}", pointer));
+                  asm.lines.push(format!("  fsubp  st(1), st"));
+                },
+                (Arg::Literal(Literal::Float(lhs)), Arg::Reference(Some(ty), ref_r)) if ty == &Ty::Float => {
+                  let pointer = add_float(&mut asm, *lhs);
+                  asm.lines.push(format!("  fld    QWORD PTR {}", pointer));
+                  asm.lines.push(format!("  fsubp  st, st(1)"));
+                }
+                (Arg::Reference(Some(ty_l), ref_l), Arg::Reference(Some(ty_r), ref_r)) if ty_l == &Ty::Float && ty_r == &Ty::Float => {
+                  asm.lines.push(format!("  fsubp  st(1), st"));
+                },
+                (lhs, rhs) => unreachable!("LHS = {:?}, RHS = {:?}", lhs, rhs)
+              }
+            },
             _ => unimplemented!(),
           },
           Op::Times(lhs, rhs) => {
