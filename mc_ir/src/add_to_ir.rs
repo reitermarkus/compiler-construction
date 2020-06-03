@@ -217,7 +217,10 @@ impl<'a> AddToIr<'a> for FunctionDeclaration<'a> {
     let start_index = ir.statements.len();
 
     for parameter in &self.parameters {
-      parameter.add_to_ir(ir);
+      ir.push(Op::Param(&parameter.identifier, parameter.ty, parameter.count.unwrap_or(1)));
+
+      let reference = ir.statements.len() - 1;
+      ir.stack.push(parameter.identifier.clone(), reference, parameter.ty);
     }
 
     self.body.add_to_ir(ir);

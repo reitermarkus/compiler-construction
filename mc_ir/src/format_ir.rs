@@ -19,6 +19,7 @@ impl fmt::Display for Op<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Self::Load(arg) => write!(f, "{}", arg),
+      Self::Param(arg, ty, size) => write!(f, "param {} {} {}", arg, ty, size),
       Self::Decl(arg, ty, size) => write!(f, "decl {} {} {}", arg, ty, size),
       Self::Gt(arg1, arg2) => write!(f, "{} > {}", arg1, arg2),
       Self::Gte(arg1, arg2) => write!(f, "{} >= {}", arg1, arg2),
@@ -55,7 +56,7 @@ impl fmt::Display for IntermediateRepresentation<'_> {
       writeln!(f, "\t {}:", identifier)?;
       for (i, stmt) in self.statements[range.start..range.end].iter().enumerate() {
         match stmt {
-          Op::Decl(..) | Op::Assign(..) | Op::Jump(..) | Op::Jumpfalse(..) | Op::Call(..) | Op::Return(..) => {
+          Op::Param(..) | Op::Decl(..) | Op::Assign(..) | Op::Jump(..) | Op::Jumpfalse(..) | Op::Call(..) | Op::Return(..) => {
             writeln!(f, "{}:\t \t {}", range.start + i, stmt)?;
           }
           _ => writeln!(f, "{}:\t \t t{} = {}", range.start + i, i, stmt)?,
