@@ -12,8 +12,6 @@ use mc_parser::ast::*;
 #[derive(Debug)]
 pub struct Asm {
   lines: Vec<String>,
-  temporary_register: BTreeMap<usize, Reg32>,
-  temporaries: VecDeque<Reg32>,
   labels: BTreeMap<usize, String>,
   floats: BTreeMap<Float, String>,
 }
@@ -33,11 +31,32 @@ pub trait ToAsm {
   fn to_asm(&self) -> Asm;
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Stack {
+  temporary_register: BTreeMap<usize, Reg32>,
+  temporaries: VecDeque<Reg32>,
   lookup_table: HashMap<usize, usize>,
   variables: Vec<(Ty, usize, usize)>,
   size: usize,
+}
+
+impl Default for Stack {
+  fn default() -> Stack {
+    Stack {
+      temporary_register: Default::default(),
+      temporaries: VecDeque::from(vec![
+        Reg32::EAX,
+        Reg32::EDX,
+        Reg32::ECX,
+        Reg32::EBX,
+        Reg32::EDI,
+        Reg32::ESI,
+      ]),
+      lookup_table: Default::default(),
+      variables: Default::default(),
+      size: Default::default(),
+    }
+  }
 }
 
 impl Stack {
@@ -233,34 +252,34 @@ fn push_temporary(temporary: Reg32, temporaries: &mut VecDeque<Reg32>) {
 }
 
 macro_rules! stack_hygiene {
-  ($asm:expr, $closure:expr) => (
-    let temp_var = $asm.temporaries.pop_front().unwrap();
+  ($stack:expr, $closure:expr) => (
+    let temp_var = $stack.temporaries.pop_front().unwrap();
     $closure(temp_var)
   );
-  ($ref_l:expr, $i:expr, $asm:expr, $closure:expr) => {
-    let temp_l = *$asm.temporary_register.get($ref_l).unwrap();
+  ($ref_l:expr, $i:expr, $stack:expr, $closure:expr) => {
+    let temp_l = *$stack.temporary_register.get($ref_l).unwrap();
 
     $closure(temp_l);
 
-    $asm.temporary_register.remove($ref_l);
+    $stack.temporary_register.remove($ref_l);
 
-    if !$asm.temporary_register.contains_key(&$i) {
-      $asm.temporary_register.insert($i, temp_l);
+    if !$stack.temporary_register.contains_key(&$i) {
+      $stack.temporary_register.insert($i, temp_l);
     }
   };
-  ($ref_l:expr, $ref_r:expr, $i:expr, $asm:expr, $closure:expr) => {
-    let temp_l = *$asm.temporary_register.get($ref_l).unwrap();
-    let temp_r = *$asm.temporary_register.get($ref_r).unwrap();
+  ($ref_l:expr, $ref_r:expr, $i:expr, $stack:expr, $closure:expr) => {
+    let temp_l = *$stack.temporary_register.get($ref_l).unwrap();
+    let temp_r = *$stack.temporary_register.get($ref_r).unwrap();
 
     $closure(temp_l, temp_r);
 
-    push_temporary(temp_r, &mut $asm.temporaries);
+    push_temporary(temp_r, &mut $stack.temporaries);
 
-    $asm.temporary_register.remove($ref_r);
-    $asm.temporary_register.remove($ref_l);
+    $stack.temporary_register.remove($ref_r);
+    $stack.temporary_register.remove($ref_l);
 
-    if !$asm.temporary_register.contains_key(&$i) {
-      $asm.temporary_register.insert($i, temp_l);
+    if !$stack.temporary_register.contains_key(&$i) {
+      $stack.temporary_register.insert($i, temp_l);
     }
   }
 }
@@ -275,18 +294,18 @@ macro_rules! operation_to_asm {
         calc_index_offset($stack, $asm, Reg32::EAX, &Arg::Literal(&Literal::$to(*l $op *r)));
       }
       (Arg::Reference(Some(ty), ref_l), Arg::Literal(Literal::$from(rhs))) if ty == &Ty::$from => {
-        stack_hygiene!(ref_l, $index, $asm, |temp_l: Reg32| {
-          $reflit_closure($index, $asm, temp_l, rhs)
+        stack_hygiene!(ref_l, $index, $stack, |temp_l: Reg32| {
+          $reflit_closure($index, $stack, $asm, temp_l, rhs)
         });
       }
       (Arg::Literal(Literal::$from(lhs)), Arg::Reference(Some(ty), ref_r)) if ty == &Ty::$from => {
-        stack_hygiene!(ref_r, $index, $asm, |temp_r: Reg32| {
-          $litref_closure($index, $asm, temp_r, lhs)
+        stack_hygiene!(ref_r, $index, $stack, |temp_r: Reg32| {
+          $litref_closure($index, $stack, $asm, temp_r, lhs)
         });
       }
       (Arg::Reference(Some(ty_l), ref_l), Arg::Reference(Some(ty_r), ref_r)) if ty_l == &Ty::$from && ty_r == &Ty::$from => {
-        stack_hygiene!(ref_l, ref_r, $index, $asm, |temp_l: Reg32, temp_r: Reg32| {
-          $reference_closure($index, $asm, temp_l, temp_r)
+        stack_hygiene!(ref_l, ref_r, $index, $stack, |temp_l: Reg32, temp_r: Reg32| {
+          $reference_closure($index, $stack, $asm, temp_l, temp_r)
         });
       },
       (lhs, rhs) => unreachable!("LHS = {:?}, RHS = {:?}", lhs, rhs)
@@ -296,81 +315,108 @@ macro_rules! operation_to_asm {
 
 macro_rules! comparison_to_asm {
   ($op:expr) => {
-    fn comparison_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+    fn comparison_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
       asm.lines.push(format!("  cmp    {}, {}", lhs, rhs));
       asm.lines.push(format!("  {}   {}", $op, lhs.as_reg8().0));
     }
   };
 }
 
-pub enum Pointer {
-  Qword { offset: usize, index_offset: Option<Reg32> },
-  Dword { offset: usize, index_offset: Option<Reg32> },
-  Byte { offset: usize, index_offset: Option<Reg32> },
+#[derive(Debug, Clone, Copy)]
+pub enum StorageType {
+  Qword,
+  Dword,
+  Byte,
 }
 
-impl Pointer {
-  fn name(&self) -> &'static str {
+impl From<&Ty> for StorageType {
+  fn from(ty: &Ty) -> Self {
+    match ty {
+      Ty::Float => Self::Qword,
+      Ty::Int => Self::Dword,
+      Ty::Bool => Self::Byte,
+      _ => unimplemented!(),
+    }
+  }
+}
+
+impl fmt::Display for StorageType {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::Qword { .. } => "QWORD PTR",
-      Self::Dword { .. } => "DWORD PTR",
-      Self::Byte { .. } => "BYTE PTR",
+      Self::Qword => "QWORD PTR",
+      Self::Dword => "DWORD PTR",
+      Self::Byte => "BYTE PTR",
+    }.fmt(f)
+  }
+}
+
+impl StorageType {
+  fn size(&self) -> usize {
+    match self {
+      Self::Qword => 8,
+      Self::Dword => 4,
+      Self::Byte => 1,
     }
   }
 
-  fn size(&self) -> usize {
+  fn map_register(&self, reg: &Reg32) -> String {
     match self {
-      Self::Qword { .. } => 8,
-      Self::Dword { .. } => 4,
-      Self::Byte { .. } => 1,
+      Self::Dword => reg.to_string(),
+      Self::Byte => reg.as_reg8().0.to_string(),
+      _ => unreachable!(),
     }
   }
+}
+
+pub struct Pointer {
+  storage_type: StorageType,
+  offset: usize,
+  index_offset: Option<Reg32>,
 }
 
 impl fmt::Display for Pointer {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Self::Qword { offset, index_offset } | Self::Dword { offset, index_offset } | Self::Byte { offset, index_offset } => {
-        write!(f, "{} [ebp-{}", self.name(), offset)?;
+    write!(f, "{} [ebp-{}", self.storage_type, self.offset)?;
 
-        if let Some(index_offset) = index_offset {
-          write!(f, "+{}*{}", index_offset, self.size())?;
-        }
-
-        write!(f, "]")
-      }
+    if let Some(index_offset) = self.index_offset {
+      write!(f, "+{}*{}", index_offset, self.storage_type.size())?;
     }
+
+    write!(f, "]")
   }
 }
 
 pub enum Storage {
   Pointer(Pointer),
-  Register(Reg32),
-  Literal(String),
+  Register(StorageType, Reg32),
+  Literal(StorageType, String),
 }
 
 impl fmt::Display for Storage {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Self::Pointer(pointer) => write!(f, "{}", pointer),
-      Self::Register(reg) => write!(f, "{}", reg),
-      Self::Literal(string) => write!(f, "{}", string)
+      Self::Register(storage_type, reg) => write!(f, "{}", storage_type.map_register(reg)),
+      Self::Literal(_, string) => write!(f, "{}", string)
     }
   }
 }
 
 impl Storage {
-  fn map_register(&self, reg: &Reg32) -> String {
-    match self {
-      Self::Pointer(Pointer::Dword { .. }) => reg.to_string(),
-      Self::Pointer(Pointer::Byte { .. }) => reg.as_reg8().0.to_string(),
-      Self::Register(_) => reg.to_string(),
-      _ => unreachable!(),
+  fn storage_type(&self) -> StorageType {
+    match *self {
+      Self::Pointer(Pointer { storage_type, .. }) => storage_type,
+      Self::Register(storage_type, _) => storage_type,
+      Self::Literal(storage_type, _) => storage_type,
     }
+  }
+
+  fn map_register(&self, reg: &Reg32) -> String {
+    self.storage_type().map_register(reg)
   }
 }
 
-fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> Storage {
+fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> Storage {
     match arg {
       Arg::Variable(ty, decl_index, index_offset) => {
         let (ty, count, mut offset) = stack.lookup(*decl_index);
@@ -382,32 +428,48 @@ fn calc_index_offset(stack: &Stack,asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> 
             None
           },
           Arg::Reference(ty, decl_index) => {
-            let temp = asm.temporary_register.remove(decl_index).unwrap();
-            push_temporary(temp, &mut asm.temporaries);
+            let temp = stack.temporary_register.remove(decl_index).unwrap();
+            push_temporary(temp, &mut stack.temporaries);
             Some(temp)
           },
           _ => None
         };
 
         Storage::Pointer(match ty {
-          Ty::Int => Pointer::Dword { offset, index_offset: index_reg },
-          Ty::Bool => Pointer::Byte { offset, index_offset: index_reg },
-          Ty::Float => Pointer::Qword { offset, index_offset: index_reg },
+          Ty::Int => Pointer { storage_type: StorageType::Dword, offset, index_offset: index_reg },
+          Ty::Bool => Pointer { storage_type: StorageType::Byte, offset, index_offset: index_reg },
+          Ty::Float => Pointer { storage_type: StorageType::Qword, offset, index_offset: index_reg },
           ty => unimplemented!("{:?}", ty),
         })
       },
-      Arg::Reference(_, reference) => {
-        Storage::Register(*asm.temporary_register.get(reference).unwrap())
+      Arg::Reference(Some(ty), reference) => {
+        Storage::Register(ty.into(), *stack.temporary_register.get(reference).unwrap())
       },
       Arg::Literal(literal) => {
-        push_temporary(reg, &mut asm.temporaries);
+        push_temporary(reg, &mut stack.temporaries);
 
-        Storage::Literal(match literal {
-          Literal::Int(integer) => integer.to_string(),
-          Literal::Bool(boolean) => if *boolean { 1 } else { 0 }.to_string(),
+        match literal {
+          Literal::Int(integer) => Storage::Literal(StorageType::Dword, integer.to_string()),
+          Literal::Bool(boolean) => Storage::Literal(StorageType::Byte, if *boolean { 1 } else { 0 }.to_string()),
           literal => unimplemented!("{:?}", literal),
-        })
+        }
       },
+      Arg::FunctionCall(Some(ty), identifier, args) => {
+        let mut args_size = 0;
+
+        for arg in args.iter().rev() {
+          let argument = calc_index_offset(stack, asm, reg, arg);
+
+          args_size += argument.storage_type().size();
+
+          asm.lines.push(format!("  push   {}", argument));
+        }
+
+        asm.lines.push(format!("  call   {}", identifier));
+        asm.lines.push(format!("  add    esp, {}", args_size));
+
+        Storage::Register(ty.into(), Reg32::EAX)
+  },
       _ => unimplemented!("{:?}", arg)
     }
 }
@@ -428,15 +490,6 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
   fn to_asm(&self) -> Asm {
     let mut asm = Asm {
         lines: vec![],
-        temporary_register: BTreeMap::new(),
-        temporaries: VecDeque::from(vec![
-          Reg32::EAX,
-          Reg32::EDX,
-          Reg32::ECX,
-          Reg32::EBX,
-          Reg32::EDI,
-          Reg32::ESI,
-        ]),
         labels: Default::default(),
         floats: BTreeMap::new(),
      };
@@ -481,13 +534,13 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               Arg::Variable(Ty::Float, ..) => {
                 match arg {
                   Arg::Literal(Literal::Float(float)) => {
-                    stack_hygiene!(&mut asm, |temp: Reg32| {
-                      let variable = calc_index_offset(&stack, &mut asm, temp, variable);
+                    stack_hygiene!(&mut stack, |temp: Reg32| {
+                      let variable = calc_index_offset(&mut stack, &mut asm, temp, variable);
                       let label = add_float(&mut asm, *float);
 
                       match variable {
                         Storage::Pointer(pointer) => {
-                          asm.lines.push(format!("  fld    {} {}", pointer.name(), label));
+                          asm.lines.push(format!("  fld    {} {}", pointer.storage_type, label));
                           asm.lines.push(format!("  fstp   {}", pointer));
                         },
                         _ => unreachable!(),
@@ -495,8 +548,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                     });
                   },
                   Arg::Reference(_, reference) => {
-                    stack_hygiene!(&mut asm, |temp: Reg32| {
-                      let variable = calc_index_offset(&stack, &mut asm, temp, variable);
+                    stack_hygiene!(&mut stack, |temp: Reg32| {
+                      let variable = calc_index_offset(&mut stack, &mut asm, temp, variable);
                       asm.lines.push(format!("  fstp   {}", variable));
                     });
                   },
@@ -504,9 +557,9 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 }
               },
               variable => {
-                stack_hygiene!(&mut asm, |temp: Reg32| {
-                  let variable = calc_index_offset(&stack, &mut asm, temp, variable);
-                  let value = calc_index_offset(&stack, &mut asm, temp, arg);
+                stack_hygiene!(&mut stack, |temp: Reg32| {
+                  let variable = calc_index_offset(&mut stack, &mut asm, temp, variable);
+                  let value = calc_index_offset(&mut stack, &mut asm, temp, arg);
                   asm.lines.push(format!("  mov    {}, {}", variable, value));
                 });
               }
@@ -515,15 +568,15 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           Op::Load(variable) => {
             match variable {
               Arg::Variable(Ty::Float, ..) => {
-                stack_hygiene!(&mut asm, |temp: Reg32| {
-                  let var = calc_index_offset(&stack, &mut asm, temp, variable);
+                stack_hygiene!(&mut stack, |temp: Reg32| {
+                  let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
                   asm.lines.push(format!("  fld    {}", var));
                 });
               },
               variable => {
-                stack_hygiene!(&mut asm, |temp: Reg32| {
-                  asm.temporary_register.insert(i, temp);
-                  let var = calc_index_offset(&stack, &mut asm, temp, variable);
+                stack_hygiene!(&mut stack, |temp: Reg32| {
+                  stack.temporary_register.insert(i, temp);
+                  let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
                   let reg = var.map_register(&temp);
                   asm.lines.push(format!("  mov    {}, {}", reg, var));
                 });
@@ -534,13 +587,16 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             if let Some(arg) = arg {
               match arg {
                 Arg::Literal(literal) => asm.lines.push(format!("  mov    eax, {}", literal)),
-                Arg::Reference(ty, reference) => {
-                  let result_register = asm.temporary_register.get(reference).unwrap();
+                arg => {
+                  stack_hygiene!(&mut stack, |temp: Reg32| {
+                    let result_register = calc_index_offset(&mut stack, &mut asm, temp, arg);
 
-                  if result_register != &Reg32::EAX {
-                    asm.lines.push(format!("  mov    {}, {}", Reg32::EAX, result_register));
-                  }
-                }
+                    if !matches!(result_register, Storage::Register(_, Reg32::EAX)) {
+                      asm.lines.push(format!("  mov    {}, {}", Reg32::EAX, result_register));
+                    }
+                  });
+                  asm.lines.push("  nop".to_string());
+                },
                 _ => unimplemented!()
               }
             }
@@ -549,15 +605,15 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           }
           Op::Plus(lhs, rhs) => match lhs.ty() {
             Some(Ty::Int) => {
-              fn add_reflit_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+              fn add_reflit_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
                 asm.lines.push(format!("  add    {}, {}", lhs, rhs));
               }
 
-              fn add_reference_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+              fn add_reference_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
                 asm.lines.push(format!("  add    {}, {}", lhs, rhs));
               }
 
-              operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), +: Int -> Int, add_reflit_to_asm, add_reference_to_asm);
+              operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), +: Int -> Int, add_reflit_to_asm, add_reference_to_asm);
             },
             Some(Ty::Float) => {
               match (lhs, rhs) {
@@ -580,24 +636,24 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           },
           Op::Minus(lhs, rhs) => match lhs.ty() {
             Some(Ty::Int) => {
-              fn sub_reflit_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+              fn sub_reflit_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
                 asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
               }
 
-              fn sub_litref_to_asm<T: Display>(index: usize, asm: &mut Asm, rhs: Reg32, lhs: T) {
-                let temp_l = asm.temporaries.pop_front().unwrap();
+              fn sub_litref_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, rhs: Reg32, lhs: T) {
+                let temp_l = stack.temporaries.pop_front().unwrap();
 
                 asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
                 asm.lines.push(format!("  sub    {}, {}", temp_l, rhs));
 
-                asm.temporary_register.insert(index, temp_l);
+                stack.temporary_register.insert(index, temp_l);
               }
 
-              fn sub_reference_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+              fn sub_reference_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
                 asm.lines.push(format!("  sub    {}, {}", lhs, rhs));
               }
 
-              operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), -: Int -> Int, sub_reflit_to_asm, sub_litref_to_asm, sub_reference_to_asm);
+              operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), -: Int -> Int, sub_reflit_to_asm, sub_litref_to_asm, sub_reference_to_asm);
             },
             Some(Ty::Float) => {
               match (lhs, rhs) {
@@ -626,27 +682,27 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           Op::Times(lhs, rhs) => {
             match lhs.ty() {
               Some(Ty::Int) => {
-                fn imul_reflit_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+                fn imul_reflit_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
                   asm.lines.push(format!("  imul   {}, {}, {}", lhs, lhs, rhs));
                 }
 
-                fn imul_reference_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+                fn imul_reference_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
                   asm.lines.push(format!("  imul   {}, {}", lhs, rhs));
                 }
 
-                operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), *: Int -> Int, imul_reflit_to_asm, imul_reference_to_asm);
+                operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), *: Int -> Int, imul_reflit_to_asm, imul_reference_to_asm);
               },
               _ => unimplemented!(),
             }
           },
           Op::Divide(lhs, rhs) => match lhs.ty() {
             Some(Ty::Int) => {
-              fn div_reflit_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+              fn div_reflit_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
                 if lhs != Reg32::EAX {
                   asm.lines.push(format!("  mov    eax, {}", lhs));
                 }
 
-                let temp_r = asm.temporaries.pop_front().unwrap();
+                let temp_r = stack.temporaries.pop_front().unwrap();
 
                 asm.lines.push(format!("  mov    {}, {}", temp_r, rhs));
 
@@ -654,11 +710,11 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 asm.lines.push(format!("  idiv   {}", temp_r));
                 asm.lines.push(format!("  mov    {}, eax", lhs));
 
-                push_temporary(temp_r, &mut asm.temporaries);
+                push_temporary(temp_r, &mut stack.temporaries);
               }
 
-              fn div_litref_to_asm<T: Display>(index: usize, asm: &mut Asm, rhs: Reg32, lhs: T) {
-                let temp_l = asm.temporaries.pop_front().unwrap();
+              fn div_litref_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, rhs: Reg32, lhs: T) {
+                let temp_l = stack.temporaries.pop_front().unwrap();
 
                 if temp_l != Reg32::EAX {
                   asm.lines.push(format!("  mov    eax, {}", lhs));
@@ -671,10 +727,10 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   asm.lines.push(format!("  mov    {}, eax", temp_l));
                 }
 
-                asm.temporary_register.insert(index, temp_l);
+                stack.temporary_register.insert(index, temp_l);
               }
 
-              fn div_reference_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+              fn div_reference_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
                 if lhs != Reg32::EAX {
                   asm.lines.push(format!("  mov    eax, {}", lhs));
                 }
@@ -687,7 +743,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 }
               }
 
-              operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), -: Int -> Int, div_reflit_to_asm, div_litref_to_asm, div_reference_to_asm);
+              operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), -: Int -> Int, div_reflit_to_asm, div_litref_to_asm, div_reference_to_asm);
             },
             _ => unimplemented!(),
           },
@@ -695,7 +751,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             comparison_to_asm!(ConditionalSet::SETG);
 
             match lhs.ty() {
-              Some(Ty::Int) => operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), >: Int -> Bool, comparison_to_asm, comparison_to_asm),
+              Some(Ty::Int) => operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), >: Int -> Bool, comparison_to_asm, comparison_to_asm),
               _ => unimplemented!(),
             }
           },
@@ -703,7 +759,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             comparison_to_asm!(ConditionalSet::SETL);
 
             match lhs.ty() {
-              Some(Ty::Int) => operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), <: Int -> Bool, comparison_to_asm, comparison_to_asm),
+              Some(Ty::Int) => operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), <: Int -> Bool, comparison_to_asm, comparison_to_asm),
               _ => unimplemented!(),
             }
           },
@@ -711,7 +767,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             comparison_to_asm!(ConditionalSet::SETE);
 
             match lhs.ty() {
-              Some(Ty::Int) => operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), ==: Int -> Bool, comparison_to_asm, comparison_to_asm),
+              Some(Ty::Int) => operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), ==: Int -> Bool, comparison_to_asm, comparison_to_asm),
               _ => unimplemented!(),
             }
           },
@@ -719,27 +775,27 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             comparison_to_asm!(ConditionalSet::SETNE);
 
             match lhs.ty() {
-              Some(Ty::Int) => operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), !=: Int -> Bool, comparison_to_asm, comparison_to_asm),
+              Some(Ty::Int) => operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), !=: Int -> Bool, comparison_to_asm, comparison_to_asm),
               _ => unimplemented!(),
             }
           },
           Op::Land(lhs, rhs) => {
-            fn and_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+            fn and_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
               asm.lines.push(format!("  and    {}, {}", lhs, rhs));
             }
 
-            operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), &&: Bool -> Bool, and_to_asm, and_to_asm)
+            operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), &&: Bool -> Bool, and_to_asm, and_to_asm)
           },
           Op::Lor(lhs, rhs) => {
-            fn or_to_asm<T: Display>(index: usize, asm: &mut Asm, lhs: Reg32, rhs: T) {
+            fn or_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
               asm.lines.push(format!("  or    {}, {}", lhs, rhs));
             }
 
-            operation_to_asm!(i, &stack, &mut asm, (lhs, rhs), ||: Bool -> Bool, or_to_asm, or_to_asm)
+            operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), ||: Bool -> Bool, or_to_asm, or_to_asm)
           }
           Op::Jumpfalse(cond, Arg::Reference(ty_r, reference)) => match cond {
             Arg::Reference(ty_l, cond) => {
-              let register = asm.temporary_register.get(cond).unwrap();
+              let register = stack.temporary_register.get(cond).unwrap();
 
               asm.lines.push(format!("  cmp    {}, 0", register.as_reg8().0));
               asm.lines.push(format!("  je     {}", asm.labels.get(reference).unwrap()));
@@ -752,6 +808,11 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           },
           Op::Jump(Arg::Reference(ty, reference)) => {
             asm.lines.push(format!("  jmp    {}", asm.labels.get(reference).unwrap()));
+          },
+          Op::Call(arg) => {
+            stack_hygiene!(&mut stack, |temp: Reg32| {
+              calc_index_offset(&mut stack, &mut asm, temp, arg);
+            });
           },
           op => unimplemented!("{:?}", op),
         }
