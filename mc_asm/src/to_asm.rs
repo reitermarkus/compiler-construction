@@ -652,13 +652,13 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   }
                 });
               }
-              Arg::Reference(_, reference) => {
+              _ => {
                 stack_hygiene!(&mut stack, |temp: Reg32| {
                   let variable = calc_index_offset(&mut stack, &mut asm, temp, variable);
+                  calc_index_offset(&mut stack, &mut asm, temp, arg);
                   asm.lines.push(format!("  fstp   {}", variable));
                 });
               }
-              _ => unreachable!(),
             },
             variable => {
               stack_hygiene!(&mut stack, |temp: Reg32| {
@@ -691,6 +691,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 if !matches!(result, Storage::Register(_, Reg32::EAX)) {
                   let op = if result.storage_type() == StorageType::Byte && !matches!(result, Storage::Literal(..)) {
                     asm.lines.push(format!("  movzx  {}, {}", Reg32::EAX, result));
+                  } else if arg.ty() == Some(Ty::Float) {
+                    asm.lines.push(format!("  fld    {}", result));
                   } else {
                     asm.lines.push(format!("  mov    {}, {}", Reg32::EAX, result));
                   };
@@ -727,10 +729,13 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 asm.lines.push(format!("  fld    DWORD PTR {}", pointer));
                 asm.lines.push(format!("  faddp  st(1), st"));
               }
-              (Arg::Reference(Some(ty_l), ref_l), Arg::Reference(Some(ty_r), ref_r))
-                if ty_l == &Ty::Float && ty_r == &Ty::Float =>
-              {
-                asm.lines.push(format!("  faddp  st(1), st"));
+              (arg_l, arg_r) if arg_l.ty() == Some(Ty::Float) && arg_r.ty() == Some(Ty::Float) => {
+                stack_hygiene!(&mut stack, |temp: Reg32| {
+                  // TODO: Move left hand side onto stack if right hand side is a function call.
+                  calc_index_offset(&mut stack, &mut asm, temp, arg_l);
+                  calc_index_offset(&mut stack, &mut asm, temp, arg_r);
+                  asm.lines.push(format!("  faddp  st(1), st"));
+                });
               }
               (lhs, rhs) => unreachable!("LHS = {:?}, RHS = {:?}", lhs, rhs),
             },
@@ -772,10 +777,13 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 asm.lines.push(format!("  fld    DWORD PTR {}", pointer));
                 asm.lines.push(format!("  fsubp  st, st(1)"));
               }
-              (Arg::Reference(Some(ty_l), ref_l), Arg::Reference(Some(ty_r), ref_r))
-                if ty_l == &Ty::Float && ty_r == &Ty::Float =>
-              {
-                asm.lines.push(format!("  fsubp  st(1), st"));
+              (arg_l, arg_r) if arg_l.ty() == Some(Ty::Float) && arg_r.ty() == Some(Ty::Float) => {
+                stack_hygiene!(&mut stack, |temp: Reg32| {
+                  // TODO: Move left hand side onto stack if right hand side is a function call.
+                  calc_index_offset(&mut stack, &mut asm, temp, arg_l);
+                  calc_index_offset(&mut stack, &mut asm, temp, arg_r);
+                  asm.lines.push(format!("  fsubp  st(1), st"));
+                });
               }
               (lhs, rhs) => unreachable!("LHS = {:?}, RHS = {:?}", lhs, rhs),
             },
