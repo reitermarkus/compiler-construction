@@ -264,9 +264,14 @@ fn push_temporary(temporary: Reg32, temporaries: &mut VecDeque<Reg32>) {
 }
 
 macro_rules! stack_hygiene {
-  ($stack:expr, $closure:expr) => {
+  (@LOAD, $stack:expr, $closure:expr) => {
     let temp_var = $stack.temporaries.pop_front().unwrap();
     $closure(temp_var)
+  };
+  ($stack:expr, $closure:expr) => {
+    let temp_var = $stack.temporaries.pop_front().unwrap();
+    $closure(temp_var);
+    push_temporary(temp_var, &mut $stack.temporaries);
   };
   ($ref_l:expr, $i:expr, $stack:expr, $closure:expr) => {
     let temp_l = *$stack.temporary_register.get($ref_l).unwrap();
@@ -620,13 +625,13 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           },
           Op::Load(variable) => match variable {
             Arg::Variable(Ty::Float, ..) => {
-              stack_hygiene!(&mut stack, |temp: Reg32| {
+              stack_hygiene!(@LOAD, &mut stack, |temp: Reg32| {
                 let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
                 asm.lines.push(format!("  fld    {}", var));
               });
             }
             variable => {
-              stack_hygiene!(&mut stack, |temp: Reg32| {
+              stack_hygiene!(@LOAD, &mut stack, |temp: Reg32| {
                 stack.temporary_register.insert(i, temp);
                 let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
                 let reg = var.map_register(&temp);
