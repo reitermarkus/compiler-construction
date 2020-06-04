@@ -56,7 +56,13 @@ impl fmt::Display for IntermediateRepresentation<'_> {
       writeln!(f, "\t {}:", identifier)?;
       for (i, stmt) in self.statements[range.start..range.end].iter().enumerate() {
         match stmt {
-          Op::Param(..) | Op::Decl(..) | Op::Assign(..) | Op::Jump(..) | Op::Jumpfalse(..) | Op::Call(..) | Op::Return(..) => {
+          Op::Param(..)
+          | Op::Decl(..)
+          | Op::Assign(..)
+          | Op::Jump(..)
+          | Op::Jumpfalse(..)
+          | Op::Call(..)
+          | Op::Return(..) => {
             writeln!(f, "{}:\t \t {}", range.start + i, stmt)?;
           }
           _ => writeln!(f, "{}:\t \t t{} = {}", range.start + i, i, stmt)?,

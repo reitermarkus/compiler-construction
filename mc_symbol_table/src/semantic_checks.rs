@@ -251,7 +251,7 @@ pub fn check_variable<'a, E>(
   index_expression: &'a Option<E>,
 ) -> Result<(), Vec<SemanticError<'a>>>
 where
-  E: AsRef<Expression<'a>>
+  E: AsRef<Expression<'a>>,
 {
   match Scope::lookup(scope, identifier) {
     Some(Symbol::Function(..)) => Err(vec![SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() }]),
@@ -280,7 +280,7 @@ pub fn check_variable_boxed_index<'a, E>(
   index_expression: &'a Option<E>,
 ) -> Result<(), Vec<SemanticError<'a>>>
 where
-  E: AsRef<Expression<'a>>
+  E: AsRef<Expression<'a>>,
 {
   match (size, index_expression) {
     (Some(size), Some(index_expression)) => {
