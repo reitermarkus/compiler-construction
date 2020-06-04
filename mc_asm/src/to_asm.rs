@@ -491,11 +491,16 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
           let label = add_float(asm, *float);
           Storage::Label(StorageType::Dword, label)
         }
-        literal => unimplemented!("{:?}", literal),
+        Literal::String(string) => {
+          let label = add_string(asm, string);
+          Storage::Label(StorageType::Dword, label)
+        }
       }
     }
     Arg::FunctionCall(ty, identifier, args) => {
       let mut args_size = 0;
+
+      let alignment_index = asm.lines.len();
 
       for arg in args.iter().rev() {
         let argument = calc_index_offset(stack, asm, reg, arg);
@@ -507,6 +512,13 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
             asm.lines.push("  nop".to_string());
           } else {
             asm.lines.push(format!("  fld   {}", argument));
+          }
+        } else if arg.ty() == Some(Ty::String) {
+          match argument {
+            Storage::Label(_, label) => {
+              asm.lines.push(format!("  push   OFFSET FLAT:{}", label));
+            }
+            _ => unreachable!()
           }
         } else {
           match argument {
@@ -531,9 +543,6 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         asm.lines.push("  push   10".to_string());
         asm.lines.push("  call   putchar".to_string());
       } else if *identifier == &Identifier::from("print_float") {
-        let offset = StorageType::Dword.size();
-        asm.lines.push(format!("  sub    esp, {}", offset));
-        args_size += offset;
         asm.lines.push("  lea    esp, [esp-8]".to_string());
         asm.lines.push("  fstp   QWORD PTR [esp]".to_string());
 
@@ -543,10 +552,17 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         args_size += 8;
 
         asm.lines.push("  call   printf".to_string());
+      } else if *identifier == &Identifier::from("print") {
+        asm.lines.push("  call   printf".to_string());
       } else {
         asm.lines.push(format!("  call   {}", identifier));
       }
 
+
+      let alignment = (16 - args_size % 16) % 16;
+      asm.lines.insert(alignment_index, format!("  sub    esp, {}", alignment));
+
+      args_size = (args_size + 15) / 16 * 16;
       asm.lines.push(format!("  add    esp, {}", args_size));
 
       if let Some(ty) = ty {
