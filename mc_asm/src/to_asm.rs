@@ -35,9 +35,11 @@ pub trait ToAsm {
 pub struct Stack {
   temporary_register: BTreeMap<usize, Reg32>,
   temporaries: VecDeque<Reg32>,
-  lookup_table: HashMap<usize, usize>,
+  lookup_table: HashMap<usize, (usize, bool)>,
+  parameters: Vec<(Ty, usize, usize)>,
+  parameters_size: usize,
   variables: Vec<(Ty, usize, usize)>,
-  size: usize,
+  variables_size: usize,
 }
 
 impl Default for Stack {
@@ -53,22 +55,37 @@ impl Default for Stack {
         Reg32::ESI,
       ]),
       lookup_table: Default::default(),
+      parameters: Default::default(),
+      parameters_size: 8,
       variables: Default::default(),
-      size: Default::default(),
+      variables_size: Default::default(),
     }
   }
 }
 
 impl Stack {
-  pub fn lookup(&self, index: usize) -> (Ty, usize, usize) {
-    let i = self.lookup_table.get(&index).unwrap();
-    self.variables[*i]
+  pub fn lookup(&self, index: usize) -> (Ty, usize, usize, bool) {
+    let &(i, parameter) = self.lookup_table.get(&index).unwrap();
+
+    let (ty, count, offset) = if parameter {
+      self.parameters[i]
+    } else {
+      self.variables[i]
+    };
+
+    (ty, count, offset, parameter)
   }
 
-  pub fn push(&mut self, index: usize, ty: Ty, count: usize) {
-    self.variables.push((ty, count, self.size));
-    self.lookup_table.insert(index, self.variables.len() - 1);
-    self.size += count * ty.size();
+  pub fn push(&mut self, index: usize, ty: Ty, count: usize, parameter: bool) {
+    if parameter {
+      self.parameters.push((ty, count, self.parameters_size));
+      self.lookup_table.insert(index, (self.parameters.len() - 1, true));
+      self.parameters_size += count * ty.size();
+    } else {
+      self.variables_size += count * ty.size();
+      self.variables.push((ty, count, self.variables_size));
+      self.lookup_table.insert(index, (self.variables.len() - 1, false));
+    }
   }
 }
 
@@ -372,11 +389,16 @@ pub struct Pointer {
   storage_type: StorageType,
   offset: usize,
   index_offset: Option<Reg32>,
+  parameter: bool,
 }
 
 impl fmt::Display for Pointer {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{} [ebp-{}", self.storage_type, self.offset)?;
+    write!(f, "{} [ebp", self.storage_type)?;
+
+    if self.parameter { "+" } else { "-" }.fmt(f)?;
+
+    write!(f, "{}", self.offset)?;
 
     if let Some(index_offset) = self.index_offset {
       write!(f, "+{}*{}", index_offset, self.storage_type.size())?;
@@ -419,12 +441,16 @@ impl Storage {
 fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> Storage {
     match arg {
       Arg::Variable(ty, decl_index, index_offset) => {
-        let (ty, count, mut offset) = stack.lookup(*decl_index);
-        offset += count * ty.size();
+        let (ty, count, mut offset, parameter) = stack.lookup(*decl_index);
 
-        let index_reg = match &**index_offset {
+        let index_reg = match index_offset.as_ref() {
           Arg::Literal(Literal::Int(index_offset)) => {
-            offset -= *index_offset as usize * ty.size();
+            if parameter {
+              offset += *index_offset as usize * ty.size();
+            } else {
+              offset -= *index_offset as usize * ty.size();
+            }
+
             None
           },
           Arg::Reference(ty, decl_index) => {
@@ -436,9 +462,9 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         };
 
         Storage::Pointer(match ty {
-          Ty::Int => Pointer { storage_type: StorageType::Dword, offset, index_offset: index_reg },
-          Ty::Bool => Pointer { storage_type: StorageType::Byte, offset, index_offset: index_reg },
-          Ty::Float => Pointer { storage_type: StorageType::Qword, offset, index_offset: index_reg },
+          Ty::Int => Pointer { storage_type: StorageType::Dword, offset, index_offset: index_reg, parameter },
+          Ty::Bool => Pointer { storage_type: StorageType::Byte, offset, index_offset: index_reg, parameter },
+          Ty::Float => Pointer { storage_type: StorageType::Qword, offset, index_offset: index_reg, parameter },
           ty => unimplemented!("{:?}", ty),
         })
       },
@@ -526,8 +552,11 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
         }
 
         match statement {
+          Op::Param(_, ty, count) => {
+            stack.push(i, *ty, *count, true);
+          }
           Op::Decl(_, ty, count) => {
-            stack.push(i, *ty, *count);
+            stack.push(i, *ty, *count, false);
           }
           Op::Assign(arg, variable) => {
             match variable {
@@ -820,15 +849,14 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
       asm.lines.push(format!(".AWAY_{}:", name));
 
-      if is_main {
-        asm.lines.push("  leave".to_string());
-      } else {
+      if stack.variables.is_empty() {
         asm.lines.push("  pop    ebp".to_string());
+      } else {
+        asm.lines.insert(stack_size_index, format!("  sub    esp, {}", ((stack.variables_size + 15) / 16) * 16));
+        asm.lines.push("  leave".to_string());
       }
 
       asm.lines.push("  ret".to_string());
-
-      asm.lines.insert(stack_size_index, format!("  sub    esp, {}", ((stack.size + 15) / 16) * 16));
     }
 
     for (float, label) in asm.floats.iter() {
