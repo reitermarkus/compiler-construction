@@ -65,15 +65,18 @@ impl Stack {
     (ty, count, offset, parameter)
   }
 
-  pub fn push(&mut self, index: usize, ty: Ty, count: usize, parameter: bool) {
+  pub fn push(&mut self, index: usize, ty: Ty, count: usize, parameter: bool) -> Pointer {
     if parameter {
+      let offset = self.parameters_size;
       self.parameters.push((ty, count, self.parameters_size));
       self.lookup_table.insert(index, (self.parameters.len() - 1, true));
       self.parameters_size += count * ty.size();
+      Pointer { storage_type: StorageType::Dword, offset, index_offset: None, parameter }
     } else {
       self.variables_size += count * ty.size();
       self.variables.push((ty, count, self.variables_size));
       self.lookup_table.insert(index, (self.variables.len() - 1, false));
+      Pointer { storage_type: (&ty).into(), offset: self.variables_size, index_offset: None, parameter }
     }
   }
 }
@@ -331,7 +334,7 @@ macro_rules! comparison_to_asm {
   };
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum StorageType {
   Qword,
   Dword,
@@ -481,7 +484,14 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
 
         args_size += argument.storage_type().size();
 
-        asm.lines.push(format!("  push   {}", argument));
+        match argument {
+          Storage::Register(_, reg) => {
+            asm.lines.push(format!("  push   {}", reg));
+          }
+          argument => {
+            asm.lines.push(format!("  push   {}", argument));
+          }
+        }
       }
 
       asm.lines.push(format!("  call   {}", identifier));
@@ -542,9 +552,37 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
         }
 
         match statement {
-          Op::Param(_, ty, count) => {
-            stack.push(i, *ty, *count, true);
-          }
+          Op::Param(_, ty, count) => match StorageType::from(ty) {
+            StorageType::Dword => {
+              stack.push(i, *ty, *count, true);
+            }
+            StorageType::Qword => {
+              stack_hygiene!(&mut stack, |temp: Reg32| {
+                let arg1 = stack.push(i, Ty::Int, 1, true);
+                let arg2 = stack.push(i, Ty::Int, 1, true);
+
+                let mut pointer = stack.push(i, *ty, *count, false);
+
+                asm.lines.push(format!("  mov    {}, {}", temp, arg1));
+                asm.lines.push(format!("  mov    {}, {}", pointer, temp));
+
+                pointer.offset += StorageType::Dword.size();
+
+                asm.lines.push(format!("  mov    {}, {}", temp, arg2));
+                asm.lines.push(format!("  mov    {}, {}", pointer, temp));
+              });
+            }
+            StorageType::Byte => {
+              stack_hygiene!(&mut stack, |temp: Reg32| {
+                let arg = stack.push(i, Ty::Int, 1, true);
+
+                let mut pointer = stack.push(i, *ty, *count, false);
+
+                asm.lines.push(format!("  mov    {}, {}", temp, arg));
+                asm.lines.push(format!("  mov    {}, {}", pointer, pointer.storage_type.map_register(&temp)));
+              });
+            }
+          },
           Op::Decl(_, ty, count) => {
             stack.push(i, *ty, *count, false);
           }
@@ -598,20 +636,19 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           },
           Op::Return(arg) => {
             if let Some(arg) = arg {
-              match arg {
-                Arg::Literal(literal) => asm.lines.push(format!("  mov    eax, {}", literal)),
-                arg => {
-                  stack_hygiene!(&mut stack, |temp: Reg32| {
-                    let result_register = calc_index_offset(&mut stack, &mut asm, temp, arg);
+              stack_hygiene!(&mut stack, |temp: Reg32| {
+                let result = calc_index_offset(&mut stack, &mut asm, temp, arg);
 
-                    if !matches!(result_register, Storage::Register(_, Reg32::EAX)) {
-                      asm.lines.push(format!("  mov    {}, {}", Reg32::EAX, result_register));
-                    }
-                  });
+                if !matches!(result, Storage::Register(_, Reg32::EAX)) {
+                  let op = if result.storage_type() == StorageType::Byte && !matches!(result, Storage::Literal(..)) {
+                    asm.lines.push(format!("  movzx  {}, {}", Reg32::EAX, result));
+                  } else {
+                    asm.lines.push(format!("  mov    {}, {}", Reg32::EAX, result));
+                  };
+                } else {
                   asm.lines.push("  nop".to_string());
                 }
-                _ => unimplemented!(),
-              }
+              });
             }
 
             asm.lines.push(format!("  jmp    .AWAY_{}", name));
@@ -816,17 +853,18 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), ||: Bool -> Bool, or_to_asm, or_to_asm)
           }
           Op::Jumpfalse(cond, Arg::Reference(ty_r, reference)) => match cond {
-            Arg::Reference(ty_l, cond) => {
-              let register = stack.temporary_register.get(cond).unwrap();
-
-              asm.lines.push(format!("  cmp    {}, 0", register.as_reg8().0));
-              asm.lines.push(format!("  je     {}", asm.labels.get(reference).unwrap()));
-            }
             Arg::Literal(Literal::Bool(true)) => (),
             Arg::Literal(Literal::Bool(false)) => {
               asm.lines.push(format!("  jmp    {}", asm.labels.get(reference).unwrap()));
             }
-            _ => unimplemented!(),
+            arg => {
+              stack_hygiene!(&mut stack, |temp: Reg32| {
+                let result_register = calc_index_offset(&mut stack, &mut asm, temp, arg);
+
+                asm.lines.push(format!("  cmp    {}, 0", result_register));
+                asm.lines.push(format!("  je     {}", asm.labels.get(reference).unwrap()));
+              });
+            }
           },
           Op::Jump(Arg::Reference(ty, reference)) => {
             asm.lines.push(format!("  jmp    {}", asm.labels.get(reference).unwrap()));
