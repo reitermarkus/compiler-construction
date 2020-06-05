@@ -1,8 +1,8 @@
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::collections::HashSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::fmt;
 use std::fmt::Display;
@@ -744,15 +744,14 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
               match (arg.ty(), register) {
                 (Some(Ty::Int), Storage::Register(_, reg)) => {
-                   asm.lines.push(format!("  neg    {}", reg));
+                  asm.lines.push(format!("  neg    {}", reg));
                   assert_eq!(reg, stack.temporaries.pop_front().unwrap());
                   stack.temporary_register.insert(i, reg);
-                },
+                }
                 (Some(Ty::Float), _) => {
-                   asm.lines.push("  fchs".to_string());
+                  asm.lines.push("  fchs".to_string());
                 }
                 _ => unreachable!(),
-
               }
             });
           }
