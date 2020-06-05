@@ -747,6 +747,26 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
             asm.lines.push(format!("  jmp    .AWAY_{}", name));
           }
+          Op::UnaryMinus(arg) => {
+            stack_hygiene!(&mut stack, |temp: Reg32| {
+              let register = calc_index_offset(&mut stack, &mut asm, temp, arg);
+
+              dbg!(&register);
+
+              match (arg.ty(), register) {
+                (Some(Ty::Int), Storage::Register(_, reg)) => {
+                   asm.lines.push(format!("  neg    {}", reg));
+                  assert_eq!(reg, stack.temporaries.pop_front().unwrap());
+                  stack.temporary_register.insert(i, reg);
+                },
+                (Some(Ty::Float), _) => {
+                   asm.lines.push("  fchs".to_string());
+                }
+                _ => unreachable!(),
+
+              }
+            });
+          }
           Op::Plus(lhs, rhs) => match lhs.ty() {
             Some(Ty::Int) => {
               fn add_reflit_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
