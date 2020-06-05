@@ -334,7 +334,7 @@ macro_rules! operation_to_asm {
 
 macro_rules! comparison_to_asm {
   ($op:expr) => {
-    fn comparison_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
+    fn comparison_to_asm<T: Display>(index: usize, mut stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
       asm.lines.push(format!("  cmp    {}, {}", lhs, rhs));
       asm.lines.push(format!("  {}   {}", $op, lhs.as_reg8().0));
     }
@@ -459,12 +459,10 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
 
           None
         }
-        Arg::Reference(ty, decl_index) => {
-          let temp = stack.temporary_register.remove(decl_index).unwrap();
-          push_temporary(temp, &mut stack.temporaries);
-          Some(temp)
-        }
-        _ => None,
+        arg => match calc_index_offset(stack, asm, reg, arg) {
+          Storage::Register(_, temp) => Some(temp),
+          _ => unreachable!(),
+        },
       };
 
       Storage::Pointer(match ty {
@@ -475,28 +473,27 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
       })
     }
     Arg::Reference(Some(ty), reference) => {
+      let temp = *stack.temporary_register.get(reference).unwrap();
+      push_temporary(temp, &mut stack.temporaries);
+
       if *ty == Ty::Float {
         Storage::Pointer(Pointer { storage_type: StorageType::Dword, offset: 0, index_offset: None, parameter: false })
       } else {
-        Storage::Register(ty.into(), *stack.temporary_register.get(reference).unwrap())
+        Storage::Register(ty.into(), temp)
       }
     }
-    Arg::Literal(literal) => {
-      push_temporary(reg, &mut stack.temporaries);
-
-      match literal {
-        Literal::Int(integer) => Storage::Literal(StorageType::Dword, integer.to_string()),
-        Literal::Bool(boolean) => Storage::Literal(StorageType::Byte, if *boolean { 1 } else { 0 }.to_string()),
-        Literal::Float(float) => {
-          let label = add_float(asm, *float);
-          Storage::Label(StorageType::Dword, label)
-        }
-        Literal::String(string) => {
-          let label = add_string(asm, string);
-          Storage::Label(StorageType::Dword, label)
-        }
+    Arg::Literal(literal) => match literal {
+      Literal::Int(integer) => Storage::Literal(StorageType::Dword, integer.to_string()),
+      Literal::Bool(boolean) => Storage::Literal(StorageType::Byte, if *boolean { 1 } else { 0 }.to_string()),
+      Literal::Float(float) => {
+        let label = add_float(asm, *float);
+        Storage::Label(StorageType::Dword, label)
       }
-    }
+      Literal::String(string) => {
+        let label = add_string(asm, string);
+        Storage::Label(StorageType::Dword, label)
+      }
+    },
     Arg::FunctionCall(ty, identifier, args) => {
       let mut args_size = 0;
 
@@ -518,7 +515,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
             Storage::Label(_, label) => {
               asm.lines.push(format!("  push   OFFSET FLAT:{}", label));
             }
-            _ => unreachable!()
+            _ => unreachable!(),
           }
         } else {
           match argument {
@@ -557,7 +554,6 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
       } else {
         asm.lines.push(format!("  call   {}", identifier));
       }
-
 
       let alignment = (16 - args_size % 16) % 16;
       asm.lines.insert(alignment_index, format!("  sub    esp, {}", alignment));
