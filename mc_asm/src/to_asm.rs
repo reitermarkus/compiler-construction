@@ -1,6 +1,7 @@
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fmt;
@@ -15,6 +16,7 @@ pub struct Asm {
   labels: BTreeMap<usize, String>,
   strings: BTreeMap<String, String>,
   floats: BTreeMap<OrderedFloat<f64>, String>,
+  builtin_functions: HashSet<Identifier>,
 }
 
 impl fmt::Display for Asm {
@@ -390,6 +392,7 @@ impl StorageType {
   }
 }
 
+#[derive(Debug)]
 pub struct Pointer {
   storage_type: StorageType,
   offset: usize,
@@ -413,6 +416,7 @@ impl fmt::Display for Pointer {
   }
 }
 
+#[derive(Debug)]
 pub enum Storage {
   Pointer(Pointer),
   Register(StorageType, Reg32),
@@ -475,12 +479,11 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
       })
     }
     Arg::Reference(Some(ty), reference) => {
-      let temp = *stack.temporary_register.get(reference).unwrap();
-      push_temporary(temp, &mut stack.temporaries);
-
       if *ty == Ty::Float {
         Storage::Pointer(Pointer { storage_type: StorageType::Dword, offset: 0, index_offset: None, parameter: false })
       } else {
+        let temp = *stack.temporary_register.get(reference).unwrap();
+        push_temporary(temp, &mut stack.temporaries);
         Storage::Register(ty.into(), temp)
       }
     }
@@ -553,42 +556,22 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         asm.lines.push("  call   printf".to_string());
       } else if *identifier == &Identifier::from("print") {
         asm.lines.push("  call   printf".to_string());
-      } else if *identifier == &Identifier::from("read_int") {
-        args_size += 8;
-
-        let insert = |asm: &mut Asm, start_index: &mut usize, line: String| -> usize {
-          asm.lines.insert(*start_index, line);
-          *start_index += 1;
-          *start_index
-        };
-
-        let mut start_index = 2;
-        insert(asm, &mut start_index, "read_int:".to_string());
-        insert(asm, &mut start_index, "  push   ebp".to_string());
-        insert(asm, &mut start_index, "  mov    ebp, esp".to_string());
-        insert(asm, &mut start_index, "  sub    esp, 24".to_string());
-        insert(asm, &mut start_index, "  lea    eax, [ebp-12]".to_string());
-        insert(asm, &mut start_index, "  push   eax".to_string());
-        let format_string_label = add_string(asm, "%d");
-        let format_string = format!("OFFSET FLAT:{}", format_string_label);
-        insert(asm, &mut start_index, format!("  push    {}", format_string));
-        insert(asm, &mut start_index, "  call   __isoc99_scanf".to_string());
-        insert(asm, &mut start_index, "  add    esp, 16".to_string());
-        insert(asm, &mut start_index, "  mov    eax, [ebp-12]".to_string());
-        insert(asm, &mut start_index, "  leave".to_string());
-        insert(asm, &mut start_index, "  ret".to_string());
-        stack.stack_size_index = stack.stack_size_index + start_index - 1;
-
-        asm.lines.push("  call   read_int".to_string());
+      } else if *identifier == &Identifier::from("read_int") || *identifier == &Identifier::from("read_float") {
+        asm.builtin_functions.insert((**identifier).clone());
+        asm.lines.push(format!("  call   {}", identifier));
       } else {
         asm.lines.push(format!("  call   {}", identifier));
       }
 
       let alignment = (16 - args_size % 16) % 16;
-      asm.lines.insert(alignment_index, format!("  sub    esp, {}", alignment));
 
-      if *identifier != &Identifier::from("read_int") {
-        args_size = (args_size + 15) / 16 * 16;
+      if alignment > 0 {
+        asm.lines.insert(alignment_index, format!("  sub    esp, {}", alignment));
+      }
+
+      args_size = (args_size + 15) / 16 * 16;
+
+      if args_size > 0 {
         asm.lines.push(format!("  add    esp, {}", args_size));
       }
 
@@ -628,7 +611,13 @@ fn add_string(asm: &mut Asm, s: &str) -> String {
 
 impl<'a> ToAsm for IntermediateRepresentation<'a> {
   fn to_asm(&self) -> Asm {
-    let mut asm = Asm { lines: vec![], labels: Default::default(), strings: BTreeMap::new(), floats: BTreeMap::new() };
+    let mut asm = Asm {
+      lines: vec![],
+      labels: Default::default(),
+      strings: Default::default(),
+      floats: Default::default(),
+      builtin_functions: Default::default(),
+    };
 
     asm.lines.push("  .intel_syntax noprefix".to_string());
     asm.lines.push("  .global main".to_string());
@@ -1008,6 +997,40 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       }
 
       asm.lines.push("  ret".to_string());
+    }
+
+    for builtin_function in asm.builtin_functions.clone().iter() {
+      asm.lines.push(format!("{}:", builtin_function));
+
+      if builtin_function == &Identifier::from("read_int") {
+        asm.lines.push("  push   ebp".to_string());
+        asm.lines.push("  mov    ebp, esp".to_string());
+        asm.lines.push("  sub    esp, 32".to_string());
+        asm.lines.push("  lea    eax, [ebp-12]".to_string());
+        asm.lines.push("  push   eax".to_string());
+        let format_string_label = add_string(&mut asm, "%d");
+        let format_string = format!("OFFSET FLAT:{}", format_string_label);
+        asm.lines.push(format!("  push   {}", format_string));
+        asm.lines.push("  call   __isoc99_scanf".to_string());
+        asm.lines.push("  add    esp, 16".to_string());
+        asm.lines.push("  mov    eax, DWORD PTR [ebp-12]".to_string());
+        asm.lines.push("  leave".to_string());
+        asm.lines.push("  ret".to_string());
+      } else if builtin_function == &Identifier::from("read_float") {
+        asm.lines.push("  push    ebp".to_string());
+        asm.lines.push("  mov     ebp, esp".to_string());
+        asm.lines.push("  sub     esp, 32".to_string());
+        asm.lines.push("  lea     eax, [ebp-12]".to_string());
+        asm.lines.push("  push    eax".to_string());
+        let format_string_label = add_string(&mut asm, "%f");
+        let format_string = format!("OFFSET FLAT:{}", format_string_label);
+        asm.lines.push(format!("  push   {}", format_string));
+        asm.lines.push("  call    __isoc99_scanf".to_string());
+        asm.lines.push("  add     esp, 16".to_string());
+        asm.lines.push("  fld     DWORD PTR [ebp-12]".to_string());
+        asm.lines.push("  leave".to_string());
+        asm.lines.push("  ret".to_string());
+      }
     }
 
     for (float, label) in asm.floats.iter() {
