@@ -39,6 +39,7 @@ pub struct Stack {
   lookup_table: HashMap<usize, (usize, bool)>,
   parameters: Vec<(Ty, usize, usize)>,
   parameters_size: usize,
+  stack_size_index: usize,
   variables: Vec<(Ty, usize, usize)>,
   variables_size: usize,
 }
@@ -51,6 +52,7 @@ impl Default for Stack {
       lookup_table: Default::default(),
       parameters: Default::default(),
       parameters_size: 8,
+      stack_size_index: Default::default(),
       variables: Default::default(),
       variables_size: Default::default(),
     }
@@ -551,6 +553,33 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         asm.lines.push("  call   printf".to_string());
       } else if *identifier == &Identifier::from("print") {
         asm.lines.push("  call   printf".to_string());
+      } else if *identifier == &Identifier::from("read_int") {
+        args_size += 8;
+
+        let insert = |asm: &mut Asm, start_index: &mut usize, line: String| -> usize {
+          asm.lines.insert(*start_index, line);
+          *start_index += 1;
+          *start_index
+        };
+
+        let mut start_index = 2;
+        insert(asm, &mut start_index, "read_int:".to_string());
+        insert(asm, &mut start_index, "  push   ebp".to_string());
+        insert(asm, &mut start_index, "  mov    ebp, esp".to_string());
+        insert(asm, &mut start_index, "  sub    esp, 24".to_string());
+        insert(asm, &mut start_index, "  lea    eax, [ebp-12]".to_string());
+        insert(asm, &mut start_index, "  push   eax".to_string());
+        let format_string_label = add_string(asm, "%d");
+        let format_string = format!("OFFSET FLAT:{}", format_string_label);
+        insert(asm, &mut start_index, format!("  push    {}", format_string));
+        insert(asm, &mut start_index, "  call   __isoc99_scanf".to_string());
+        insert(asm, &mut start_index, "  add    esp, 16".to_string());
+        insert(asm, &mut start_index, "  mov    eax, [ebp-12]".to_string());
+        insert(asm, &mut start_index, "  leave".to_string());
+        insert(asm, &mut start_index, "  ret".to_string());
+        stack.stack_size_index = stack.stack_size_index + start_index - 1;
+
+        asm.lines.push("  call   read_int".to_string());
       } else {
         asm.lines.push(format!("  call   {}", identifier));
       }
@@ -558,8 +587,10 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
       let alignment = (16 - args_size % 16) % 16;
       asm.lines.insert(alignment_index, format!("  sub    esp, {}", alignment));
 
-      args_size = (args_size + 15) / 16 * 16;
-      asm.lines.push(format!("  add    esp, {}", args_size));
+      if *identifier != &Identifier::from("read_int") {
+        args_size = (args_size + 15) / 16 * 16;
+        asm.lines.push(format!("  add    esp, {}", args_size));
+      }
 
       if let Some(ty) = ty {
         Storage::Register(ty.into(), Reg32::EAX)
@@ -621,7 +652,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       asm.lines.push("  push   ebp".to_string());
       asm.lines.push("  mov    ebp, esp".to_string());
 
-      let stack_size_index = asm.lines.len();
+      stack.stack_size_index = asm.lines.len();
 
       for (i, statement) in self.statements.iter().enumerate().skip(range.start).take(range.end) {
         if let Some(label) = asm.labels.get(&i) {
@@ -952,7 +983,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       if stack.variables.is_empty() {
         asm.lines.push("  pop    ebp".to_string());
       } else {
-        asm.lines.insert(stack_size_index, format!("  sub    esp, {}", ((stack.variables_size + 15) / 16) * 16));
+        asm.lines.insert(stack.stack_size_index, format!("  sub    esp, {}", ((stack.variables_size + 15) / 16) * 16));
         asm.lines.push("  leave".to_string());
       }
 
