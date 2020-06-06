@@ -481,8 +481,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         Storage::Label(StorageType::Dword, label, false)
       }
       Literal::String(string) => {
-        let label = add_string(asm, string);
-        Storage::Label(StorageType::Dword, label, true)
+        add_string(asm, string)
       }
     },
     Arg::FunctionCall(ty, identifier, args) => {
@@ -515,8 +514,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
 
       if *identifier == &Identifier::from("print_int") {
         args_size += StorageType::Dword.size();
-        let format_string_label = add_string(asm, "%d");
-        let format_string = format!("OFFSET FLAT:{}", format_string_label);
+        let format_string = add_string(asm, "%d");
         asm.lines.push(format!("  push   {}", format_string));
         asm.lines.push("  call   printf".to_string());
       } else if *identifier == &Identifier::from("print_nl") {
@@ -527,8 +525,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         asm.lines.push("  lea    esp, [esp-8]".to_string());
         asm.lines.push("  fstp   QWORD PTR [esp]".to_string());
 
-        let format_string_label = add_string(asm, "%f");
-        let format_string = format!("OFFSET FLAT:{}", format_string_label);
+        let format_string = add_string(asm, "%f");
         asm.lines.push(format!("  push   {}", format_string));
         args_size += 8;
 
@@ -577,15 +574,16 @@ fn add_float(asm: &mut Asm, float: f64) -> String {
   .to_owned()
 }
 
-fn add_string(asm: &mut Asm, s: &str) -> String {
-  if let Some(label) = asm.strings.get(s) {
+fn add_string(asm: &mut Asm, s: &str) -> Storage {
+  let label = if let Some(label) = asm.strings.get(s) {
     label
   } else {
     let string_number = asm.strings.len();
     asm.strings.insert(s.to_owned(), format!(".LS{}", string_number));
     asm.strings.get(s).unwrap()
-  }
-  .to_owned()
+  };
+
+  Storage::Label(StorageType::Dword, label.to_owned(), true)
 }
 
 impl<'a> ToAsm for IntermediateRepresentation<'a> {
@@ -986,8 +984,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
         asm.lines.push("  sub    esp, 32".to_string());
         asm.lines.push("  lea    eax, [ebp-12]".to_string());
         asm.lines.push("  push   eax".to_string());
-        let format_string_label = add_string(&mut asm, "%d");
-        let format_string = format!("OFFSET FLAT:{}", format_string_label);
+        let format_string = add_string(&mut asm, "%d");
         asm.lines.push(format!("  push   {}", format_string));
         asm.lines.push("  call   __isoc99_scanf".to_string());
         asm.lines.push("  add    esp, 16".to_string());
@@ -1000,8 +997,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
         asm.lines.push("  sub     esp, 32".to_string());
         asm.lines.push("  lea     eax, [ebp-12]".to_string());
         asm.lines.push("  push    eax".to_string());
-        let format_string_label = add_string(&mut asm, "%f");
-        let format_string = format!("OFFSET FLAT:{}", format_string_label);
+        let format_string = add_string(&mut asm, "%f");
         asm.lines.push(format!("  push   {}", format_string));
         asm.lines.push("  call    __isoc99_scanf".to_string());
         asm.lines.push("  add     esp, 16".to_string());
