@@ -338,7 +338,7 @@ macro_rules! operation_to_asm {
 
 macro_rules! comparison_to_asm {
   ($op:expr) => {
-    fn comparison_to_asm<T: Display>(index: usize, mut stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
+    fn comparison_to_asm<T: Display>(_index: usize, mut _stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
       asm.lines.push(format!("  cmp    {}, {}", lhs, rhs));
       asm.lines.push(format!("  {}   {}", $op, lhs.as_reg8().0));
     }
@@ -452,8 +452,8 @@ impl Storage {
 
 fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> Storage {
   match arg {
-    Arg::Variable(ty, decl_index, index_offset) => {
-      let (ty, count, mut offset, parameter) = stack.lookup(*decl_index);
+    Arg::Variable(_, decl_index, index_offset) => {
+      let (ty, _, mut offset, parameter) = stack.lookup(*decl_index);
 
       let index_reg = match index_offset.as_ref() {
         Arg::Literal(Literal::Int(index_offset)) => {
@@ -622,7 +622,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
     asm.lines.push("  .intel_syntax noprefix".to_string());
     asm.lines.push("  .global main".to_string());
 
-    for (i, statement) in self.statements.iter().enumerate() {
+    for statement in self.statements.iter() {
       match statement {
         Op::Jumpfalse(_, Arg::Reference(_, reference)) | Op::Jump(Arg::Reference(_, reference)) => {
           let label_number = asm.labels.len();
@@ -657,7 +657,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               stack_hygiene!(&mut stack, |temp: Reg32| {
                 let arg = stack.push(i, Ty::Int, 1, true);
 
-                let mut pointer = stack.push(i, *ty, *count, false);
+                let pointer = stack.push(i, *ty, *count, false);
 
                 asm.lines.push(format!("  mov    {}, {}", temp, arg));
                 asm.lines.push(format!("  mov    {}, {}", pointer, pointer.storage_type.map_register(&temp)));
@@ -721,7 +721,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 let result = calc_index_offset(&mut stack, &mut asm, temp, arg);
 
                 if !matches!(result, Storage::Register(_, Reg32::EAX)) {
-                  let op = if result.storage_type() == StorageType::Byte && !matches!(result, Storage::Literal(..)) {
+                  if result.storage_type() == StorageType::Byte && !matches!(result, Storage::Literal(..)) {
                     asm.lines.push(format!("  movzx  {}, {}", Reg32::EAX, result));
                   } else if arg.ty() == Some(Ty::Float) {
                     asm.lines.push(format!("  fld    {}", result));
@@ -772,8 +772,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 let pointer = add_float(&mut asm, lhs + rhs);
                 asm.lines.push(format!("  fld    DWORD PTR {}", pointer));
               }
-              (Arg::Reference(Some(ty), ref_l), Arg::Literal(Literal::Float(rhs)))
-              | (Arg::Literal(Literal::Float(rhs)), Arg::Reference(Some(ty), ref_l))
+              (Arg::Reference(Some(ty), _), Arg::Literal(Literal::Float(rhs)))
+              | (Arg::Literal(Literal::Float(rhs)), Arg::Reference(Some(ty), _))
                 if ty == &Ty::Float =>
               {
                 let pointer = add_float(&mut asm, *rhs);
@@ -818,12 +818,12 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 let pointer = add_float(&mut asm, lhs - rhs);
                 asm.lines.push(format!("  fld    DWORD PTR {}", pointer));
               }
-              (Arg::Reference(Some(ty), ref_l), Arg::Literal(Literal::Float(rhs))) if ty == &Ty::Float => {
+              (Arg::Reference(Some(ty), _), Arg::Literal(Literal::Float(rhs))) if ty == &Ty::Float => {
                 let pointer = add_float(&mut asm, *rhs);
                 asm.lines.push(format!("  fld    DWORD PTR {}", pointer));
                 asm.lines.push(format!("  fsubp  st(1), st"));
               }
-              (Arg::Literal(Literal::Float(lhs)), Arg::Reference(Some(ty), ref_r)) if ty == &Ty::Float => {
+              (Arg::Literal(Literal::Float(lhs)), Arg::Reference(Some(ty), _)) if ty == &Ty::Float => {
                 let pointer = add_float(&mut asm, *lhs);
                 asm.lines.push(format!("  fld    DWORD PTR {}", pointer));
                 asm.lines.push(format!("  fsubp  st, st(1)"));
@@ -974,7 +974,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               });
             }
           },
-          Op::Jump(Arg::Reference(ty, reference)) => {
+          Op::Jump(Arg::Reference(_, reference)) => {
             asm.lines.push(format!("  jmp    {}", asm.labels.get(reference).unwrap()));
           }
           Op::Call(arg) => {
