@@ -883,7 +883,17 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             }
             _ => unimplemented!(),
           },
-          Op::Gt(lhs, rhs) | Op::Lte(rhs, lhs) => {
+          Op::Lte(lhs, rhs) => {
+            comparison_to_asm!(ConditionalSet::SETLE);
+
+            match lhs.ty() {
+              Some(Ty::Int) => {
+                operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), >: Int -> Bool, comparison_to_asm, comparison_to_asm)
+              }
+              _ => unimplemented!(),
+            }
+          }
+          Op::Gt(lhs, rhs) => {
             comparison_to_asm!(ConditionalSet::SETG);
 
             match lhs.ty() {
@@ -893,7 +903,17 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               _ => unimplemented!(),
             }
           }
-          Op::Lt(lhs, rhs) | Op::Gte(rhs, lhs) => {
+          Op::Gte(lhs, rhs) => {
+            comparison_to_asm!(ConditionalSet::SETGE);
+
+            match lhs.ty() {
+              Some(Ty::Int) => {
+                operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), <: Int -> Bool, comparison_to_asm, comparison_to_asm)
+              }
+              _ => unimplemented!(),
+            }
+          }
+          Op::Lt(lhs, rhs) => {
             comparison_to_asm!(ConditionalSet::SETL);
 
             match lhs.ty() {
