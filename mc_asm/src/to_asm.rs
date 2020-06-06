@@ -239,27 +239,6 @@ impl fmt::Display for ConditionalSet {
   }
 }
 
-#[derive(Clone, PartialEq, Debug, Eq, PartialOrd, Copy)]
-pub struct Float {
-  long1: i32,
-  long2: i32,
-}
-
-impl From<f64> for Float {
-  fn from(f: f64) -> Self {
-    let fb = f.to_le_bytes();
-    let long1 = i32::from_le_bytes([fb[0], fb[1], fb[2], fb[3]]);
-    let long2 = i32::from_le_bytes([fb[4], fb[5], fb[6], fb[7]]);
-    Self { long1, long2 }
-  }
-}
-
-impl Ord for Float {
-  fn cmp(&self, other: &Self) -> Ordering {
-    self.long1.cmp(&other.long1).then(self.long2.cmp(&other.long2))
-  }
-}
-
 fn push_temporary(temporary: Reg32, temporaries: &mut VecDeque<Reg32>) {
   if temporary == Reg32::EAX || temporary == Reg32::EDX || temporary == Reg32::ECX {
     temporaries.push_front(temporary);
@@ -358,7 +337,7 @@ impl From<&Ty> for StorageType {
       Ty::Float => Self::Dword,
       Ty::Int => Self::Dword,
       Ty::Bool => Self::Byte,
-      _ => unimplemented!(),
+      Ty::String => Self::Dword,
     }
   }
 }
@@ -421,7 +400,7 @@ pub enum Storage {
   Pointer(Pointer),
   Register(StorageType, Reg32),
   Literal(StorageType, String),
-  Label(StorageType, String),
+  Label(StorageType, String, bool),
 }
 
 impl fmt::Display for Storage {
@@ -430,7 +409,14 @@ impl fmt::Display for Storage {
       Self::Pointer(pointer) => write!(f, "{}", pointer),
       Self::Register(storage_type, reg) => write!(f, "{}", storage_type.map_register(reg)),
       Self::Literal(_, string) => write!(f, "{}", string),
-      Self::Label(ty, label) => write!(f, "{} {}", ty, label),
+      Self::Label(ty, label, flat) => {
+        if *flat {
+          write!(f, "OFFSET FLAT:{}", label)
+        } else {
+          write!(f, "{} {}", ty, label)
+        }
+
+      },
     }
   }
 }
@@ -441,7 +427,7 @@ impl Storage {
       Self::Pointer(Pointer { storage_type, .. }) => storage_type,
       Self::Register(storage_type, _) => storage_type,
       Self::Literal(storage_type, _) => storage_type,
-      Self::Label(storage_type, _) => storage_type,
+      Self::Label(storage_type, ..) => storage_type,
     }
   }
 
@@ -475,7 +461,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         Ty::Int => Pointer { storage_type: StorageType::Dword, offset, index_offset: index_reg, parameter },
         Ty::Bool => Pointer { storage_type: StorageType::Byte, offset, index_offset: index_reg, parameter },
         Ty::Float => Pointer { storage_type: StorageType::Dword, offset, index_offset: index_reg, parameter },
-        ty => unimplemented!("{:?}", ty),
+        Ty::String => Pointer { storage_type: StorageType::Dword, offset, index_offset: index_reg, parameter },
       })
     }
     Arg::Reference(Some(ty), reference) => {
@@ -492,11 +478,11 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
       Literal::Bool(boolean) => Storage::Literal(StorageType::Byte, if *boolean { 1 } else { 0 }.to_string()),
       Literal::Float(float) => {
         let label = add_float(asm, *float);
-        Storage::Label(StorageType::Dword, label)
+        Storage::Label(StorageType::Dword, label, false)
       }
       Literal::String(string) => {
         let label = add_string(asm, string);
-        Storage::Label(StorageType::Dword, label)
+        Storage::Label(StorageType::Dword, label, true)
       }
     },
     Arg::FunctionCall(ty, identifier, args) => {
@@ -514,13 +500,6 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
             asm.lines.push("  nop".to_string());
           } else {
             asm.lines.push(format!("  fld   {}", argument));
-          }
-        } else if arg.ty() == Some(Ty::String) {
-          match argument {
-            Storage::Label(_, label) => {
-              asm.lines.push(format!("  push   OFFSET FLAT:{}", label));
-            }
-            _ => unreachable!(),
           }
         } else {
           match argument {
