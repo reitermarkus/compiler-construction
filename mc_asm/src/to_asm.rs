@@ -661,7 +661,17 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   asm.lines.push(format!("  fstp   {}", var));
                 },
                 _ => {
-                  asm.lines.push(format!("  mov    {}, {}", var, val));
+                  match val {
+                    Storage::Pointer(..) => {
+                      stack_hygiene!(&mut stack, |temp: Reg32| {
+                        asm.lines.push(format!("  mov    {}, {}", temp, val));
+                        asm.lines.push(format!("  mov    {}, {}", var, temp));
+                      });
+                    },
+                    _ => {
+                      asm.lines.push(format!("  mov    {}, {}", var, val));
+                    }
+                  }
                 }
               }
             });
@@ -759,8 +769,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
                 stack_hygiene!(&mut stack, |temp_r: Reg32| {
                   let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
-                asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
-                push_storage_temporary(lhs, &mut stack.temporaries);
+                  asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
+                  push_storage_temporary(lhs, &mut stack.temporaries);
 
                   let rhs =  calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
                   asm.lines.push(format!("  sub    {}, {}", temp_l, rhs));
@@ -818,53 +828,63 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           },
           Op::Divide(lhs, rhs) => match lhs.ty() {
             Some(Ty::Int) => {
-              fn div_reflit_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
-                if lhs != Reg32::EAX {
+              let eax_free = stack.temporaries.contains(&Reg32::EAX);
+              let edx_free = stack.temporaries.contains(&Reg32::EDX);
+
+              stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
+                stack_hygiene!(&mut stack, |temp_r: Reg32| {
+                  let eax_backup = if !eax_free {
+                    let eax_backup = stack.temporaries.pop_front().unwrap();
+                    asm.lines.push(format!("  mov    {}, eax", eax_backup));
+                    Some(eax_backup)
+                  } else {
+                    None
+                  };
+
+                  let edx_backup = if !edx_free {
+                    let edx_backup = stack.temporaries.pop_front().unwrap();
+                    asm.lines.push(format!("  mov    {}, edx", edx_backup));
+                    Some(edx_backup)
+                  } else {
+                    None
+                  };
+
+                  let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
+                  let rhs =  calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
+
+                  let rhs_backup = if matches!(rhs, Storage::Register(_, Reg32::EAX)) {
+                    asm.lines.push(format!("  mov    {}, eax", temp_r));
+                    Some(temp_r)
+                  } else {
+                    None
+                  };
+
                   asm.lines.push(format!("  mov    eax, {}", lhs));
-                }
+                  push_storage_temporary(lhs, &mut stack.temporaries);
 
-                let temp_r = stack.temporaries.pop_front().unwrap();
+                  asm.lines.push(format!("  cdq"));
 
-                asm.lines.push(format!("  mov    {}, {}", temp_r, rhs));
+                  if let Some(rhs_backup) = rhs_backup {
+                    asm.lines.push(format!("  idiv   {}", rhs_backup));
+                  } else {
+                    asm.lines.push(format!("  idiv   {}", rhs));
+                  }
 
-                asm.lines.push(format!("  cdq"));
-                asm.lines.push(format!("  idiv   {}", temp_r));
-                asm.lines.push(format!("  mov    {}, eax", lhs));
+                  if temp_l != Reg32::EAX {
+                    asm.lines.push(format!("  mov    {}, eax # temp != eax", temp_l));
+                  }
 
-                push_temporary(temp_r, &mut stack.temporaries);
-              }
+                  if let Some(eax_backup) = eax_backup {
+                    asm.lines.push(format!("  mov    eax, {}", eax_backup));
+                  }
 
-              fn div_litref_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, rhs: Reg32, lhs: T) {
-                let temp_l = stack.temporaries.pop_front().unwrap();
+                  if let Some(edx_backup) = edx_backup {
+                    asm.lines.push(format!("  mov    edx, {}", edx_backup));
+                  }
 
-                if temp_l != Reg32::EAX {
-                  asm.lines.push(format!("  mov    eax, {}", lhs));
-                }
-
-                asm.lines.push(format!("  cdq"));
-                asm.lines.push(format!("  idiv   {}", rhs));
-
-                if temp_l != Reg32::EAX {
-                  asm.lines.push(format!("  mov    {}, eax", temp_l));
-                }
-
-                stack.temporary_register.insert(index, temp_l);
-              }
-
-              fn div_reference_to_asm<T: Display>(index: usize, stack: &mut Stack, asm: &mut Asm, lhs: Reg32, rhs: T) {
-                if lhs != Reg32::EAX {
-                  asm.lines.push(format!("  mov    eax, {}", lhs));
-                }
-
-                asm.lines.push(format!("  cdq"));
-                asm.lines.push(format!("  idiv   {}", rhs));
-
-                if lhs != Reg32::EAX {
-                  asm.lines.push(format!("  mov    {}, eax", lhs));
-                }
-              }
-
-              operation_to_asm!(i, &mut stack, &mut asm, (lhs, rhs), -: Int -> Int, div_reflit_to_asm, div_litref_to_asm, div_reference_to_asm);
+                  push_storage_temporary(rhs, &mut stack.temporaries);
+                });
+              });
             }
             Some(Ty::Float) => {
               stack_hygiene!(&mut stack, |temp: Reg32| {
