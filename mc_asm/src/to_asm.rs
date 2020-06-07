@@ -479,7 +479,6 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         Storage::Pointer(Pointer { storage_type: StorageType::Dword, offset, index_offset: None, parameter })
       } else {
         let temp = *stack.temporary_register.get(reference).unwrap();
-        push_temporary(temp, &mut stack.temporaries);
         Storage::Register(ty.into(), temp)
       }
     }
@@ -791,8 +790,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
                 stack_hygiene!(&mut stack, |temp_r: Reg32| {
                   let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
-                asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
-                push_storage_temporary(lhs, &mut stack.temporaries);
+                  asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
+                  push_storage_temporary(lhs, &mut stack.temporaries);
 
                   let rhs =  calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
                   asm.lines.push(format!("  imul   {}, {}", temp_l, rhs));
@@ -949,6 +948,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
                 asm.lines.push(format!("  cmp    {}, 0", result_register));
                 asm.lines.push(format!("  je     {}", asm.labels.get(reference).unwrap()));
+
+                push_storage_temporary(result_register, &mut stack.temporaries);
               });
             }
           },
