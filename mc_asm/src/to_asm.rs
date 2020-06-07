@@ -625,7 +625,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
       stack.stack_size_index = asm.lines.len();
 
-      for (i, statement) in self.statements.iter().enumerate().skip(range.start).take(range.end) {
+      for (i, statement) in self.statements.iter().enumerate().skip(range.start).take(range.end - range.start) {
         if let Some(label) = asm.labels.get(&i) {
           asm.lines.push(format!("{}:", label));
         }
@@ -665,15 +665,18 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                     Storage::Pointer(..) => {
                       stack_hygiene!(&mut stack, |temp: Reg32| {
                         asm.lines.push(format!("  mov    {}, {}", temp, val));
-                        asm.lines.push(format!("  mov    {}, {}", var, temp));
+                        asm.lines.push(format!("  mov    {}, {:#}", var, temp));
                       });
                     },
                     _ => {
-                      asm.lines.push(format!("  mov    {}, {}", var, val));
+                      asm.lines.push(format!("  mov    {}, {:#}", var, val));
                     }
                   }
                 }
               }
+
+              push_storage_temporary(var, &mut stack.temporaries);
+              push_storage_temporary(val, &mut stack.temporaries);
             });
           },
           Op::Load(variable) => match variable {
@@ -831,10 +834,15 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               let eax_free = stack.temporaries.contains(&Reg32::EAX);
               let edx_free = stack.temporaries.contains(&Reg32::EDX);
 
+              let find_non_eax_edx = |temporaries: &mut VecDeque<Reg32>| {
+                let position = temporaries.iter().position(|&reg| reg != Reg32::EAX && reg != Reg32::EDX).unwrap();
+                temporaries.remove(position).unwrap()
+              };
+
               stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
                 stack_hygiene!(&mut stack, |temp_r: Reg32| {
                   let eax_backup = if !eax_free {
-                    let eax_backup = stack.temporaries.pop_front().unwrap();
+                    let eax_backup = find_non_eax_edx(&mut stack.temporaries);
                     asm.lines.push(format!("  mov    {}, eax", eax_backup));
                     Some(eax_backup)
                   } else {
@@ -842,7 +850,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   };
 
                   let edx_backup = if !edx_free {
-                    let edx_backup = stack.temporaries.pop_front().unwrap();
+                    let edx_backup = find_non_eax_edx(&mut stack.temporaries);
                     asm.lines.push(format!("  mov    {}, edx", edx_backup));
                     Some(edx_backup)
                   } else {
@@ -850,17 +858,25 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   };
 
                   let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
-                  let rhs =  calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
+                  let rhs = calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
 
-                  let rhs_backup = if matches!(rhs, Storage::Register(_, Reg32::EAX)) {
-                    asm.lines.push(format!("  mov    {}, eax", temp_r));
-                    Some(temp_r)
-                  } else {
-                    None
+                  let temp_r_backup = match temp_r {
+                    Reg32::EAX | Reg32::EDX => Some(find_non_eax_edx(&mut stack.temporaries)),
+                    _ => None,
                   };
 
-                  asm.lines.push(format!("  mov    eax, {}", lhs));
-                  push_storage_temporary(lhs, &mut stack.temporaries);
+                  let rhs_backup = match rhs {
+                    Storage::Register(_, Reg32::EAX) | Storage::Register(_, Reg32::EDX) | Storage::Literal(..) => {
+                      let temp = temp_r_backup.unwrap_or(temp_r);
+                      asm.lines.push(format!("  mov    {}, {}", temp, rhs));
+                      Some(temp)
+                    }
+                    _ => None,
+                  };
+
+                  if !matches!(lhs, Storage::Register(_, Reg32::EAX)) {
+                    asm.lines.push(format!("  mov    eax, {}", lhs));
+                  }
 
                   asm.lines.push(format!("  cdq"));
 
@@ -871,17 +887,24 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   }
 
                   if temp_l != Reg32::EAX {
-                    asm.lines.push(format!("  mov    {}, eax # temp != eax", temp_l));
+                    asm.lines.push(format!("  mov    {}, eax", temp_l));
+                  }
+
+                  if let Some(temp_r_backup) = temp_r_backup {
+                    push_temporary(temp_r_backup, &mut stack.temporaries);
                   }
 
                   if let Some(eax_backup) = eax_backup {
                     asm.lines.push(format!("  mov    eax, {}", eax_backup));
+                    push_temporary(eax_backup, &mut stack.temporaries);
                   }
 
                   if let Some(edx_backup) = edx_backup {
                     asm.lines.push(format!("  mov    edx, {}", edx_backup));
+                    push_temporary(edx_backup, &mut stack.temporaries);
                   }
 
+                  push_storage_temporary(lhs, &mut stack.temporaries);
                   push_storage_temporary(rhs, &mut stack.temporaries);
                 });
               });
@@ -966,7 +989,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               stack_hygiene!(&mut stack, |temp: Reg32| {
                 let result_register = calc_index_offset(&mut stack, &mut asm, temp, arg);
 
-                asm.lines.push(format!("  cmp    {}, 0", result_register));
+                asm.lines.push(format!("  cmp    {:#}, 0", result_register));
                 asm.lines.push(format!("  je     {}", asm.labels.get(reference).unwrap()));
 
                 push_storage_temporary(result_register, &mut stack.temporaries);
@@ -977,8 +1000,12 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             asm.lines.push(format!("  jmp    {}", asm.labels.get(reference).unwrap()));
           }
           Op::Call(arg) => {
-            stack_hygiene!(&mut stack, |temp: Reg32| {
-              calc_index_offset(&mut stack, &mut asm, temp, arg);
+            stack_hygiene!(i, &mut stack, |temp: Reg32| {
+              let result_register = calc_index_offset(&mut stack, &mut asm, temp, arg);
+
+              if temp != Reg32::EAX {
+                asm.lines.push(format!("  mov  {}, {}", temp, result_register));
+              }
             });
           }
           op => unimplemented!("{:?}", op),
