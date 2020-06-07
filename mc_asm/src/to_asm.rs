@@ -44,19 +44,21 @@ pub struct Stack {
   stack_size_index: usize,
   variables: Vec<(Ty, usize, usize)>,
   variables_size: usize,
+  used_registers: BTreeMap<Reg32, usize>,
 }
 
 impl Default for Stack {
   fn default() -> Stack {
     Stack {
       temporary_register: Default::default(),
-      temporaries: VecDeque::from(vec![Reg32::EAX, Reg32::EDX, Reg32::ECX, Reg32::EBX, Reg32::EDI, Reg32::ESI]),
+      temporaries: VecDeque::from(vec![Reg32::EAX, Reg32::EDX, Reg32::ECX, Reg32::EDI, Reg32::ESI]),
       lookup_table: Default::default(),
       parameters: Default::default(),
       parameters_size: 8,
       stack_size_index: Default::default(),
       variables: Default::default(),
       variables_size: Default::default(),
+      used_registers: Default::default(),
     }
   }
 }
@@ -86,7 +88,7 @@ impl Stack {
   }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Reg32 {
   EAX,
   ECX,
@@ -256,8 +258,9 @@ fn push_temporary(temporary: Reg32, temporaries: &mut VecDeque<Reg32>) {
 macro_rules! stack_hygiene {
   ($i:expr, $stack:expr, $closure:expr) => {
     let temp_var = $stack.temporaries.pop_front().unwrap();
+    $closure(temp_var);
     $stack.temporary_register.insert($i, temp_var);
-    $closure(temp_var)
+    $stack.used_registers.insert(temp_var, $i);
   };
   ($stack:expr, $closure:expr) => {
     let temp_var = $stack.temporaries.pop_front().unwrap();
@@ -288,35 +291,6 @@ macro_rules! stack_hygiene {
 
     if !$stack.temporary_register.contains_key(&$i) {
       $stack.temporary_register.insert($i, temp_l);
-    }
-  };
-}
-
-macro_rules! operation_to_asm {
-  ($index:expr, $stack:expr, $asm:expr, $args:expr, $op:tt: $from:ident -> $to:ident, $reflit_closure:expr, $reference_closure:expr) => {
-    operation_to_asm!($index, $stack, $asm, $args, $op: $from -> $to, $reflit_closure, $reflit_closure, $reference_closure)
-  };
-  ($index:expr, $stack:expr, $asm:expr, $args:expr, $op:tt: $from:ident -> $to:ident, $reflit_closure:expr, $litref_closure:expr, $reference_closure:expr) => {
-    match $args {
-      (Arg::Literal(Literal::$from(l)), Arg::Literal(Literal::$from(r))) => {
-        calc_index_offset($stack, $asm, Reg32::EAX, &Arg::Literal(&Literal::$to(*l $op *r)));
-      }
-      (Arg::Reference(Some(ty), ref_l), Arg::Literal(Literal::$from(rhs))) if ty == &Ty::$from => {
-        stack_hygiene!(ref_l, $index, $stack, |temp_l: Reg32| {
-          $reflit_closure($index, $stack, $asm, temp_l, rhs)
-        });
-      }
-      (Arg::Literal(Literal::$from(lhs)), Arg::Reference(Some(ty), ref_r)) if ty == &Ty::$from => {
-        stack_hygiene!(ref_r, $index, $stack, |temp_r: Reg32| {
-          $litref_closure($index, $stack, $asm, temp_r, lhs)
-        });
-      }
-      (Arg::Reference(Some(ty_l), ref_l), Arg::Reference(Some(ty_r), ref_r)) if ty_l == &Ty::$from && ty_r == &Ty::$from => {
-        stack_hygiene!(ref_l, ref_r, $index, $stack, |temp_l: Reg32, temp_r: Reg32| {
-          $reference_closure($index, $stack, $asm, temp_l, temp_r)
-        });
-      },
-      (lhs, rhs) => unreachable!("LHS = {:?}, RHS = {:?}", lhs, rhs)
     }
   };
 }
@@ -368,7 +342,7 @@ impl StorageType {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Pointer {
   storage_type: StorageType,
   offset: usize,
@@ -393,7 +367,7 @@ impl fmt::Display for Pointer {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Storage {
   Pointer(Pointer),
   Register(StorageType, Reg32),
@@ -474,7 +448,6 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
     }
     Arg::Reference(Some(ty), reference) => {
       if *ty == Ty::Float {
-        dbg!(&reference);
         let (ty, _, offset, parameter) = stack.lookup(*reference);
         Storage::Pointer(Pointer { storage_type: StorageType::Dword, offset, index_offset: None, parameter })
       } else {
@@ -493,6 +466,13 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
       }
     },
     Arg::FunctionCall(ty, identifier, args) => {
+
+      if let Some(eax_index) = stack.used_registers.remove(&Reg32::EAX) {
+        asm.lines.push(format!("  mov    ebx, eax"));
+        stack.temporary_register.insert(eax_index, Reg32::EBX);
+        stack.used_registers.insert(Reg32::EBX, eax_index);
+      }
+
       let mut args_size = 0;
 
       let alignment_index = asm.lines.len();
@@ -624,6 +604,9 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       asm.lines.push("  mov    ebp, esp".to_string());
 
       stack.stack_size_index = asm.lines.len();
+
+
+      let mut push_ebx = false;
 
       for (i, statement) in self.statements.iter().enumerate().skip(range.start).take(range.end - range.start) {
         if let Some(label) = asm.labels.get(&i) {
@@ -943,10 +926,11 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   stack_hygiene!(&mut stack, |temp_r: Reg32| {
                     let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
                     asm.lines.push(format!("  mov    {}, {} # cmp", temp_l, lhs));
-                    push_storage_temporary(lhs, &mut stack.temporaries);
 
                     let rhs =  calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
                     asm.lines.push(format!("  cmp    {}, {}", temp_l, rhs));
+
+                    push_storage_temporary(lhs, &mut stack.temporaries);
                     push_storage_temporary(rhs, &mut stack.temporaries);
 
                     asm.lines.push(format!("  {}   {}", set_instruction, temp_l.as_reg8().0));
@@ -965,16 +949,37 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
             match lhs.ty() {
               Some(Ty::Bool) => {
-                stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
-                  stack_hygiene!(&mut stack, |temp_r: Reg32| {
-                    let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
-                    asm.lines.push(format!("  movzx  {}, {:#}", temp_l, lhs));
-                    push_storage_temporary(lhs, &mut stack.temporaries);
+                stack_hygiene!(i, &mut stack, |temp: Reg32| {
+                  let mut lhs = calc_index_offset(&mut stack, &mut asm, temp, lhs);
 
-                    let rhs =  calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
-                    asm.lines.push(format!("  {}    {}, {}", set_instruction, temp_l, rhs));
-                    push_storage_temporary(rhs, &mut stack.temporaries);
-                  });
+                  let lhs_reg = if let Storage::Register(ty, reg) = lhs {
+                    stack.temporary_register.insert(i, reg);
+                    stack.used_registers.insert(reg, i);
+                    Some((ty, reg))
+                  } else {
+                    None
+                  };
+
+                  let rhs =  calc_index_offset(&mut stack, &mut asm, temp, rhs);
+
+                  if let Some((ty, lhs_reg)) = lhs_reg {
+                    if let Some(lhs_reg) = stack.temporary_register.get(&i) {
+                      if lhs_reg == &Reg32::EBX {
+                        push_ebx = true;
+                      }
+
+                      lhs = Storage::Register(ty, *lhs_reg);
+                    }
+
+                    stack.used_registers.remove(&lhs_reg);
+                  }
+
+                  asm.lines.push(format!("  {}    {:#}, {:#}", set_instruction, lhs, rhs));
+
+                  asm.lines.push(format!("  movzx  {:#}, {:#} # ebx", temp, lhs));
+
+                  push_storage_temporary(lhs, &mut stack.temporaries);
+                  push_storage_temporary(rhs, &mut stack.temporaries);
                 });
               }
               _ => unreachable!(),
@@ -1000,12 +1005,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             asm.lines.push(format!("  jmp    {}", asm.labels.get(reference).unwrap()));
           }
           Op::Call(arg) => {
-            stack_hygiene!(i, &mut stack, |temp: Reg32| {
-              let result_register = calc_index_offset(&mut stack, &mut asm, temp, arg);
-
-              if temp != Reg32::EAX {
-                asm.lines.push(format!("  mov  {}, {}", temp, result_register));
-              }
+            stack_hygiene!(&mut stack, |temp: Reg32| {
+              calc_index_offset(&mut stack, &mut asm, temp, arg);
             });
           }
           op => unimplemented!("{:?}", op),
@@ -1013,6 +1014,11 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       }
 
       asm.lines.push(format!(".AWAY_{}:", name));
+
+      if push_ebx {
+        asm.lines.insert(stack.stack_size_index, format!("  push   ebx"));
+        asm.lines.push("  pop    ebx".to_string());
+      }
 
       if stack.variables.is_empty() {
         asm.lines.push("  pop    ebp".to_string());
