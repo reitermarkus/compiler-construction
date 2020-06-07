@@ -44,12 +44,10 @@ impl<'a> AddToIr<'a> for Expression<'a> {
 
         if let Some(index_expression) = index_expression {
           let index_expression = index_expression.add_to_ir(ir);
-          ir.push(Op::Load(Arg::Variable(ty, reference, Box::new(index_expression))));
+          Arg::Variable(ty, reference, Box::new(index_expression))
         } else {
-          ir.push(Op::Load(Arg::Variable(ty, reference, Box::new(Arg::Literal(&Literal::Int(0))))));
+          Arg::Variable(ty, reference, Box::new(Arg::Literal(&Literal::Int(0))))
         }
-
-        ir.last_ref()
       }
       Self::Binary { op, lhs, rhs, .. } => {
         let arg1 = lhs.add_to_ir(ir);
@@ -57,13 +55,29 @@ impl<'a> AddToIr<'a> for Expression<'a> {
 
         match (&arg1, &arg2) {
           (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r)))
-            if op == &BinaryOp::Plus || op == &BinaryOp::Minus || op == &BinaryOp::Times =>
+            if op == &BinaryOp::Plus || op == &BinaryOp::Minus || op == &BinaryOp::Times || op == &BinaryOp::Divide =>
           {
             let boxed = Box::new(Literal::Int(match op {
               BinaryOp::Plus => l + r,
               BinaryOp::Minus => l - r,
               BinaryOp::Times => l * r,
-              _ => 0,
+              BinaryOp::Divide => l / r,
+              _ => unreachable!(),
+            }));
+
+            // TODO
+
+            Arg::Literal(&*Box::leak(boxed))
+          }
+          (Arg::Literal(Literal::Float(l)), Arg::Literal(Literal::Float(r)))
+            if op == &BinaryOp::Plus || op == &BinaryOp::Minus || op == &BinaryOp::Times || op == &BinaryOp::Divide =>
+          {
+            let boxed = Box::new(Literal::Float(match op {
+              BinaryOp::Plus => l + r,
+              BinaryOp::Minus => l - r,
+              BinaryOp::Times => l * r,
+              BinaryOp::Divide => l / r,
+              _ => unreachable!(),
             }));
 
             // TODO
