@@ -78,20 +78,13 @@ impl Stack {
       self.parameters.push((ty, count, self.parameters_size));
       self.lookup_table.insert(index, (self.parameters.len() - 1, true, array));
       self.parameters_size += count * ty.size();
-      Pointer {
-        base: "ebp".to_string(),
-        storage_type: StorageType::Dword,
-        offset,
-        index_offset: None,
-        parameter,
-        array,
-      }
+      Pointer { base: Reg32::EBP, storage_type: StorageType::Dword, offset, index_offset: None, parameter, array }
     } else {
       self.variables_size += count * ty.size();
       self.variables.push((ty, count, self.variables_size));
       self.lookup_table.insert(index, (self.variables.len() - 1, false, array));
       Pointer {
-        base: "ebp".to_string(),
+        base: Reg32::EBP,
         storage_type: (&ty).into(),
         offset: self.variables_size,
         index_offset: None,
@@ -358,7 +351,7 @@ impl StorageType {
 
 #[derive(Debug, Clone)]
 pub struct Pointer {
-  base: String,
+  base: Reg32,
   storage_type: StorageType,
   offset: usize,
   index_offset: Option<Offset>,
@@ -464,16 +457,16 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
 
       let mut pointer = match ty {
         Ty::Int => {
-          Pointer { base: "ebp".to_string(), storage_type: StorageType::Dword, offset, index_offset, parameter, array }
+          Pointer { base: Reg32::EBP, storage_type: StorageType::Dword, offset, index_offset, parameter, array }
         }
         Ty::Bool => {
-          Pointer { base: "ebp".to_string(), storage_type: StorageType::Byte, offset, index_offset, parameter, array }
+          Pointer { base: Reg32::EBP, storage_type: StorageType::Byte, offset, index_offset, parameter, array }
         }
         Ty::Float => {
-          Pointer { base: "ebp".to_string(), storage_type: StorageType::Dword, offset, index_offset, parameter, array }
+          Pointer { base: Reg32::EBP, storage_type: StorageType::Dword, offset, index_offset, parameter, array }
         }
         Ty::String => {
-          Pointer { base: "ebp".to_string(), storage_type: StorageType::Dword, offset, index_offset, parameter, array }
+          Pointer { base: Reg32::EBP, storage_type: StorageType::Dword, offset, index_offset, parameter, array }
         }
       };
 
@@ -486,7 +479,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
 
           let index_offset = pointer.index_offset.take();
           asm.lines.push(format!("  mov    {}, {}", reg, pointer));
-          pointer.base = reg.to_string();
+          pointer.base = reg;
           pointer.offset = 0;
           pointer.index_offset = index_offset;
         });
@@ -498,7 +491,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
       if *ty == Ty::Float {
         let (ty, _, offset, parameter, array) = stack.lookup(*reference);
         Storage::Pointer(Pointer {
-          base: "ebp".to_string(),
+          base: Reg32::EBP,
           storage_type: StorageType::Dword,
           offset,
           index_offset: None,
