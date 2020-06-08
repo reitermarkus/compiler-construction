@@ -38,7 +38,7 @@ pub trait ToAsm {
 pub struct Stack {
   temporary_register: BTreeMap<usize, Reg32>,
   temporaries: VecDeque<Reg32>,
-  lookup_table: HashMap<usize, (usize, bool)>,
+  lookup_table: HashMap<usize, (usize, bool, bool)>,
   parameters: Vec<(Ty, usize, usize)>,
   parameters_size: usize,
   stack_size_index: usize,
@@ -64,26 +64,40 @@ impl Default for Stack {
 }
 
 impl Stack {
-  pub fn lookup(&self, index: usize) -> (Ty, usize, usize, bool) {
-    let &(i, parameter) = self.lookup_table.get(&index).unwrap();
+  pub fn lookup(&self, index: usize) -> (Ty, usize, usize, bool, bool) {
+    let &(i, parameter, array) = self.lookup_table.get(&index).unwrap();
 
     let (ty, count, offset) = if parameter { self.parameters[i] } else { self.variables[i] };
 
-    (ty, count, offset, parameter)
+    (ty, count, offset, parameter, array)
   }
 
-  pub fn push(&mut self, index: usize, ty: Ty, count: usize, parameter: bool) -> Pointer {
+  pub fn push(&mut self, index: usize, ty: Ty, count: usize, parameter: bool, array: bool) -> Pointer {
     if parameter {
       let offset = self.parameters_size;
       self.parameters.push((ty, count, self.parameters_size));
-      self.lookup_table.insert(index, (self.parameters.len() - 1, true));
+      self.lookup_table.insert(index, (self.parameters.len() - 1, true, array));
       self.parameters_size += count * ty.size();
-      Pointer { storage_type: StorageType::Dword, offset, index_offset: None, parameter }
+      Pointer {
+        base: "ebp".to_string(),
+        storage_type: StorageType::Dword,
+        offset,
+        index_offset: None,
+        parameter,
+        array,
+      }
     } else {
       self.variables_size += count * ty.size();
       self.variables.push((ty, count, self.variables_size));
-      self.lookup_table.insert(index, (self.variables.len() - 1, false));
-      Pointer { storage_type: (&ty).into(), offset: self.variables_size, index_offset: None, parameter }
+      self.lookup_table.insert(index, (self.variables.len() - 1, false, array));
+      Pointer {
+        base: "ebp".to_string(),
+        storage_type: (&ty).into(),
+        offset: self.variables_size,
+        index_offset: None,
+        parameter,
+        array,
+      }
     }
   }
 }
@@ -344,22 +358,24 @@ impl StorageType {
 
 #[derive(Debug, Clone)]
 pub struct Pointer {
+  base: String,
   storage_type: StorageType,
   offset: usize,
-  index_offset: Option<Reg32>,
+  index_offset: Option<Offset>,
   parameter: bool,
+  array: bool,
 }
 
 impl fmt::Display for Pointer {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{} [ebp", self.storage_type)?;
+    write!(f, "{} [{}", self.storage_type, self.base)?;
 
     if self.offset != 0 {
       if self.parameter { "+" } else { "-" }.fmt(f)?;
 
       write!(f, "{}", self.offset)?;
     }
-    if let Some(index_offset) = self.index_offset {
+    if let Some(index_offset) = &self.index_offset {
       write!(f, "+{}*{}", index_offset, self.storage_type.size())?;
     }
 
@@ -398,6 +414,21 @@ impl fmt::Display for Storage {
   }
 }
 
+#[derive(Debug, Clone)]
+enum Offset {
+  Register(Reg32),
+  Literal(usize),
+}
+
+impl fmt::Display for Offset {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::Register(reg) => reg.fmt(f),
+      Self::Literal(lit) => lit.fmt(f),
+    }
+  }
+}
+
 impl Storage {
   fn storage_type(&self) -> StorageType {
     match *self {
@@ -416,39 +447,64 @@ impl Storage {
 fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> Storage {
   match arg {
     Arg::Variable(_, decl_index, index_offset) => {
-      let (ty, _, mut offset, parameter) = stack.lookup(*decl_index);
+      let (ty, _, offset, parameter, array) = stack.lookup(*decl_index);
 
-      let index_reg = match index_offset.as_ref() {
-        Arg::Literal(Literal::Int(index_offset)) => {
-          if parameter {
-            offset += *index_offset as usize * ty.size();
-          } else {
-            offset -= *index_offset as usize * ty.size();
-          }
-
-          None
-        }
-        arg => match calc_index_offset(stack, asm, reg, arg) {
-          Storage::Register(_, temp) => Some(temp),
+      let index_offset = match index_offset.as_ref() {
+        Some(Arg::Literal(Literal::Int(index_offset))) => Some(Offset::Literal(*index_offset as usize)),
+        Some(arg) => match calc_index_offset(stack, asm, reg, arg) {
+          Storage::Register(_, reg) => Some(Offset::Register(reg)),
           pointer @ Storage::Pointer(..) => {
-            asm.lines.push(format!("  mov    {}, {}", reg, pointer));
-            Some(reg)
+            asm.lines.push(format!("  mov    {}, {} # arg", reg, pointer));
+            Some(Offset::Register(reg))
           }
           u => unreachable!("{:?}", u),
         },
+        None => None,
       };
 
-      Storage::Pointer(match ty {
-        Ty::Int => Pointer { storage_type: StorageType::Dword, offset, index_offset: index_reg, parameter },
-        Ty::Bool => Pointer { storage_type: StorageType::Byte, offset, index_offset: index_reg, parameter },
-        Ty::Float => Pointer { storage_type: StorageType::Dword, offset, index_offset: index_reg, parameter },
-        Ty::String => Pointer { storage_type: StorageType::Dword, offset, index_offset: index_reg, parameter },
-      })
+      let mut pointer = match ty {
+        Ty::Int => {
+          Pointer { base: "ebp".to_string(), storage_type: StorageType::Dword, offset, index_offset, parameter, array }
+        }
+        Ty::Bool => {
+          Pointer { base: "ebp".to_string(), storage_type: StorageType::Byte, offset, index_offset, parameter, array }
+        }
+        Ty::Float => {
+          Pointer { base: "ebp".to_string(), storage_type: StorageType::Dword, offset, index_offset, parameter, array }
+        }
+        Ty::String => {
+          Pointer { base: "ebp".to_string(), storage_type: StorageType::Dword, offset, index_offset, parameter, array }
+        }
+      };
+
+      if parameter && array {
+        stack_hygiene!(stack, |temp: Reg32| {
+          if let Some(Offset::Register(index_reg)) = pointer.index_offset {
+            asm.lines.push(format!("  lea    {}, [0+{}]", temp, index_reg));
+            pointer.index_offset = Some(Offset::Register(temp))
+          }
+
+          let index_offset = pointer.index_offset.take();
+          asm.lines.push(format!("  mov    {}, {}", reg, pointer));
+          pointer.base = reg.to_string();
+          pointer.offset = 0;
+          pointer.index_offset = index_offset;
+        });
+      }
+
+      Storage::Pointer(pointer)
     }
     Arg::Reference(Some(ty), reference) => {
       if *ty == Ty::Float {
-        let (ty, _, offset, parameter) = stack.lookup(*reference);
-        Storage::Pointer(Pointer { storage_type: StorageType::Dword, offset, index_offset: None, parameter })
+        let (ty, _, offset, parameter, array) = stack.lookup(*reference);
+        Storage::Pointer(Pointer {
+          base: "ebp".to_string(),
+          storage_type: StorageType::Dword,
+          offset,
+          index_offset: None,
+          parameter,
+          array,
+        })
       } else {
         let temp = *stack.temporary_register.get(reference).unwrap();
         Storage::Register(ty.into(), temp)
@@ -480,6 +536,12 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
           asm.lines.push(format!("  fld    {}", argument));
         } else {
           match argument {
+            Storage::Pointer(Pointer { array, ref index_offset, .. }) if array && index_offset.is_none() => {
+              stack_hygiene!(stack, |temp: Reg32| {
+                asm.lines.push(format!("  lea    {}, {}", temp, argument));
+                asm.lines.push(format!("  push   {}", temp));
+              });
+            }
             Storage::Register(_, reg) => {
               asm.lines.push(format!("  push   {}", reg));
             }
@@ -624,13 +686,13 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
         match statement {
           Op::Param(_, ty, count) => match StorageType::from(ty) {
             StorageType::Dword => {
-              stack.push(i, *ty, *count, true);
+              stack.push(i, *ty, count.clone().unwrap_or(1), true, count.is_some());
             }
             StorageType::Byte => {
               stack_hygiene!(&mut stack, |temp: Reg32| {
-                let arg = stack.push(i, Ty::Int, 1, true);
+                let arg = stack.push(i, Ty::Int, 1, true, false);
 
-                let pointer = stack.push(i, *ty, *count, false);
+                let pointer = stack.push(i, *ty, count.clone().unwrap_or(1), false, count.is_some());
 
                 asm.lines.push(format!("  mov    {}, {}", temp, arg));
                 asm.lines.push(format!("  mov    {}, {}", pointer, pointer.storage_type.map_register(&temp)));
@@ -639,7 +701,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             _ => unreachable!(),
           },
           Op::Decl(_, ty, count) => {
-            stack.push(i, *ty, *count, false);
+            stack.push(i, *ty, count.clone().unwrap_or(1), false, count.is_some());
           }
           Op::Assign(value, variable) => {
             stack_hygiene!(&mut stack, |temp: Reg32| {
@@ -707,7 +769,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             Some(Ty::Float) => {
               stack_hygiene!(i, &mut stack, |temp: Reg32| {
                 let register = calc_index_offset(&mut stack, &mut asm, temp, arg);
-                let temp_float = stack.push(i, Ty::Float, 1, false);
+                let temp_float = stack.push(i, Ty::Float, 1, false, false);
                 asm.lines.push(format!("  fld    {}", register));
                 asm.lines.push("  fchs".to_string());
                 asm.lines.push(format!("  fstp   {}", temp_float));
@@ -826,7 +888,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   let rhs = calc_index_offset(&mut stack, &mut asm, temp, rhs);
                   asm.lines.push(format!("  {}   {}", float_instruction, rhs));
 
-                  let temp_float = stack.push(i, Ty::Float, 1, false);
+                  let temp_float = stack.push(i, Ty::Float, 1, false, false);
                   asm.lines.push(format!("  fstp   {}", temp_float));
 
                   push_storage_temporary(rhs, &mut stack.temporaries);

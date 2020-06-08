@@ -12,9 +12,9 @@ impl<'a> AddToIr<'a> for Assignment<'a> {
     let (reference, ty) = ir.stack.lookup(&self.identifier).unwrap();
 
     let variable = if let Some(index_expression) = &self.index_expression {
-      Arg::Variable(ty, reference, Box::new(index_expression.add_to_ir(ir)))
+      Arg::Variable(ty, reference, Box::new(Some(index_expression.add_to_ir(ir))))
     } else {
-      Arg::Variable(ty, reference, Box::new(Arg::Literal(&Literal::Int(0))))
+      Arg::Variable(ty, reference, Box::new(None))
     };
 
     let arg = self.rvalue.add_to_ir(ir);
@@ -27,7 +27,7 @@ impl<'a> AddToIr<'a> for Assignment<'a> {
 
 impl<'a> AddToIr<'a> for Declaration<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
-    ir.push(Op::Decl(&self.identifier, self.ty, self.count.unwrap_or(1)));
+    ir.push(Op::Decl(&self.identifier, self.ty, self.count));
 
     let reference = ir.statements.len() - 1;
     ir.stack.push(self.identifier.clone(), reference, self.ty);
@@ -44,9 +44,9 @@ impl<'a> AddToIr<'a> for Expression<'a> {
 
         if let Some(index_expression) = index_expression {
           let index_expression = index_expression.add_to_ir(ir);
-          Arg::Variable(ty, reference, Box::new(index_expression))
+          Arg::Variable(ty, reference, Box::new(Some(index_expression)))
         } else {
-          Arg::Variable(ty, reference, Box::new(Arg::Literal(&Literal::Int(0))))
+          Arg::Variable(ty, reference, Box::new(None))
         }
       }
       Self::Binary { op, lhs, rhs, .. } => {
@@ -231,7 +231,7 @@ impl<'a> AddToIr<'a> for FunctionDeclaration<'a> {
     let start_index = ir.statements.len();
 
     for parameter in &self.parameters {
-      ir.push(Op::Param(&parameter.identifier, parameter.ty, parameter.count.unwrap_or(1)));
+      ir.push(Op::Param(&parameter.identifier, parameter.ty, parameter.count));
 
       let reference = ir.statements.len() - 1;
       ir.stack.push(parameter.identifier.clone(), reference, parameter.ty);

@@ -29,7 +29,7 @@ impl HashStack {
 #[derive(Debug)]
 pub enum Arg<'a> {
   Literal(&'a Literal),
-  Variable(Ty, usize, Box<Arg<'a>>),
+  Variable(Ty, usize, Box<Option<Arg<'a>>>),
   FunctionCall(Option<Ty>, &'a Identifier, Vec<Arg<'a>>),
   Reference(Option<Ty>, usize),
 }
@@ -90,8 +90,8 @@ impl<'a> IntermediateRepresentation<'a> {
 
 #[derive(Debug, PartialEq)]
 pub enum Op<'a> {
-  Param(&'a Identifier, Ty, usize),
-  Decl(&'a Identifier, Ty, usize),
+  Param(&'a Identifier, Ty, Option<usize>),
+  Decl(&'a Identifier, Ty, Option<usize>),
   Gt(Arg<'a>, Arg<'a>),
   Gte(Arg<'a>, Arg<'a>),
   Lt(Arg<'a>, Arg<'a>),
