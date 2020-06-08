@@ -668,21 +668,6 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               push_storage_temporary(val, &mut stack.temporaries);
             });
           }
-          Op::Load(variable) => match variable {
-            Arg::Variable(Ty::Float, ..) => {
-              stack_hygiene!(i, &mut stack, |temp: Reg32| {
-                let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
-                asm.lines.push(format!("  fld    {}", var));
-              });
-            }
-            variable => {
-              stack_hygiene!(i, &mut stack, |temp: Reg32| {
-                let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
-                let reg = var.map_register(&temp);
-                asm.lines.push(format!("  mov    {}, {}", reg, var));
-              });
-            }
-          },
           Op::Return(arg) => {
             if let Some(arg) = arg {
               stack_hygiene!(&mut stack, |temp: Reg32| {

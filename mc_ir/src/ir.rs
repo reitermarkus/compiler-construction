@@ -90,7 +90,6 @@ impl<'a> IntermediateRepresentation<'a> {
 
 #[derive(Debug, PartialEq)]
 pub enum Op<'a> {
-  Load(Arg<'a>),
   Param(&'a Identifier, Ty, usize),
   Decl(&'a Identifier, Ty, usize),
   Gt(Arg<'a>, Arg<'a>),
@@ -117,7 +116,6 @@ pub enum Op<'a> {
 impl<'a> Op<'a> {
   pub fn ty(&self) -> Option<Ty> {
     match self {
-      Self::Load(arg) => arg.ty(),
       Self::Param(_, ty, _) => Some(*ty),
       Self::Decl(_, ty, _) => Some(*ty),
       Self::Gt(..) => Some(Ty::Bool),

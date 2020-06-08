@@ -18,7 +18,6 @@ impl fmt::Display for Arg<'_> {
 impl fmt::Display for Op<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::Load(arg) => write!(f, "{}", arg),
       Self::Param(arg, ty, size) => write!(f, "param {} {} {}", arg, ty, size),
       Self::Decl(arg, ty, size) => write!(f, "decl {} {} {}", arg, ty, size),
       Self::Gt(arg1, arg2) => write!(f, "{} > {}", arg1, arg2),
