@@ -10,7 +10,7 @@ impl fmt::Display for Arg<'_> {
         f,
         "(&{}, {})",
         reference,
-        offset.as_ref().as_ref().map(|o| format!("[{}]", o)).unwrap_or("0".to_string())
+        offset.as_ref().as_ref().map(|o| format!("[{}]", o)).unwrap_or_else(|| "lel".to_string())
       ),
       Self::Reference(_, reference) => write!(f, "t{}", reference),
       Self::FunctionCall(_, identifier, arguments) => {
@@ -24,10 +24,10 @@ impl fmt::Display for Op<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Self::Param(arg, ty, size) => {
-        write!(f, "param {} {} {}", arg, ty, size.map(|s| format!("[{}]", s)).unwrap_or("lel".to_string()))
+        write!(f, "param {} {} {}", arg, ty, size.map(|s| format!("[{}]", s)).unwrap_or_else(|| "lel".to_string()))
       }
       Self::Decl(arg, ty, size) => {
-        write!(f, "decl {} {} {}", arg, ty, size.map(|s| format!("[{}]", s)).unwrap_or("lel".to_string()))
+        write!(f, "decl {} {} {}", arg, ty, size.map(|s| format!("[{}]", s)).unwrap_or_else(|| "lel".to_string()))
       }
       Self::Gt(arg1, arg2) => write!(f, "{} > {}", arg1, arg2),
       Self::Gte(arg1, arg2) => write!(f, "{} >= {}", arg1, arg2),
@@ -60,7 +60,7 @@ impl fmt::Display for Op<'_> {
 
 impl fmt::Display for IntermediateRepresentation<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    for (identifier, (range, ty)) in &self.functions {
+    for (identifier, (range, _)) in &self.functions {
       writeln!(f, "\t {}:", identifier)?;
       for (i, stmt) in self.statements[range.start..range.end].iter().enumerate() {
         match stmt {

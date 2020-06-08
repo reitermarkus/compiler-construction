@@ -1,11 +1,10 @@
 use ordered_float::OrderedFloat;
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::fmt;
-use std::fmt::Display;
+use std::mem;
 
 use mc_ir::{Arg, IntermediateRepresentation, Op};
 use mc_parser::ast::*;
@@ -132,46 +131,6 @@ impl Reg32 {
       Self::EBX => (Reg8::BL, Reg8::BH),
       _ => unreachable!(),
     }
-  }
-
-  pub fn as_reg16(&self) -> Reg16 {
-    match self {
-      Self::EAX => Reg16::AX,
-      Self::ECX => Reg16::CX,
-      Self::EDX => Reg16::DX,
-      Self::EBX => Reg16::BX,
-      Self::ESP => Reg16::SP,
-      Self::EBP => Reg16::BP,
-      Self::ESI => Reg16::SI,
-      Self::EDI => Reg16::DI,
-    }
-  }
-}
-
-pub enum Reg16 {
-  AX,
-  CX,
-  DX,
-  BX,
-  SP,
-  BP,
-  SI,
-  DI,
-}
-
-impl fmt::Display for Reg16 {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Self::AX => "ax",
-      Self::CX => "cx",
-      Self::DX => "dx",
-      Self::BX => "bx",
-      Self::SP => "sp",
-      Self::BP => "bp",
-      Self::SI => "si",
-      Self::DI => "di",
-    }
-    .fmt(f)
   }
 }
 
@@ -431,10 +390,6 @@ impl Storage {
       Self::Label(storage_type, ..) => storage_type,
     }
   }
-
-  fn map_register(&self, reg: &Reg32) -> String {
-    self.storage_type().map_register(reg)
-  }
 }
 
 fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> Storage {
@@ -489,7 +444,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
     }
     Arg::Reference(Some(ty), reference) => {
       if *ty == Ty::Float {
-        let (ty, _, offset, parameter, array) = stack.lookup(*reference);
+        let (_, _, offset, parameter, array) = stack.lookup(*reference);
         Storage::Pointer(Pointer {
           base: Reg32::EBP,
           storage_type: StorageType::Dword,
@@ -511,7 +466,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
     },
     Arg::FunctionCall(ty, identifier, args) => {
       if let Some(eax_index) = stack.used_registers.remove(&Reg32::EAX) {
-        asm.lines.push(format!("  mov    ebx, eax"));
+        asm.lines.push(format!("  mov    {}, {}", Reg32::EBX, Reg32::EAX));
         stack.temporary_register.insert(eax_index, Reg32::EBX);
         stack.used_registers.insert(Reg32::EBX, eax_index);
       }
@@ -818,7 +773,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   asm.lines.push(format!("  mov    eax, {}", lhs));
                 }
 
-                asm.lines.push(format!("  cdq"));
+                asm.lines.push("  cdq".to_string());
 
                 if let Some(rhs_backup) = rhs_backup {
                   asm.lines.push(format!("  idiv   {}", rhs_backup));
@@ -971,7 +926,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               _ => unreachable!(),
             }
           }
-          Op::Jumpfalse(cond, Arg::Reference(ty_r, reference)) => match cond {
+          Op::Jumpfalse(cond, Arg::Reference(_, reference)) => match cond {
             Arg::Literal(Literal::Bool(true)) => (),
             Arg::Literal(Literal::Bool(false)) => {
               asm.lines.push(format!("  jmp    {}", asm.labels.get(reference).unwrap()));
@@ -1002,7 +957,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       asm.lines.push(format!(".AWAY_{}:", name));
 
       if push_ebx {
-        asm.lines.insert(stack.stack_size_index, format!("  push   ebx"));
+        asm.lines.insert(stack.stack_size_index, "  push   ebx".to_string());
         asm.lines.push("  pop    ebx".to_string());
       }
 
@@ -1019,7 +974,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       asm.lines.push("  ret".to_string());
     }
 
-    for builtin_function in asm.builtin_functions.clone().iter() {
+    for builtin_function in mem::take(&mut asm.builtin_functions).iter() {
       asm.lines.push(format!("{}:", builtin_function));
 
       match builtin_function.as_ref() {
