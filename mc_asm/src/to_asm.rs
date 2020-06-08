@@ -490,31 +490,38 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         }
       }
 
-      if *identifier == &Identifier::from("print_int") {
-        args_size += StorageType::Dword.size();
-        let format_string = add_string(asm, "%d");
-        asm.lines.push(format!("  push   {}", format_string));
-        asm.lines.push("  call   printf".to_string());
-      } else if *identifier == &Identifier::from("print_nl") {
-        args_size += StorageType::Dword.size();
-        asm.lines.push("  push   10".to_string());
-        asm.lines.push("  call   putchar".to_string());
-      } else if *identifier == &Identifier::from("print_float") {
-        asm.lines.push("  lea    esp, [esp-8]".to_string());
-        asm.lines.push("  fstp   QWORD PTR [esp]".to_string());
+      match identifier.as_ref() {
+        "print_int" => {
+          args_size += StorageType::Dword.size();
+          let format_string = add_string(asm, "%d");
+          asm.lines.push(format!("  push   {}", format_string));
+          asm.lines.push("  call   printf".to_string());
+        }
+        "print_nl" => {
+          args_size += StorageType::Dword.size();
+          asm.lines.push("  push   10".to_string());
+          asm.lines.push("  call   putchar".to_string());
+        }
+        "print_float" => {
+          asm.lines.push("  lea    esp, [esp-8]".to_string());
+          asm.lines.push("  fstp   QWORD PTR [esp]".to_string());
 
-        let format_string = add_string(asm, "%f");
-        asm.lines.push(format!("  push   {}", format_string));
-        args_size += 8;
+          let format_string = add_string(asm, "%f");
+          asm.lines.push(format!("  push   {}", format_string));
+          args_size += 8;
 
-        asm.lines.push("  call   printf".to_string());
-      } else if *identifier == &Identifier::from("print") {
-        asm.lines.push("  call   printf".to_string());
-      } else if *identifier == &Identifier::from("read_int") || *identifier == &Identifier::from("read_float") {
-        asm.builtin_functions.insert((**identifier).clone());
-        asm.lines.push(format!("  call   {}", identifier));
-      } else {
-        asm.lines.push(format!("  call   {}", identifier));
+          asm.lines.push("  call   printf".to_string());
+        }
+        "print" => {
+          asm.lines.push("  call   printf".to_string());
+        }
+        "read_int" | "read_float" => {
+          asm.builtin_functions.insert((**identifier).clone());
+          asm.lines.push(format!("  call   {}", identifier));
+        }
+        _ => {
+          asm.lines.push(format!("  call   {}", map_function_name(identifier.as_ref())));
+        }
       }
 
       let alignment = (16 - args_size % 16) % 16;
@@ -565,6 +572,14 @@ fn add_string(asm: &mut Asm, s: &str) -> Storage {
   Storage::Label(StorageType::Dword, label.to_owned(), true)
 }
 
+fn map_function_name(name: &str) -> String {
+  if name == "main" {
+    return name.to_owned();
+  }
+
+  format!("mc_{}", name)
+}
+
 impl<'a> ToAsm for IntermediateRepresentation<'a> {
   fn to_asm(&self) -> Asm {
     let mut asm = Asm {
@@ -592,7 +607,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
     for (&name, (range, _)) in &self.functions {
       let mut stack = Stack::default();
 
-      asm.lines.push(format!("{}:", name));
+      asm.lines.push(format!("{}:", map_function_name(name.as_ref())));
 
       asm.lines.push("  push   ebp".to_string());
       asm.lines.push("  mov    ebp, esp".to_string());
@@ -960,32 +975,36 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
     for builtin_function in asm.builtin_functions.clone().iter() {
       asm.lines.push(format!("{}:", builtin_function));
 
-      if builtin_function == &Identifier::from("read_int") {
-        asm.lines.push("  push   ebp".to_string());
-        asm.lines.push("  mov    ebp, esp".to_string());
-        asm.lines.push("  sub    esp, 32".to_string());
-        asm.lines.push("  lea    eax, [ebp-12]".to_string());
-        asm.lines.push("  push   eax".to_string());
-        let format_string = add_string(&mut asm, "%d");
-        asm.lines.push(format!("  push   {}", format_string));
-        asm.lines.push("  call   __isoc99_scanf".to_string());
-        asm.lines.push("  add    esp, 16".to_string());
-        asm.lines.push("  mov    eax, DWORD PTR [ebp-12]".to_string());
-        asm.lines.push("  leave".to_string());
-        asm.lines.push("  ret".to_string());
-      } else if builtin_function == &Identifier::from("read_float") {
-        asm.lines.push("  push    ebp".to_string());
-        asm.lines.push("  mov     ebp, esp".to_string());
-        asm.lines.push("  sub     esp, 32".to_string());
-        asm.lines.push("  lea     eax, [ebp-12]".to_string());
-        asm.lines.push("  push    eax".to_string());
-        let format_string = add_string(&mut asm, "%f");
-        asm.lines.push(format!("  push   {}", format_string));
-        asm.lines.push("  call    __isoc99_scanf".to_string());
-        asm.lines.push("  add     esp, 16".to_string());
-        asm.lines.push("  fld     DWORD PTR [ebp-12]".to_string());
-        asm.lines.push("  leave".to_string());
-        asm.lines.push("  ret".to_string());
+      match builtin_function.as_ref() {
+        "read_int" => {
+          asm.lines.push("  push   ebp".to_string());
+          asm.lines.push("  mov    ebp, esp".to_string());
+          asm.lines.push("  sub    esp, 32".to_string());
+          asm.lines.push("  lea    eax, [ebp-12]".to_string());
+          asm.lines.push("  push   eax".to_string());
+          let format_string = add_string(&mut asm, "%d");
+          asm.lines.push(format!("  push   {}", format_string));
+          asm.lines.push("  call   __isoc99_scanf".to_string());
+          asm.lines.push("  add    esp, 16".to_string());
+          asm.lines.push("  mov    eax, DWORD PTR [ebp-12]".to_string());
+          asm.lines.push("  leave".to_string());
+          asm.lines.push("  ret".to_string());
+        }
+        "read_float" => {
+          asm.lines.push("  push    ebp".to_string());
+          asm.lines.push("  mov     ebp, esp".to_string());
+          asm.lines.push("  sub     esp, 32".to_string());
+          asm.lines.push("  lea     eax, [ebp-12]".to_string());
+          asm.lines.push("  push    eax".to_string());
+          let format_string = add_string(&mut asm, "%f");
+          asm.lines.push(format!("  push   {}", format_string));
+          asm.lines.push("  call    __isoc99_scanf".to_string());
+          asm.lines.push("  add     esp, 16".to_string());
+          asm.lines.push("  fld     DWORD PTR [ebp-12]".to_string());
+          asm.lines.push("  leave".to_string());
+          asm.lines.push("  ret".to_string());
+        }
+        _ => unreachable!(),
       }
     }
 

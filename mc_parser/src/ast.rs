@@ -352,6 +352,12 @@ impl<'a> FromPest<'a> for Expression<'a> {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Identifier(pub String);
 
+impl AsRef<str> for &Identifier {
+  fn as_ref(&self) -> &str {
+    &self.0
+  }
+}
+
 impl fmt::Display for Identifier {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     self.0.fmt(f)
