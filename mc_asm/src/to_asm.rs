@@ -1033,6 +1033,11 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           asm.lines.push(format!("  push   {}", format_string));
           asm.lines.push("  call   __isoc99_scanf".to_string());
           asm.lines.push("  add    esp, 16".to_string());
+          asm.lines.push("  cmp    eax, 1".to_string());
+          asm.lines.push("  je    .READ_INT_SUCCEEDED".to_string());
+          asm.lines.push("  push   101".to_string());
+          asm.lines.push("  call   exit".to_string());
+          asm.lines.push(".READ_INT_SUCCEEDED:".to_string());
           asm.lines.push("  mov    eax, DWORD PTR [ebp-12]".to_string());
           asm.lines.push("  leave".to_string());
           asm.lines.push("  ret".to_string());
@@ -1047,6 +1052,11 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           asm.lines.push(format!("  push   {}", format_string));
           asm.lines.push("  call    __isoc99_scanf".to_string());
           asm.lines.push("  add     esp, 16".to_string());
+          asm.lines.push("  cmp    eax, 1".to_string());
+          asm.lines.push("  je    .READ_FLOAT_SUCCEEDED".to_string());
+          asm.lines.push("  push   101".to_string());
+          asm.lines.push("  call   exit".to_string());
+          asm.lines.push(".READ_FLOAT_SUCCEEDED:".to_string());
           asm.lines.push("  fld     DWORD PTR [ebp-12]".to_string());
           asm.lines.push("  leave".to_string());
           asm.lines.push("  ret".to_string());

@@ -54,8 +54,11 @@ task :run, [:example] => :asm do |example: '*'|
     asm = Pathname(asm).relative_path_from(dir)
     bin = asm.sub_ext('.bin')
 
-    sh 'docker', 'run', '--rm', '-it', '-v', "#{dir}:/root", 'gcc', 'gcc', '-m32', asm.to_s, '-o', bin.to_s
-    system 'docker', 'run', '--rm', '-it', '-v', "#{dir}:/root", 'gcc', "./#{bin}"
-    puts $CHILD_STATUS.exitstatus
+    sh 'docker', 'run', '--rm', '-v', "#{dir}:/root", 'gcc', 'gcc', '-m32', asm.to_s, '-o', bin.to_s
+
+    tty_flags = STDIN.tty? ? '-t' : nil
+
+    system 'docker', 'run', '--rm', '-i', *tty_flags, '-v', "#{dir}:/root", 'gcc', "./#{bin}"
+    exit $CHILD_STATUS.exitstatus unless $CHILD_STATUS.success?
   end
 end
