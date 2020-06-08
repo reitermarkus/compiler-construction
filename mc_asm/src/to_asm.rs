@@ -708,196 +708,126 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             }
             _ => unreachable!(),
           },
-          Op::Plus(lhs, rhs) => match lhs.ty() {
-            Some(Ty::Int) => {
-              stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
-                stack_hygiene!(&mut stack, |temp_r: Reg32| {
-                  let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
-                  asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
-                  push_storage_temporary(lhs, &mut stack.temporaries);
+          Op::Divide(lhs, rhs) if lhs.ty() == Some(Ty::Int) => {
+            let eax_free = stack.temporaries.contains(&Reg32::EAX);
+            let edx_free = stack.temporaries.contains(&Reg32::EDX);
 
-                  let rhs = calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
-                  asm.lines.push(format!("  add    {}, {}", temp_l, rhs));
-                  push_storage_temporary(rhs, &mut stack.temporaries);
-                });
-              });
-            }
-            Some(Ty::Float) => {
-              stack_hygiene!(&mut stack, |temp: Reg32| {
-                let lhs = calc_index_offset(&mut stack, &mut asm, temp, lhs);
-                asm.lines.push(format!("  fld    {}", lhs));
+            let find_non_eax_edx = |temporaries: &mut VecDeque<Reg32>| {
+              let position = temporaries.iter().position(|&reg| reg != Reg32::EAX && reg != Reg32::EDX).unwrap();
+              temporaries.remove(position).unwrap()
+            };
+
+            stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
+              stack_hygiene!(&mut stack, |temp_r: Reg32| {
+                let eax_backup = if !eax_free {
+                  let eax_backup = find_non_eax_edx(&mut stack.temporaries);
+                  asm.lines.push(format!("  mov    {}, eax", eax_backup));
+                  Some(eax_backup)
+                } else {
+                  None
+                };
+
+                let edx_backup = if !edx_free {
+                  let edx_backup = find_non_eax_edx(&mut stack.temporaries);
+                  asm.lines.push(format!("  mov    {}, edx", edx_backup));
+                  Some(edx_backup)
+                } else {
+                  None
+                };
+
+                let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
+                let rhs = calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
+
+                let temp_r_backup = match temp_r {
+                  Reg32::EAX | Reg32::EDX => Some(find_non_eax_edx(&mut stack.temporaries)),
+                  _ => None,
+                };
+
+                let rhs_backup = match rhs {
+                  Storage::Register(_, Reg32::EAX) | Storage::Register(_, Reg32::EDX) | Storage::Literal(..) => {
+                    let temp = temp_r_backup.unwrap_or(temp_r);
+                    asm.lines.push(format!("  mov    {}, {}", temp, rhs));
+                    Some(temp)
+                  }
+                  _ => None,
+                };
+
+                if !matches!(lhs, Storage::Register(_, Reg32::EAX)) {
+                  asm.lines.push(format!("  mov    eax, {}", lhs));
+                }
+
+                asm.lines.push(format!("  cdq"));
+
+                if let Some(rhs_backup) = rhs_backup {
+                  asm.lines.push(format!("  idiv   {}", rhs_backup));
+                } else {
+                  asm.lines.push(format!("  idiv   {}", rhs));
+                }
+
+                if temp_l != Reg32::EAX {
+                  asm.lines.push(format!("  mov    {}, eax", temp_l));
+                }
+
+                if let Some(temp_r_backup) = temp_r_backup {
+                  push_temporary(temp_r_backup, &mut stack.temporaries);
+                }
+
+                if let Some(eax_backup) = eax_backup {
+                  asm.lines.push(format!("  mov    eax, {}", eax_backup));
+                  push_temporary(eax_backup, &mut stack.temporaries);
+                }
+
+                if let Some(edx_backup) = edx_backup {
+                  asm.lines.push(format!("  mov    edx, {}", edx_backup));
+                  push_temporary(edx_backup, &mut stack.temporaries);
+                }
+
                 push_storage_temporary(lhs, &mut stack.temporaries);
-
-                let rhs = calc_index_offset(&mut stack, &mut asm, temp, rhs);
-                asm.lines.push(format!("  fadd   {}", rhs));
-
-                let temp_float = stack.push(i, Ty::Float, 1, false);
-                asm.lines.push(format!("  fstp   {}", temp_float));
-
                 push_storage_temporary(rhs, &mut stack.temporaries);
               });
-            }
-            _ => unimplemented!(),
-          },
-          Op::Minus(lhs, rhs) => match lhs.ty() {
-            Some(Ty::Int) => {
-              stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
-                stack_hygiene!(&mut stack, |temp_r: Reg32| {
-                  let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
-                  asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
+            });
+          }
+          op @ Op::Plus(..) | op @ Op::Minus(..) | op @ Op::Times(..) | op @ Op::Divide(..) => {
+            let (lhs, rhs, int_instruction, float_instruction) = match op {
+              Op::Plus(lhs, rhs) => (lhs, rhs, "add", "fadd"),
+              Op::Minus(lhs, rhs) => (lhs, rhs, "sub", "fsub"),
+              Op::Times(lhs, rhs) => (lhs, rhs, "imul", "fmul"),
+              Op::Divide(lhs, rhs) => (lhs, rhs, "idiv", "fdiv"),
+              _ => unreachable!(),
+            };
+
+            match lhs.ty() {
+              Some(Ty::Int) => {
+                stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
+                  stack_hygiene!(&mut stack, |temp_r: Reg32| {
+                    let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
+                    asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
+                    push_storage_temporary(lhs, &mut stack.temporaries);
+
+                    let rhs = calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
+                    asm.lines.push(format!("  {}    {}, {}", int_instruction, temp_l, rhs));
+                    push_storage_temporary(rhs, &mut stack.temporaries);
+                  });
+                });
+              }
+              Some(Ty::Float) => {
+                stack_hygiene!(&mut stack, |temp: Reg32| {
+                  let lhs = calc_index_offset(&mut stack, &mut asm, temp, lhs);
+                  asm.lines.push(format!("  fld    {}", lhs));
                   push_storage_temporary(lhs, &mut stack.temporaries);
 
-                  let rhs = calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
-                  asm.lines.push(format!("  sub    {}, {}", temp_l, rhs));
+                  let rhs = calc_index_offset(&mut stack, &mut asm, temp, rhs);
+                  asm.lines.push(format!("  {}   {}", float_instruction, rhs));
+
+                  let temp_float = stack.push(i, Ty::Float, 1, false);
+                  asm.lines.push(format!("  fstp   {}", temp_float));
+
                   push_storage_temporary(rhs, &mut stack.temporaries);
                 });
-              });
+              }
+              _ => unimplemented!(),
             }
-            Some(Ty::Float) => {
-              stack_hygiene!(&mut stack, |temp: Reg32| {
-                let lhs = calc_index_offset(&mut stack, &mut asm, temp, lhs);
-                asm.lines.push(format!("  fld    {}", lhs));
-                push_storage_temporary(lhs, &mut stack.temporaries);
-
-                let rhs = calc_index_offset(&mut stack, &mut asm, temp, rhs);
-                asm.lines.push(format!("  fsub   {}", rhs));
-
-                let temp_float = stack.push(i, Ty::Float, 1, false);
-                asm.lines.push(format!("  fstp   {}", temp_float));
-
-                push_storage_temporary(rhs, &mut stack.temporaries);
-              });
-            }
-            _ => unimplemented!(),
-          },
-          Op::Times(lhs, rhs) => match lhs.ty() {
-            Some(Ty::Int) => {
-              stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
-                stack_hygiene!(&mut stack, |temp_r: Reg32| {
-                  let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
-                  asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
-                  push_storage_temporary(lhs, &mut stack.temporaries);
-
-                  let rhs = calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
-                  asm.lines.push(format!("  imul   {}, {}", temp_l, rhs));
-                  push_storage_temporary(rhs, &mut stack.temporaries);
-                });
-              });
-            }
-            Some(Ty::Float) => {
-              stack_hygiene!(&mut stack, |temp: Reg32| {
-                let lhs = calc_index_offset(&mut stack, &mut asm, temp, lhs);
-                asm.lines.push(format!("  fld    {}", lhs));
-                push_storage_temporary(lhs, &mut stack.temporaries);
-
-                let rhs = calc_index_offset(&mut stack, &mut asm, temp, rhs);
-                asm.lines.push(format!("  fmul   {}", rhs));
-
-                let temp_float = stack.push(i, Ty::Float, 1, false);
-                asm.lines.push(format!("  fstp   {}", temp_float));
-
-                push_storage_temporary(rhs, &mut stack.temporaries);
-              });
-            }
-            _ => unimplemented!(),
-          },
-          Op::Divide(lhs, rhs) => match lhs.ty() {
-            Some(Ty::Int) => {
-              let eax_free = stack.temporaries.contains(&Reg32::EAX);
-              let edx_free = stack.temporaries.contains(&Reg32::EDX);
-
-              let find_non_eax_edx = |temporaries: &mut VecDeque<Reg32>| {
-                let position = temporaries.iter().position(|&reg| reg != Reg32::EAX && reg != Reg32::EDX).unwrap();
-                temporaries.remove(position).unwrap()
-              };
-
-              stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
-                stack_hygiene!(&mut stack, |temp_r: Reg32| {
-                  let eax_backup = if !eax_free {
-                    let eax_backup = find_non_eax_edx(&mut stack.temporaries);
-                    asm.lines.push(format!("  mov    {}, eax", eax_backup));
-                    Some(eax_backup)
-                  } else {
-                    None
-                  };
-
-                  let edx_backup = if !edx_free {
-                    let edx_backup = find_non_eax_edx(&mut stack.temporaries);
-                    asm.lines.push(format!("  mov    {}, edx", edx_backup));
-                    Some(edx_backup)
-                  } else {
-                    None
-                  };
-
-                  let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
-                  let rhs = calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
-
-                  let temp_r_backup = match temp_r {
-                    Reg32::EAX | Reg32::EDX => Some(find_non_eax_edx(&mut stack.temporaries)),
-                    _ => None,
-                  };
-
-                  let rhs_backup = match rhs {
-                    Storage::Register(_, Reg32::EAX) | Storage::Register(_, Reg32::EDX) | Storage::Literal(..) => {
-                      let temp = temp_r_backup.unwrap_or(temp_r);
-                      asm.lines.push(format!("  mov    {}, {}", temp, rhs));
-                      Some(temp)
-                    }
-                    _ => None,
-                  };
-
-                  if !matches!(lhs, Storage::Register(_, Reg32::EAX)) {
-                    asm.lines.push(format!("  mov    eax, {}", lhs));
-                  }
-
-                  asm.lines.push(format!("  cdq"));
-
-                  if let Some(rhs_backup) = rhs_backup {
-                    asm.lines.push(format!("  idiv   {}", rhs_backup));
-                  } else {
-                    asm.lines.push(format!("  idiv   {}", rhs));
-                  }
-
-                  if temp_l != Reg32::EAX {
-                    asm.lines.push(format!("  mov    {}, eax", temp_l));
-                  }
-
-                  if let Some(temp_r_backup) = temp_r_backup {
-                    push_temporary(temp_r_backup, &mut stack.temporaries);
-                  }
-
-                  if let Some(eax_backup) = eax_backup {
-                    asm.lines.push(format!("  mov    eax, {}", eax_backup));
-                    push_temporary(eax_backup, &mut stack.temporaries);
-                  }
-
-                  if let Some(edx_backup) = edx_backup {
-                    asm.lines.push(format!("  mov    edx, {}", edx_backup));
-                    push_temporary(edx_backup, &mut stack.temporaries);
-                  }
-
-                  push_storage_temporary(lhs, &mut stack.temporaries);
-                  push_storage_temporary(rhs, &mut stack.temporaries);
-                });
-              });
-            }
-            Some(Ty::Float) => {
-              stack_hygiene!(&mut stack, |temp: Reg32| {
-                let lhs = calc_index_offset(&mut stack, &mut asm, temp, lhs);
-                asm.lines.push(format!("  fld    {}", lhs));
-                push_storage_temporary(lhs, &mut stack.temporaries);
-
-                let rhs = calc_index_offset(&mut stack, &mut asm, temp, rhs);
-                asm.lines.push(format!("  fdiv   {}", rhs));
-
-                let temp_float = stack.push(i, Ty::Float, 1, false);
-                asm.lines.push(format!("  fstp   {}", temp_float));
-
-                push_storage_temporary(rhs, &mut stack.temporaries);
-              });
-            }
-            _ => unimplemented!(),
-          },
+          }
           op @ Op::Eq(..)
           | op @ Op::Neq(..)
           | op @ Op::Lte(..)
