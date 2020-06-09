@@ -50,7 +50,7 @@ impl Default for Stack {
   fn default() -> Stack {
     Stack {
       temporary_register: Default::default(),
-      temporaries: VecDeque::from(vec![Reg32::EAX, Reg32::EDX, Reg32::ECX, Reg32::EDI, Reg32::ESI]),
+      temporaries: VecDeque::from(vec![Reg32::EAX, Reg32::EDX, Reg32::ECX, Reg32::EBX, Reg32::EDI, Reg32::ESI]),
       lookup_table: Default::default(),
       parameters: Default::default(),
       parameters_size: 8,
@@ -590,8 +590,6 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
       stack.stack_size_index = asm.lines.len();
 
-      let mut push_ebx = false;
-
       for (i, statement) in self.statements.iter().enumerate().skip(range.start).take(range.end - range.start) {
         if let Some(label) = asm.labels.get(&i) {
           asm.lines.push(format!("{}:", label));
@@ -834,11 +832,16 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             };
 
             match lhs.ty() {
-              Some(Ty::Int) => {
+              Some(Ty::Int) | Some(Ty::Bool) => {
                 stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
                   stack_hygiene!(&mut stack, |temp_r: Reg32| {
                     let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
-                    asm.lines.push(format!("  mov    {}, {} # cmp", temp_l, lhs));
+
+                    if lhs.storage_type() == StorageType::Byte {
+                      asm.lines.push(format!("  movzx  {}, {:#} # cmp", temp_l, lhs));
+                    } else {
+                      asm.lines.push(format!("  mov    {}, {} # cmp", temp_l, lhs));
+                    }
 
                     let rhs = calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
                     asm.lines.push(format!("  cmp    {}, {}", temp_l, rhs));
@@ -880,33 +883,16 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             match lhs.ty() {
               Some(Ty::Bool) => {
                 stack_hygiene!(i, &mut stack, |temp: Reg32| {
-                  let mut lhs = calc_index_offset(&mut stack, &mut asm, temp, lhs);
-
-                  let lhs_reg = if let Storage::Register(ty, reg) = lhs {
-                    stack.temporary_register.insert(i, reg);
-                    stack.used_registers.insert(reg, i);
-                    Some((ty, reg))
-                  } else {
-                    None
-                  };
-
+                  let lhs = calc_index_offset(&mut stack, &mut asm, temp, lhs);
                   let rhs = calc_index_offset(&mut stack, &mut asm, temp, rhs);
 
-                  if let Some((ty, lhs_reg)) = lhs_reg {
-                    if let Some(lhs_reg) = stack.temporary_register.get(&i) {
-                      if lhs_reg == &Reg32::EBX {
-                        push_ebx = true;
-                      }
-
-                      lhs = Storage::Register(ty, *lhs_reg);
-                    }
-
-                    stack.used_registers.remove(&lhs_reg);
+                  if lhs.storage_type() == StorageType::Byte {
+                    asm.lines.push(format!("  movzx  {}, {:#}", temp, lhs));
+                  } else {
+                    asm.lines.push(format!("  mov    {}, {}", temp, lhs));
                   }
 
-                  asm.lines.push(format!("  {}    {:#}, {:#}", set_instruction, lhs, rhs));
-
-                  asm.lines.push(format!("  movzx  {:#}, {:#} # ebx", temp, lhs));
+                  asm.lines.push(format!("  {}    {:#}, {:#}", set_instruction, temp.as_reg8().0, rhs));
 
                   push_storage_temporary(lhs, &mut stack);
                   push_storage_temporary(rhs, &mut stack);
@@ -969,16 +955,11 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             }
           },
           Op::Nope => asm.lines.push("  nop".to_string()),
-          op => unimplemented!("{:?}", op),
+          _ => unreachable!(),
         }
       }
 
       asm.lines.push(format!(".AWAY_{}:", name));
-
-      if push_ebx {
-        asm.lines.insert(stack.stack_size_index, "  push   ebx".to_string());
-        asm.lines.push("  pop    ebx".to_string());
-      }
 
       if stack.variables.is_empty() {
         asm.lines.push("  pop    ebp".to_string());
