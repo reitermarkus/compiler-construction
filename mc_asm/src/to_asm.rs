@@ -574,8 +574,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       match statement {
         Op::Jumpfalse(_, Arg::Reference(_, reference)) | Op::Jump(Arg::Reference(_, reference)) => {
           let label_number = asm.labels.len();
-          let label = format!(".L{}", label_number);
-          asm.labels.insert(*reference, label);
+          asm.labels.entry(*reference).or_insert_with(|| format!(".L{}", label_number));
         }
         _ => {}
       }
