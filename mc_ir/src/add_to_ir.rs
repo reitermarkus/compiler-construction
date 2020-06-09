@@ -116,8 +116,16 @@ impl<'a> AddToIr<'a> for Expression<'a> {
       }
       Self::FunctionCall { identifier, arguments, .. } => {
         let args = arguments.iter().map(|a| a.add_to_ir(ir)).collect::<Vec<Arg<'_>>>();
-        let ty = ir.functions.get(identifier).and_then(|&(_, ty)| ty);
-        Arg::FunctionCall(ty, identifier, args)
+
+        let ty = match identifier.as_ref() {
+          "read_int" => Some(Ty::Int),
+          "read_float" => Some(Ty::Float),
+          _ => ir.functions.get(identifier).and_then(|&(_, ty)| ty),
+        };
+
+        let arg = Arg::FunctionCall(ty, identifier, args);
+        ir.push(Op::Call(arg));
+        ir.last_ref()
       }
     }
   }
@@ -128,15 +136,7 @@ impl<'a> AddToIr<'a> for Statement<'a> {
     match self {
       Self::Assignment(assignment) => assignment.add_to_ir(ir),
       Self::Decl(declaration) => declaration.add_to_ir(ir),
-      Self::Expression(expression) => {
-        if let Expression::FunctionCall { .. } = expression {
-          let arg = expression.add_to_ir(ir);
-          ir.push(Op::Call(arg));
-          ir.last_ref()
-        } else {
-          expression.add_to_ir(ir)
-        }
-      }
+      Self::Expression(expression) => expression.add_to_ir(ir),
       Self::If(if_stmt) => if_stmt.add_to_ir(ir),
       Self::While(while_stmt) => while_stmt.add_to_ir(ir),
       Self::Ret(ret_stmt) => ret_stmt.add_to_ir(ir),
