@@ -13,6 +13,7 @@ fn main() -> std::io::Result<()> {
     .arg(Arg::from_usage("-q, --quiet 'suppress error output'").required(false))
     .arg(Arg::from_usage("-o, --output <out-file> 'output file (defaults to 'a.out')'").required(false))
     .arg(Arg::from_usage("--backend <backend> 'override the back-end compiler (defaults to 'gcc')'").env("MCC_BACKEND").required(false))
+    .arg(Arg::from_usage("--docker-image <backend> 'run the back-end compiler inside a Docker image'").env("MCC_DOCKER_IMAGE").required(false))
     .arg(Arg::from_usage("<file> 'input file (use '-' to read from stdin)'"))
     .get_matches();
 
@@ -20,6 +21,7 @@ fn main() -> std::io::Result<()> {
   let out_file = value_t!(matches, "output", String).unwrap_or_else(|_| "a.out".into());
   let in_file = value_t!(matches, "file", String).unwrap();
   let backend = value_t!(matches, "backend", String).unwrap_or_else(|_| "gcc".into());
+  let docker_image = value_t!(matches, "docker-image", String).ok();
 
-  mcc(in_file, out_file, backend, quiet)
+  mcc(in_file, out_file, backend, docker_image, quiet)
 }

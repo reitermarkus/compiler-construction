@@ -33,5 +33,17 @@ rake graphs
 ## Generation of Symbol Tables
 
 ```
-rake symbol_tables
+rake symbol_table
+```
+
+## Generation of Intermediate Representation
+
+```
+rake ir
+```
+
+## Generation of Assembly Code
+
+```
+rake asm
 ```

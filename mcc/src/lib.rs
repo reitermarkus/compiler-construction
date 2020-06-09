@@ -11,7 +11,7 @@ use mc_asm::ToAsm;
 use mc_ir::AddToIr;
 use mc_ir::IntermediateRepresentation;
 
-pub fn mcc(in_file: impl AsRef<Path>, out_file: impl AsRef<Path>, backend: String, quiet: bool) -> std::io::Result<()> {
+pub fn mcc(in_file: impl AsRef<Path>, out_file: impl AsRef<Path>, backend: String, docker_image: Option<String>, quiet: bool) -> std::io::Result<()> {
   let mut contents = String::new();
 
   if in_file.as_ref() == Path::new("-") {
@@ -36,17 +36,24 @@ pub fn mcc(in_file: impl AsRef<Path>, out_file: impl AsRef<Path>, backend: Strin
     Stdio::inherit()
   };
 
-  let mut command = Command::new(&backend);
+  let mut command;
 
-  if backend == "docker" {
+  if let Some(docker_image) = docker_image {
+    command = Command::new("docker");
+
     command.arg("run");
     command.arg("-i");
 
     command.arg("-v");
-    command.arg(format!("{}:/root", current_dir().unwrap().display()));
+    command.arg(format!("{}:/project", current_dir().unwrap().display()));
 
-    command.arg("gcc");
-    command.arg("gcc");
+    command.arg("-w");
+    command.arg("/project");
+
+    command.arg(docker_image);
+    command.arg(backend);
+  } else {
+    command = Command::new(backend)
   }
 
   command.arg("-m32");
