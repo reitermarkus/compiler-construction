@@ -5,7 +5,7 @@ require 'english'
 
 def cargo_run(*args)
   command, *args = args
-  sh 'cargo', 'run', '--release', '--bin', command, '--', *args
+  sh 'cargo', 'run', '--bin', command, '--', *args
 end
 
 desc 'generate AST graphs for all examples'
