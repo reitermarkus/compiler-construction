@@ -968,7 +968,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             for reg in saved_registers.iter().rev() {
               asm.lines.push(format!("  pop    {}", reg));
             }
-          }
+          },
+          Op::Nope => asm.lines.push("  nop".to_string()),
           op => unimplemented!("{:?}", op),
         }
       }

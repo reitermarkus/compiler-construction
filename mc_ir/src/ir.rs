@@ -111,6 +111,7 @@ pub enum Op<'a> {
   Jump(Arg<'a>),
   Call(Arg<'a>),
   Return(Option<Arg<'a>>),
+  Nope,
 }
 
 impl<'a> Op<'a> {
@@ -137,6 +138,7 @@ impl<'a> Op<'a> {
       Self::Jump(_) => None,
       Self::Call(arg) => arg.ty(),
       Self::Return(arg) => arg.as_ref().and_then(|a| a.ty()),
+      Self::Nope => None,
     }
   }
 }

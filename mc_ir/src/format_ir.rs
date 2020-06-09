@@ -54,6 +54,7 @@ impl fmt::Display for Op<'_> {
           write!(f, "return;")
         }
       }
+      Self::Nope => write!(f, "nope"),
     }
   }
 }
@@ -70,10 +71,11 @@ impl fmt::Display for IntermediateRepresentation<'_> {
           | Op::Jump(..)
           | Op::Jumpfalse(..)
           | Op::Call(..)
-          | Op::Return(..) => {
+          | Op::Return(..)
+          | Op::Nope => {
             writeln!(f, "{}:\t \t {}", range.start + i, stmt)?;
           }
-          _ => writeln!(f, "{}:\t \t t{} = {}", range.start + i, i, stmt)?,
+          _ => writeln!(f, "{}:\t \t t{} = {}", range.start + i, range.start + i, stmt)?,
         }
       }
 
