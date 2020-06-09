@@ -11,4 +11,3 @@ mc_symbol_table = { path = "../mc_symbol_table" }
 mc_ir = { path = "../mc_ir" }
 mc_ast_to_dot = { path = "../mc_ast_to_dot" }
 mc_asm = { path = "../mc_asm" }
-tempfile = "3.1.0"
