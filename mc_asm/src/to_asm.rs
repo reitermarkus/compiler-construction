@@ -186,9 +186,9 @@ fn push_temporary(temporary: Reg32, stack: &mut Stack) {
 macro_rules! stack_hygiene {
   ($i:expr, $stack:expr, $closure:expr) => {
     let temp_var = $stack.temporaries.pop_front().unwrap();
-    $closure(temp_var);
-    $stack.temporary_register.insert($i, temp_var);
     $stack.used_registers.insert(temp_var, $i);
+    $stack.temporary_register.insert($i, temp_var);
+    $closure(temp_var);
   };
   ($stack:expr, $closure:expr) => {
     let temp_var = $stack.temporaries.pop_front().unwrap();
@@ -953,10 +953,13 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               ty => {
                 stack_hygiene!(i, &mut stack, |temp: Reg32| {
                   let result = calc_index_offset(&mut stack, &mut asm, temp, arg);
-                  asm.lines.push(format!("  mov    {}, {}", temp, result));
+
+                  if matches!(result, Storage::Register(_, reg) if reg != temp) {
+                    asm.lines.push(format!("  mov    {}, {}", temp, result));
+                  }
 
                   if ty.is_none() {
-                    push_storage_temporary(result, &mut stack);
+                    push_temporary(temp, &mut stack);
                   }
                 });
               }
