@@ -191,6 +191,7 @@ impl<'a> AddToIr<'a> for WhileStatement<'a> {
 
     ir.update_reference(jumpfalse_index, ir.statements.len());
 
+    ir.push(Op::Nope);
     ir.last_ref()
   }
 }
