@@ -140,6 +140,7 @@ impl Reg32 {
   }
 }
 
+#[derive(Debug)]
 pub enum Reg8 {
   AL,
   CL,

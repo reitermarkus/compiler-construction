@@ -1,0 +1,14 @@
+[package]
+name = "mcc"
+version = "0.1.0"
+authors = ["Markus Reiter <me@reitermark.us>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.33"
+mc_parser = { path = "../mc_parser" }
+mc_symbol_table = { path = "../mc_symbol_table" }
+mc_ir = { path = "../mc_ir" }
+mc_ast_to_dot = { path = "../mc_ast_to_dot" }
+mc_asm = { path = "../mc_asm" }
+tempfile = "3.1.0"

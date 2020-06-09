@@ -8,7 +8,7 @@ use mc_ir::AddToIr;
 use mc_ir::IntermediateRepresentation;
 
 mod to_asm;
-use to_asm::ToAsm;
+pub use to_asm::ToAsm;
 
 pub fn mc_asm(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::Result<()> {
   let mut contents = String::new();
