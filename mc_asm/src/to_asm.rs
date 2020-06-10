@@ -430,31 +430,30 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
 
         args_size += argument.storage_type().size();
 
-        if arg.ty() == Some(Ty::Float) {
-          load_float(asm, &argument, "push function argument");
-
-          if identifier.as_ref() != "print_float" {
-            asm.lines.push("  lea    esp, [esp-4]".to_string());
-            asm.lines.push("  fstp    DWORD PTR [esp]".to_string());
+        match &argument {
+          Storage::Pointer(Pointer { array, ref index_offset, .. }) if *array && index_offset.is_none() => {
+            stack_hygiene!(stack, |temp: Reg32| {
+              asm.lines.push(format!("  lea    {}, {}", temp, argument));
+              asm.lines.push(format!("  push   {} # ptr", temp));
+            });
           }
-        } else {
-          match &argument {
-            Storage::Pointer(Pointer { array, ref index_offset, .. }) if *array && index_offset.is_none() => {
-              stack_hygiene!(stack, |temp: Reg32| {
-                asm.lines.push(format!("  lea    {}, {}", temp, argument));
-                asm.lines.push(format!("  push   {} # ptr", temp));
-              });
-            }
-            Storage::Register(_, reg) => {
-              asm.lines.push(format!("  push   {} # reg", reg));
-            }
-            argument => {
-              asm.lines.push(format!("  push   {} # arg", argument));
+          argument if arg.ty() == Some(Ty::Float) => {
+            load_float(asm, &argument, "push function argument");
+
+            if identifier.as_ref() != "print_float" {
+              asm.lines.push("  lea    esp, [esp-4]".to_string());
+              asm.lines.push("  fstp    DWORD PTR [esp]".to_string());
             }
           }
-
-          push_storage_temporary(argument, stack);
+          Storage::Register(_, reg) => {
+            asm.lines.push(format!("  push   {} # reg", reg));
+          }
+          argument => {
+            asm.lines.push(format!("  push   {} # arg", argument));
+          }
         }
+
+        push_storage_temporary(argument, stack);
       }
 
       match identifier.as_ref() {
@@ -944,12 +943,10 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 stack_hygiene!(i, &mut stack, |temp: Reg32| {
                   let result = calc_index_offset(&mut stack, &mut asm, temp, arg);
 
-                  if matches!(result, Storage::Register(_, reg) if reg != temp) {
-                    asm.lines.push(format!("  mov    {}, {}", temp, result));
-                  }
-
                   if ty.is_none() {
                     push_temporary(temp, &mut stack);
+                  } else if matches!(result, Storage::Register(_, reg) if reg != temp) {
+                    asm.lines.push(format!("  mov    {}, {}", temp, result));
                   }
                 });
               }

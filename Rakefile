@@ -79,6 +79,7 @@ end
 desc 'test all examples'
 task :test, [:example] => [:build_gcc_docker_image, :compile] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
+    example_name = mc.sub_ext('').basename
     input = File.read(mc.sub_ext('.stdin.txt'))
     expected_output = File.read(mc.sub_ext('.stdout.txt'))
 
@@ -89,21 +90,23 @@ task :test, [:example] => [:build_gcc_docker_image, :compile] do |example: '*'|
       exit_status = wait_thr.value
 
       unless exit_status.success?
-        $stderr.puts "Example '#{mc.sub_ext('').basename}' failed with status #{exit_status.exitstatus}"
+        raise "Example '#{example_name}' failed with status #{exit_status.exitstatus}"
       end
 
       actual_output = stdout.read
 
       next if actual_output == expected_output
 
-      $stderr.puts 'Expected:'
-      $stderr.puts '─' * 100
-      $stderr.puts expected_output
-      $stderr.puts '─' * 100
-      $stderr.puts 'Actual:'
-      $stderr.puts '─' * 100
-      $stderr.puts actual_output
-      $stderr.puts '─' * 100
+      message = +"Example '#{example_name}' failed with wrong output. Expected output is\n"
+      message << '─' * 100 << "\n"
+      message << expected_output
+      message << '─' * 100 << "\n"
+      message << "but actual output was\n"
+      message << '─' * 100 << "\n"
+      message << actual_output
+      message << '─' * 100 << "\n"
+
+      raise message
     end
   end
 end
