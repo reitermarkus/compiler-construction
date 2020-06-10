@@ -24,7 +24,7 @@ macro_rules! stack_hygiene {
   ($stack:expr, $closure:expr) => {
     let temp_var = $stack.temporaries.pop_front().unwrap();
     $closure(temp_var);
-    push_temporary(temp_var, $stack);
+    $stack.push_temporary(temp_var);
   };
   ($ref_l:expr, $i:expr, $stack:expr, $closure:expr) => {
     let temp_l = *$stack.temporary_register.get($ref_l).unwrap();
@@ -63,7 +63,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         Some(Arg::Literal(Literal::Int(index_offset))) => Some(Offset::Literal(*index_offset as usize)),
         Some(arg) => match calc_index_offset(stack, asm, reg, arg) {
           Storage::Register(_, reg) => {
-            push_temporary(reg, stack);
+            stack.push_temporary(reg);
             Some(Offset::Register(reg))
           }
           pointer @ Storage::Pointer(..) => {
@@ -152,7 +152,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
           }
         }
 
-        push_storage_temporary(argument, stack);
+        stack.push_storage_temporary(argument);
       }
 
       match identifier.as_ref() {
@@ -319,7 +319,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
                   let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
                   asm.lines.push(format!("  fstp   {}", var));
-                  push_storage_temporary(var, &mut stack);
+                  stack.push_storage_temporary(var);
                 }
                 _ => match val {
                   Storage::Pointer(..) => {
@@ -328,18 +328,18 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
                       let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
                       asm.lines.push(format!("  mov    {}, {:#}", var, temp_val));
-                      push_storage_temporary(var, &mut stack);
+                      stack.push_storage_temporary(var);
                     });
                   }
                   _ => {
                     let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
                     asm.lines.push(format!("  mov    {}, {:#}", var, val));
-                    push_storage_temporary(var, &mut stack);
+                    stack.push_storage_temporary(var);
                   }
                 },
               }
 
-              push_storage_temporary(val, &mut stack);
+              stack.push_storage_temporary(val);
             });
           }
           Op::Return(arg) => {
@@ -359,7 +359,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   asm.lines.push("  nop".to_string());
                 }
 
-                push_storage_temporary(result, &mut stack);
+                stack.push_storage_temporary(result);
               });
             }
 
@@ -454,21 +454,21 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 }
 
                 if let Some(temp_r_backup) = temp_r_backup {
-                  push_temporary(temp_r_backup, &mut stack);
+                  stack.push_temporary(temp_r_backup);
                 }
 
                 if let Some(eax_backup) = eax_backup {
                   asm.lines.push(format!("  mov    eax, {}", eax_backup));
-                  push_temporary(eax_backup, &mut stack);
+                  stack.push_temporary(eax_backup);
                 }
 
                 if let Some(edx_backup) = edx_backup {
                   asm.lines.push(format!("  mov    edx, {}", edx_backup));
-                  push_temporary(edx_backup, &mut stack);
+                  stack.push_temporary(edx_backup);
                 }
 
-                push_storage_temporary(lhs, &mut stack);
-                push_storage_temporary(rhs, &mut stack);
+                stack.push_storage_temporary(lhs);
+                stack.push_storage_temporary(rhs);
               });
             });
           }
@@ -487,12 +487,12 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   stack_hygiene!(&mut stack, |temp_r: Reg32| {
                     let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
                     asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
-                    push_storage_temporary(lhs, &mut stack);
+                    stack.push_storage_temporary(lhs);
 
                     let rhs = calc_index_offset(&mut stack, &mut asm, temp_r, rhs);
                     asm.lines.push(format!("  {}    {}, {}", int_instruction, temp_l, rhs));
 
-                    push_storage_temporary(rhs, &mut stack);
+                    stack.push_storage_temporary(rhs);
                   });
                 });
               }
@@ -501,7 +501,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   let lhs = calc_index_offset(&mut stack, &mut asm, temp, lhs);
 
                   load_float(&mut asm, &lhs, "calc FPU");
-                  push_storage_temporary(lhs, &mut stack);
+                  stack.push_storage_temporary(lhs);
 
                   let rhs = calc_index_offset(&mut stack, &mut asm, temp, rhs);
                   asm.lines.push(format!("  {}   {}", float_instruction, rhs));
@@ -509,7 +509,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   let temp_float = stack.push(i, ty.into(), 1, false, false);
                   asm.lines.push(format!("  fstp   {}", temp_float));
 
-                  push_storage_temporary(rhs, &mut stack);
+                  stack.push_storage_temporary(rhs);
                 });
               }
               _ => unimplemented!(),
@@ -548,8 +548,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
                     asm.lines.push(format!("  {}   {}", int_instruction, temp_l.as_reg8().0));
 
-                    push_storage_temporary(lhs, &mut stack);
-                    push_storage_temporary(rhs, &mut stack);
+                    stack.push_storage_temporary(lhs);
+                    stack.push_storage_temporary(rhs);
                   });
                 });
               }
@@ -566,8 +566,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
                   asm.lines.push(format!("  {}   {}", float_instruction, temp_l.as_reg8().0));
 
-                  push_storage_temporary(lhs, &mut stack);
-                  push_storage_temporary(rhs, &mut stack);
+                  stack.push_storage_temporary(lhs);
+                  stack.push_storage_temporary(rhs);
                 });
               }
               _ => unimplemented!(),
@@ -594,8 +594,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
                   asm.lines.push(format!("  {}    {:#}, {:#}", set_instruction, temp.as_reg8().0, rhs));
 
-                  push_storage_temporary(lhs, &mut stack);
-                  push_storage_temporary(rhs, &mut stack);
+                  stack.push_storage_temporary(lhs);
+                  stack.push_storage_temporary(rhs);
                 });
               }
               _ => unreachable!(),
@@ -613,7 +613,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 asm.lines.push(format!("  cmp    {:#}, 0", result_register));
                 asm.lines.push(format!("  je     {}", asm.labels.get(reference).unwrap()));
 
-                push_storage_temporary(result_register, &mut stack);
+                stack.push_storage_temporary(result_register);
               });
             }
           },
@@ -640,7 +640,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   let result = calc_index_offset(&mut stack, &mut asm, temp, arg);
 
                   if ty.is_none() {
-                    push_temporary(temp, &mut stack);
+                    stack.push_temporary(temp);
                   } else if matches!(result, Storage::Register(_, reg) if reg != temp) {
                     asm.lines.push(format!("  mov    {}, {}", temp, result));
                   }

@@ -70,20 +70,20 @@ impl Stack {
       Pointer { base: Reg32::EBP, storage_type, offset: self.variables_size, index_offset: None, parameter, array }
     }
   }
-}
 
-pub fn push_storage_temporary(storage: Storage, stack: &mut Stack) {
-  if let Storage::Register(_, reg) = storage {
-    push_temporary(reg, stack);
+  pub fn push_temporary(&mut self, temporary: Reg32) {
+    self.used_registers.remove(&temporary);
+
+    if temporary == Reg32::EAX || temporary == Reg32::EDX || temporary == Reg32::ECX || temporary == Reg32::EBX {
+      self.temporaries.push_front(temporary);
+    } else {
+      self.temporaries.push_back(temporary);
+    }
   }
-}
 
-pub fn push_temporary(temporary: Reg32, stack: &mut Stack) {
-  stack.used_registers.remove(&temporary);
-
-  if temporary == Reg32::EAX || temporary == Reg32::EDX || temporary == Reg32::ECX || temporary == Reg32::EBX {
-    stack.temporaries.push_front(temporary);
-  } else {
-    stack.temporaries.push_back(temporary);
+  pub fn push_storage_temporary(&mut self, storage: Storage) {
+    if let Storage::Register(_, reg) = storage {
+      self.push_temporary(reg);
+    }
   }
 }
