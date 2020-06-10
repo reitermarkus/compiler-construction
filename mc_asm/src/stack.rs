@@ -71,6 +71,12 @@ impl Stack {
     }
   }
 
+  pub fn with_temporary(&mut self, closure: impl FnOnce(&mut Stack, Reg32) -> ()) {
+    let temp_var = self.temporaries.pop_front().unwrap();
+    closure(self, temp_var);
+    self.push_temporary(temp_var);
+  }
+
   pub fn push_temporary(&mut self, temporary: Reg32) {
     self.used_registers.remove(&temporary);
 
