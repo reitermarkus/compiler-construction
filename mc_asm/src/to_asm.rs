@@ -26,32 +26,6 @@ macro_rules! stack_hygiene {
     $closure(temp_var);
     $stack.push_temporary(temp_var);
   };
-  ($ref_l:expr, $i:expr, $stack:expr, $closure:expr) => {
-    let temp_l = *$stack.temporary_register.get($ref_l).unwrap();
-
-    $closure(temp_l);
-
-    $stack.temporary_register.remove($ref_l);
-
-    if !$stack.temporary_register.contains_key(&$i) {
-      $stack.temporary_register.insert($i, temp_l);
-    }
-  };
-  ($ref_l:expr, $ref_r:expr, $i:expr, $stack:expr, $closure:expr) => {
-    let temp_l = *$stack.temporary_register.get($ref_l).unwrap();
-    let temp_r = *$stack.temporary_register.get($ref_r).unwrap();
-
-    $closure(temp_l, temp_r);
-
-    push_temporary(temp_r, &mut $stack);
-
-    $stack.temporary_register.remove($ref_r);
-    $stack.temporary_register.remove($ref_l);
-
-    if !$stack.temporary_register.contains_key(&$i) {
-      $stack.temporary_register.insert($i, temp_l);
-    }
-  };
 }
 
 fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> Storage {
