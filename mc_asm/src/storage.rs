@@ -34,7 +34,7 @@ impl fmt::Display for StorageType {
 }
 
 impl StorageType {
-  pub fn size(&self) -> usize {
+  pub fn size(self) -> usize {
     match self {
       Self::Qword => 8,
       Self::Dword => 4,
@@ -42,7 +42,7 @@ impl StorageType {
     }
   }
 
-  pub fn map_register(&self, reg: &Reg32) -> String {
+  pub fn map_register(self, reg: Reg32) -> String {
     match self {
       Self::Dword => reg.to_string(),
       Self::Byte => reg.as_reg8().0.to_string(),
@@ -93,7 +93,7 @@ impl fmt::Display for Storage {
       Self::Pointer(pointer) => write!(f, "{}", pointer),
       Self::Register(storage_type, reg) => {
         if f.alternate() {
-          write!(f, "{}", storage_type.map_register(reg))
+          write!(f, "{}", storage_type.map_register(*reg))
         } else {
           write!(f, "{}", reg)
         }

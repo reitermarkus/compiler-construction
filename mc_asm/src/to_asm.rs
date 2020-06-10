@@ -266,7 +266,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 let pointer = stack.push(i, storage_type, count.clone().unwrap_or(1), false, count.is_some());
 
                 asm.lines.push(format!("  mov    {}, {}", temp, arg));
-                asm.lines.push(format!("  mov    {}, {}", pointer, pointer.storage_type.map_register(&temp)));
+                asm.lines.push(format!("  mov    {}, {}", pointer, pointer.storage_type.map_register(temp)));
               });
             }
             storage_type => {

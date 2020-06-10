@@ -29,7 +29,7 @@ impl fmt::Display for Reg32 {
 }
 
 impl Reg32 {
-  pub fn as_reg8(&self) -> (Reg8, Reg8) {
+  pub fn as_reg8(self) -> (Reg8, Reg8) {
     match self {
       Self::EAX => (Reg8::AL, Reg8::AH),
       Self::ECX => (Reg8::CL, Reg8::CH),
