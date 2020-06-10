@@ -861,9 +861,9 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               Some(Ty::Float) => {
                 stack_hygiene!(i, &mut stack, |temp_l: Reg32| {
                   let lhs = calc_index_offset(&mut stack, &mut asm, temp_l, lhs);
-                  let rhs = calc_index_offset(&mut stack, &mut asm, temp_l, rhs);
-
                   load_float(&mut asm, &lhs, "cmp FPU lhs");
+
+                  let rhs = calc_index_offset(&mut stack, &mut asm, temp_l, rhs);
                   asm.lines.push(format!("  fld    {} # cmp rhs", rhs));
 
                   asm.lines.push("  fcomip  st, st(1)".to_string());
