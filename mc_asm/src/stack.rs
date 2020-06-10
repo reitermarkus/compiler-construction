@@ -71,6 +71,13 @@ impl Stack {
     }
   }
 
+  pub fn with_indexed_temporary(&mut self, index: usize, closure: impl FnOnce(&mut Stack, Reg32) -> ()) {
+    let temp_var = self.temporaries.pop_front().unwrap();
+    self.used_registers.insert(temp_var, index);
+    self.temporary_register.insert(index, temp_var);
+    closure(self, temp_var);
+  }
+
   pub fn with_temporary(&mut self, closure: impl FnOnce(&mut Stack, Reg32) -> ()) {
     let temp_var = self.temporaries.pop_front().unwrap();
     closure(self, temp_var);
