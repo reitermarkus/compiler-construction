@@ -486,7 +486,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   stack.push_storage_temporary(rhs);
                 });
               }
-              _ => unimplemented!(),
+              _ => unreachable!(),
             }
           }
           op @ Op::Eq(..)
@@ -544,7 +544,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   stack.push_storage_temporary(rhs);
                 });
               }
-              _ => unimplemented!(),
+              _ => unreachable!(),
             }
           }
           op @ Op::Land(..) | op @ Op::Lor(..) => {
