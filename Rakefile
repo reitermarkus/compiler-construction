@@ -116,3 +116,15 @@ task :build_gcc_docker_image do
   ENV['MCC_DOCKER_IMAGE'] = 'gcc'
   sh 'docker', 'build', '-t', ENV['MCC_DOCKER_IMAGE'], '-f', 'Dockerfile.gcc', '.'
 end
+
+desc 'clean example directories'
+task :clean, [:example] do |example: '*'|
+  Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
+    FileUtils.rm_f mc.sub_ext('.dot')
+    FileUtils.rm_f mc.sub_ext('.svg')
+    FileUtils.rm_f mc.sub_ext('.txt')
+    FileUtils.rm_f mc.sub_ext('.ir')
+    FileUtils.rm_f mc.sub_ext('.s')
+    FileUtils.rm_f mc.sub_ext('.bin')
+  end
+end
