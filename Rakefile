@@ -87,13 +87,18 @@ task :test, [:example] => [:build_gcc_docker_image, :compile] do |example: '*'|
       stdin.write input
       stdin.close
 
+      actual_output = stdout.read
+      stdout.close
+      stderr.close
+
       exit_status = wait_thr.value
 
-      unless exit_status.success?
+
+      if exit_status.success?
+        puts "Example '#{example_name}' passed IO test."
+      else
         raise "Example '#{example_name}' failed with status #{exit_status.exitstatus}"
       end
-
-      actual_output = stdout.read
 
       next if actual_output == expected_output
 
