@@ -669,7 +669,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           Op::Not(arg) => {
             stack_hygiene!(i, &mut stack, |temp: Reg32| {
               let result = calc_index_offset(&mut stack, &mut asm, temp, arg);
-              asm.lines.push(format!("  movzx  {}, {}", temp, result));
+              asm.lines.push(format!("  movzx  {}, {:#}", temp, result));
               asm.lines.push(format!("  xor    {}, 1", temp))
             });
           }
