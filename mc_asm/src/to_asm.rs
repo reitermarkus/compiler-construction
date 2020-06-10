@@ -617,29 +617,33 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           }
           Op::Assign(value, variable) => {
             stack_hygiene!(&mut stack, |temp: Reg32| {
-              let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
-
               let val = calc_index_offset(&mut stack, &mut asm, temp, value);
 
               match variable.ty() {
                 Some(Ty::Float) => {
+                  let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
                   load_float(&mut asm, &val, "assign FPU");
                   asm.lines.push(format!("  fstp   {}", var));
+                  push_storage_temporary(var, &mut stack);
                 }
                 _ => match val {
                   Storage::Pointer(..) => {
-                    stack_hygiene!(&mut stack, |temp: Reg32| {
-                      asm.lines.push(format!("  mov    {}, {}", temp, val));
-                      asm.lines.push(format!("  mov    {}, {:#}", var, temp));
+                    stack_hygiene!(&mut stack, |temp_val: Reg32| {
+                      asm.lines.push(format!("  mov    {}, {}", temp_val, val));
+
+                      let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
+                      asm.lines.push(format!("  mov    {}, {:#}", var, temp_val));
+                      push_storage_temporary(var, &mut stack);
                     });
                   }
                   _ => {
+                    let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
                     asm.lines.push(format!("  mov    {}, {:#}", var, val));
+                    push_storage_temporary(var, &mut stack);
                   }
                 },
               }
 
-              push_storage_temporary(var, &mut stack);
               push_storage_temporary(val, &mut stack);
             });
           }
@@ -954,7 +958,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
             for reg in saved_registers.iter().rev() {
               asm.lines.push(format!("  pop    {}", reg));
             }
-          },
+          }
           Op::Nope => asm.lines.push("  nop".to_string()),
           _ => unreachable!(),
         }
