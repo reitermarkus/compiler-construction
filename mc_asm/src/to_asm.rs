@@ -14,6 +14,15 @@ pub trait ToAsm {
   fn to_asm(&self) -> Asm;
 }
 
+const fn extend_to_multiple(number: usize, n: usize) -> usize {
+  ((number + n - 1) / n) * n
+}
+
+const fn calculate_alignment(number: usize, n: usize) -> (usize, usize) {
+  let multiple = extend_to_multiple(number, n);
+  (multiple - number, multiple)
+}
+
 fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> Storage {
   match arg {
     Arg::Variable(_, decl_index, index_offset) => {
@@ -149,16 +158,14 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         }
       }
 
-      let alignment = (16 - args_size % 16) % 16;
+      let (stack_alignment, stack_size) = calculate_alignment(args_size, 16);
 
-      if alignment > 0 {
-        asm.lines.insert(alignment_index, format!("  sub    esp, {}   # alignment", alignment));
-      }
+      if stack_size > 0 {
+        if stack_alignment > 0 {
+          asm.lines.insert(alignment_index, format!("  sub    esp, {} # stack alignment", stack_alignment));
+        }
 
-      args_size = (args_size + 15) / 16 * 16;
-
-      if args_size > 0 {
-        asm.lines.push(format!("  add    esp, {}", args_size));
+        asm.lines.push(format!("  add    esp, {}", stack_size));
       }
 
       match &ty {
@@ -624,7 +631,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       } else {
         asm.lines.insert(
           stack.stack_size_index,
-          format!("  sub    esp, {}   # stack variables size", ((stack.variables_size + 15) / 16) * 16),
+          format!("  sub    esp, {}   # stack variables size", extend_to_multiple(stack.variables_size, 16)),
         );
         asm.lines.push("  leave".to_string());
       }
