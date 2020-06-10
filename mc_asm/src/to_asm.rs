@@ -474,7 +474,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
           asm.lines.push("  lea    esp, [esp-8]".to_string());
           asm.lines.push("  fstp   QWORD PTR [esp]".to_string());
 
-          let format_string = add_string(asm, "%f");
+          let format_string = add_string(asm, "%.2f");
           asm.lines.push(format!("  push   {}", format_string));
 
           asm.lines.push("  call   printf".to_string());
