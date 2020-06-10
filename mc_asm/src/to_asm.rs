@@ -620,8 +620,9 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
               match variable.ty() {
                 Some(Ty::Float) => {
-                  let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
                   load_float(&mut asm, &val, "assign FPU");
+
+                  let var = calc_index_offset(&mut stack, &mut asm, temp, variable);
                   asm.lines.push(format!("  fstp   {}", var));
                   push_storage_temporary(var, &mut stack);
                 }
