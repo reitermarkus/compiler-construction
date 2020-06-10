@@ -42,6 +42,7 @@ pub fn mcc(in_file: impl AsRef<Path>, out_file: impl AsRef<Path>, backend: Strin
     command = Command::new("docker");
 
     command.arg("run");
+    command.arg("--rm");
     command.arg("-i");
 
     command.arg("-v");

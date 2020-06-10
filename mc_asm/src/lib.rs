@@ -7,6 +7,11 @@ use std::path::Path;
 use mc_ir::AddToIr;
 use mc_ir::IntermediateRepresentation;
 
+mod asm;
+mod register;
+mod stack;
+mod storage;
+
 mod to_asm;
 pub use to_asm::ToAsm;
 
