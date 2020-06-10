@@ -9,11 +9,21 @@ fn main() -> std::io::Result<()> {
   let matches = App::new("mC Compiler")
     .set_term_width(0)
     .max_term_width(0)
-    .about("The mC compiler. It takes an mC input file and produces an executable. Errors are reported on invalid inputs.")
+    .about(
+      "The mC compiler. It takes an mC input file and produces an executable. Errors are reported on invalid inputs.",
+    )
     .arg(Arg::from_usage("-q, --quiet 'suppress error output'").required(false))
     .arg(Arg::from_usage("-o, --output <out-file> 'output file (defaults to 'a.out')'").required(false))
-    .arg(Arg::from_usage("--backend <backend> 'override the back-end compiler (defaults to 'gcc')'").env("MCC_BACKEND").required(false))
-    .arg(Arg::from_usage("--docker-image <backend> 'run the back-end compiler inside a Docker image'").env("MCC_DOCKER_IMAGE").required(false))
+    .arg(
+      Arg::from_usage("--backend <backend> 'override the back-end compiler (defaults to 'gcc')'")
+        .env("MCC_BACKEND")
+        .required(false),
+    )
+    .arg(
+      Arg::from_usage("--docker-image <backend> 'run the back-end compiler inside a Docker image'")
+        .env("MCC_DOCKER_IMAGE")
+        .required(false),
+    )
     .arg(Arg::from_usage("<file> 'input file (use '-' to read from stdin)'"))
     .get_matches();
 

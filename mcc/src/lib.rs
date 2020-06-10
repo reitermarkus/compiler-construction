@@ -11,7 +11,13 @@ use mc_asm::ToAsm;
 use mc_ir::AddToIr;
 use mc_ir::IntermediateRepresentation;
 
-pub fn mcc(in_file: impl AsRef<Path>, out_file: impl AsRef<Path>, backend: String, docker_image: Option<String>, quiet: bool) -> std::io::Result<()> {
+pub fn mcc(
+  in_file: impl AsRef<Path>,
+  out_file: impl AsRef<Path>,
+  backend: String,
+  docker_image: Option<String>,
+  quiet: bool,
+) -> std::io::Result<()> {
   let mut contents = String::new();
 
   if in_file.as_ref() == Path::new("-") {
@@ -30,11 +36,7 @@ pub fn mcc(in_file: impl AsRef<Path>, out_file: impl AsRef<Path>, backend: Strin
 
   let asm = ir.to_asm();
 
-  let stderr = if quiet {
-    Stdio::null()
-  } else {
-    Stdio::inherit()
-  };
+  let stderr = if quiet { Stdio::null() } else { Stdio::inherit() };
 
   let mut command;
 
@@ -79,7 +81,7 @@ pub fn mcc(in_file: impl AsRef<Path>, out_file: impl AsRef<Path>, backend: Strin
   if !status.success() {
     match status.code() {
       Some(exit_code) => exit(exit_code),
-      None => panic!("'{:?}' failed.", command)
+      None => panic!("'{:?}' failed.", command),
     }
   }
 
