@@ -5,6 +5,8 @@ Cargo.lock
 *.dot
 *.svg
 *.txt
+!*.stdin*.txt
+!*.stdout*.txt
 *.ir
 *.s
 *.bin

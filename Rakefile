@@ -80,39 +80,45 @@ desc 'test all examples'
 task :test, [:example] => [:build_gcc_docker_image, :compile] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
     example_name = mc.sub_ext('').basename
-    input = File.read(mc.sub_ext('.stdin.txt'))
-    expected_output = File.read(mc.sub_ext('.stdout.txt'))
 
-    Open3.popen3(*run_example(mc)) do |stdin, stdout, stderr, wait_thr|
-      stdin.write input
-      stdin.close
+    inputs = Pathname.glob(mc.sub_ext('.stdin*.txt')).sort
+    expected_outputs = Pathname.glob(mc.sub_ext('.stdout*.txt')).sort
 
-      actual_output = stdout.read
-      stdout.close
-      stderr.close
+    raise "No IO tests found for example '#{example_name}'." if inputs.empty?
 
-      exit_status = wait_thr.value
+    inputs.zip(expected_outputs).each_with_index do |(input_file, expected_output_file), i|
+      input = File.read(input_file)
+      expected_output = File.read(expected_output_file)
 
+      Open3.popen3(*run_example(mc)) do |stdin, stdout, stderr, wait_thr|
+        stdin.write input
+        stdin.close
 
-      if exit_status.success?
-        puts "Example '#{example_name}' passed IO test."
-      else
-        raise "Example '#{example_name}' failed with status #{exit_status.exitstatus}"
-      end
+        actual_output = stdout.read
+        stdout.close
+        stderr.close
 
-      next if actual_output == expected_output
+        exit_status = wait_thr.value
 
-      message = +"Example '#{example_name}' failed with wrong output. Expected output is\n"
-      message << '─' * 100 << "\n"
-      message << expected_output
-      message << '─' * 100 << "\n"
-      message << "but actual output was\n"
-      message << '─' * 100 << "\n"
-      message << actual_output
-      message << '─' * 100 << "\n"
+        if exit_status.success?
+          puts "Example '#{example_name}' passed IO test #{i + 1}."
+        else
+          raise "Example '#{example_name}' failed with status #{exit_status.exitstatus}"
+        end
 
-      raise message
-    end
+        next if actual_output == expected_output
+
+        message = +"Example '#{example_name}' failed with wrong output. Expected output is\n"
+        message << '─' * 100 << "\n"
+        message << expected_output
+        message << '─' * 100 << "\n"
+        message << "but actual output was\n"
+        message << '─' * 100 << "\n"
+        message << actual_output
+        message << '─' * 100 << "\n"
+
+        raise message
+      end    end
   end
 end
 

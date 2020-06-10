@@ -131,6 +131,7 @@ int main(){
         while(i < arr_size){
             print_int(i);
             print(". number = ");
+            print_nl();
             f_number = read_float();
             f_arr[i] = f_number;
             i = i+1;

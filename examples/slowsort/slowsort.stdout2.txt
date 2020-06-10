@@ -1,0 +1,18 @@
+*** Implementation of Slowsort ***
+Do you want to sort: 
+[1] integers, or
+[2] floats?
+choice: 
+give a sequence of 10 numbers to be sorted: 
+0. number = 
+1. number = 
+2. number = 
+3. number = 
+4. number = 
+5. number = 
+6. number = 
+7. number = 
+8. number = 
+9. number = 
+input array: 25.00 35435.00 232.00 12435.00 25.00 678.00 96854.00 1.00 456.00 77777.00 
+output array: 1.00 25.00 25.00 232.00 456.00 678.00 12435.00 35435.00 77777.00 96854.00 
