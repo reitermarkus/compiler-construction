@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
+require 'English'
 require 'pathname'
-require 'english'
+require 'open3'
 
 def cargo_run(*args)
   command, *args = args
@@ -61,15 +62,49 @@ task :compile, [:example] => [:build_gcc_docker_image] do |example: '*'|
   end
 end
 
+def run_example(mc, tty: false)
+  dir = Pathname.pwd
+  mc = Pathname(mc).relative_path_from(dir)
+  bin = mc.sub_ext('.bin')
+  ['docker', 'run', '--rm', '-i', *(tty ? '-t' : nil ), '-v', "#{dir}:/project", '-w', '/project', ENV['MCC_DOCKER_IMAGE'], "./#{bin}"]
+end
+
 desc 'run all examples'
 task :run, [:example] => [:build_gcc_docker_image, :compile] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
-    dir = Pathname.pwd
-    mc = Pathname(mc).relative_path_from(dir)
-    bin = mc.sub_ext('.bin')
+    sh *run_example(mc, tty: STDIN.tty?)
+  end
+end
 
-    tty_flags = STDIN.tty? ? '-t' : nil
-    sh 'docker', 'run', '--rm', '-i', *tty_flags, '-v', "#{dir}:/project", '-w', '/project', ENV['MCC_DOCKER_IMAGE'], "./#{bin}"
+desc 'test all examples'
+task :test, [:example] => [:build_gcc_docker_image, :compile] do |example: '*'|
+  Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
+    input = File.read(mc.sub_ext('.stdin.txt'))
+    expected_output = File.read(mc.sub_ext('.stdout.txt'))
+
+    Open3.popen3(*run_example(mc)) do |stdin, stdout, stderr, wait_thr|
+      stdin.write input
+      stdin.close
+
+      exit_status = wait_thr.value
+
+      unless exit_status.success?
+        $stderr.puts "Example '#{mc.sub_ext('').basename}' failed with status #{exit_status.exitstatus}"
+      end
+
+      actual_output = stdout.read
+
+      next if actual_output == expected_output
+
+      $stderr.puts 'Expected:'
+      $stderr.puts '─' * 100
+      $stderr.puts expected_output
+      $stderr.puts '─' * 100
+      $stderr.puts 'Actual:'
+      $stderr.puts '─' * 100
+      $stderr.puts actual_output
+      $stderr.puts '─' * 100
+    end
   end
 end
 
