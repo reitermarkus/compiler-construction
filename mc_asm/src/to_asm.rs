@@ -124,7 +124,12 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
       for arg in args.iter().rev() {
         let argument = calc_index_offset(stack, asm, reg, arg);
 
-        args_size += argument.storage_type().size();
+        let storage_type = match (identifier.as_ref(), arg.ty()) {
+          ("print_float", Some(Ty::Float)) => StorageType::Qword,
+          _ => argument.storage_type(),
+        };
+
+        args_size += storage_type.size();
 
         match &argument {
           Storage::Pointer(Pointer { array, ref index_offset, .. }) if *array && index_offset.is_none() => {
@@ -136,10 +141,8 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
           argument if arg.ty() == Some(Ty::Float) => {
             load_float(asm, &argument, "push function argument");
 
-            if identifier.as_ref() != "print_float" {
-              asm.lines.push("  lea    esp, [esp-4]".to_string());
-              asm.lines.push("  fstp    DWORD PTR [esp]".to_string());
-            }
+            asm.lines.push(format!("  lea    esp, [esp-{}]", storage_type.size()));
+            asm.lines.push(format!("  fstp   {} [esp]", storage_type));
           }
           Storage::Register(_, reg) => {
             asm.lines.push(format!("  push   {} # reg", reg));
@@ -165,10 +168,6 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
           asm.lines.push("  call   putchar".to_string());
         }
         "print_float" => {
-          args_size += 4;
-          asm.lines.push("  lea    esp, [esp-8]".to_string());
-          asm.lines.push("  fstp   QWORD PTR [esp]".to_string());
-
           let format_string = add_string(asm, "%.2f");
           asm.lines.push(format!("  push   {}", format_string));
 
