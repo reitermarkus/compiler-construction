@@ -26,7 +26,7 @@ const fn calculate_alignment(number: usize, n: usize) -> (usize, usize) {
 fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> Storage {
   match arg {
     Arg::Variable(_, decl_index, index_offset) => {
-      let (storage_type, _, offset, parameter, array) = stack.lookup(*decl_index);
+      let (storage_type, offset, parameter, array) = stack.lookup(*decl_index);
 
       let index_offset = match index_offset.as_ref() {
         Some(Arg::Literal(Literal::Int(index_offset))) => Some(Offset::Literal(*index_offset as usize)),
@@ -65,7 +65,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
     }
     Arg::Reference(ty, reference) => {
       if *ty == Some(Ty::Float) {
-        let (_, _, offset, parameter, array) = stack.lookup(*reference);
+        let (_, offset, parameter, array) = stack.lookup(*reference);
         Storage::Pointer(Pointer {
           base: Reg32::EBP,
           storage_type: StorageType::Dword,

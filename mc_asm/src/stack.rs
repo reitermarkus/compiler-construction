@@ -10,10 +10,10 @@ pub struct Stack {
   pub temporary_register: BTreeMap<usize, Reg32>,
   pub temporaries: VecDeque<Reg32>,
   pub lookup_table: HashMap<usize, (usize, bool, bool)>,
-  pub parameters: Vec<(StorageType, usize, usize)>,
+  pub parameters: Vec<(StorageType, usize)>,
   pub parameters_size: usize,
   pub stack_size_index: usize,
-  pub variables: Vec<(StorageType, usize, usize)>,
+  pub variables: Vec<(StorageType, usize)>,
   pub variables_size: usize,
   pub used_registers: BTreeMap<Reg32, usize>,
 }
@@ -35,12 +35,12 @@ impl Default for Stack {
 }
 
 impl Stack {
-  pub fn lookup(&self, index: usize) -> (StorageType, usize, usize, bool, bool) {
+  pub fn lookup(&self, index: usize) -> (StorageType, usize, bool, bool) {
     let &(i, parameter, array) = self.lookup_table.get(&index).unwrap();
 
-    let (ty, count, offset) = if parameter { self.parameters[i] } else { self.variables[i] };
+    let (ty, offset) = if parameter { self.parameters[i] } else { self.variables[i] };
 
-    (ty, count, offset, parameter, array)
+    (ty, offset, parameter, array)
   }
 
   pub fn push(
@@ -53,7 +53,7 @@ impl Stack {
   ) -> Pointer {
     if parameter {
       let offset = self.parameters_size;
-      self.parameters.push((storage_type, count, self.parameters_size));
+      self.parameters.push((storage_type, self.parameters_size));
       self.lookup_table.insert(index, (self.parameters.len() - 1, true, array));
 
       if array {
@@ -65,7 +65,7 @@ impl Stack {
       Pointer { base: Reg32::EBP, storage_type: StorageType::Dword, offset, index_offset: None, parameter, array }
     } else {
       self.variables_size += count * storage_type.size();
-      self.variables.push((storage_type, count, self.variables_size));
+      self.variables.push((storage_type, self.variables_size));
       self.lookup_table.insert(index, (self.variables.len() - 1, false, array));
       Pointer { base: Reg32::EBP, storage_type, offset: self.variables_size, index_offset: None, parameter, array }
     }
