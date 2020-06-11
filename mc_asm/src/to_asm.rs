@@ -647,49 +647,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
     }
 
     for builtin_function in mem::take(&mut asm.builtin_functions).iter() {
-      asm.lines.push(format!("{}:", builtin_function));
-
-      match builtin_function.as_ref() {
-        "read_int" => {
-          asm.lines.push("  push   ebp".to_string());
-          asm.lines.push("  mov    ebp, esp".to_string());
-          asm.lines.push("  sub    esp, 32".to_string());
-          asm.lines.push("  lea    eax, [ebp-12]".to_string());
-          asm.lines.push("  push   eax".to_string());
-          let format_string = add_string(&mut asm, "%d");
-          asm.lines.push(format!("  push   {}", format_string));
-          asm.lines.push("  call   __isoc99_scanf".to_string());
-          asm.lines.push("  add    esp, 16".to_string());
-          asm.lines.push("  cmp    eax, 1".to_string());
-          asm.lines.push("  je    .READ_INT_SUCCEEDED".to_string());
-          asm.lines.push("  push   101".to_string());
-          asm.lines.push("  call   exit".to_string());
-          asm.lines.push(".READ_INT_SUCCEEDED:".to_string());
-          asm.lines.push("  mov    eax, DWORD PTR [ebp-12]".to_string());
-          asm.lines.push("  leave".to_string());
-          asm.lines.push("  ret".to_string());
-        }
-        "read_float" => {
-          asm.lines.push("  push    ebp".to_string());
-          asm.lines.push("  mov     ebp, esp".to_string());
-          asm.lines.push("  sub     esp, 32".to_string());
-          asm.lines.push("  lea     eax, [ebp-12]".to_string());
-          asm.lines.push("  push    eax".to_string());
-          let format_string = add_string(&mut asm, "%f");
-          asm.lines.push(format!("  push   {}", format_string));
-          asm.lines.push("  call    __isoc99_scanf".to_string());
-          asm.lines.push("  add     esp, 16".to_string());
-          asm.lines.push("  cmp    eax, 1".to_string());
-          asm.lines.push("  je    .READ_FLOAT_SUCCEEDED".to_string());
-          asm.lines.push("  push   101".to_string());
-          asm.lines.push("  call   exit".to_string());
-          asm.lines.push(".READ_FLOAT_SUCCEEDED:".to_string());
-          asm.lines.push("  fld     DWORD PTR [ebp-12]".to_string());
-          asm.lines.push("  leave".to_string());
-          asm.lines.push("  ret".to_string());
-        }
-        _ => unreachable!(),
-      }
+      add_builtin_function(&mut asm, builtin_function.as_ref());
     }
 
     for (float, label) in asm.floats.iter() {
@@ -703,5 +661,51 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
     }
 
     asm
+  }
+}
+
+fn add_builtin_function(asm: &mut Asm, function: &str) {
+  asm.lines.push(format!("{}:", function));
+
+  match function {
+    "read_int" => {
+      asm.lines.push("  push   ebp".to_string());
+      asm.lines.push("  mov    ebp, esp".to_string());
+      asm.lines.push("  sub    esp, 32".to_string());
+      asm.lines.push("  lea    eax, [ebp-12]".to_string());
+      asm.lines.push("  push   eax".to_string());
+      let format_string = add_string(asm, "%d");
+      asm.lines.push(format!("  push   {}", format_string));
+      asm.lines.push("  call   __isoc99_scanf".to_string());
+      asm.lines.push("  add    esp, 16".to_string());
+      asm.lines.push("  cmp    eax, 1".to_string());
+      asm.lines.push("  je    .READ_INT_SUCCEEDED".to_string());
+      asm.lines.push("  push   101".to_string());
+      asm.lines.push("  call   exit".to_string());
+      asm.lines.push(".READ_INT_SUCCEEDED:".to_string());
+      asm.lines.push("  mov    eax, DWORD PTR [ebp-12]".to_string());
+      asm.lines.push("  leave".to_string());
+      asm.lines.push("  ret".to_string());
+    }
+    "read_float" => {
+      asm.lines.push("  push    ebp".to_string());
+      asm.lines.push("  mov     ebp, esp".to_string());
+      asm.lines.push("  sub     esp, 32".to_string());
+      asm.lines.push("  lea     eax, [ebp-12]".to_string());
+      asm.lines.push("  push    eax".to_string());
+      let format_string = add_string(asm, "%f");
+      asm.lines.push(format!("  push   {}", format_string));
+      asm.lines.push("  call    __isoc99_scanf".to_string());
+      asm.lines.push("  add     esp, 16".to_string());
+      asm.lines.push("  cmp    eax, 1".to_string());
+      asm.lines.push("  je    .READ_FLOAT_SUCCEEDED".to_string());
+      asm.lines.push("  push   101".to_string());
+      asm.lines.push("  call   exit".to_string());
+      asm.lines.push(".READ_FLOAT_SUCCEEDED:".to_string());
+      asm.lines.push("  fld     DWORD PTR [ebp-12]".to_string());
+      asm.lines.push("  leave".to_string());
+      asm.lines.push("  ret".to_string());
+    }
+    _ => unreachable!(),
   }
 }
