@@ -265,60 +265,54 @@ impl<'a> AddToIr<'a> for Program<'a> {
   }
 }
 
- #[cfg(test)]
- mod tests {
-   use std::convert::TryFrom;
+#[cfg(test)]
+mod tests {
+  use std::convert::TryFrom;
 
-   use super::*;
+  use super::*;
 
-   use Arg::{
-     Reference,
-     Variable
-   };
+  use Arg::{Reference, Variable};
 
-   use Op::*;
+  use Op::*;
 
-   use Ty::*;
+  use Ty::*;
 
-   #[test]
-   fn assignment_to_ir() {
-     let assignment = CompoundStatement::try_from(
-       "{
+  #[test]
+  fn assignment_to_ir() {
+    let assignment = CompoundStatement::try_from(
+      "{
        int x;
        x = 1 + 2 * 3;
        }
        ",
-     )
-     .unwrap();
+    )
+    .unwrap();
 
-     let mut ir = IntermediateRepresentation::default();
-     assignment.add_to_ir(&mut ir);
+    let mut ir = IntermediateRepresentation::default();
+    assignment.add_to_ir(&mut ir);
 
-     assert_eq!(
-       ir.statements,
-       vec![
-         Op::Decl(&Identifier("x".to_owned()), Ty::Int, None),
-         Op::Assign(Arg::Literal(Literal::Int(7)), Arg::Variable(Ty::Int, 0, Box::new(None)))
-       ]
-     );
-   }
+    assert_eq!(
+      ir.statements,
+      vec![
+        Op::Decl(&Identifier("x".to_owned()), Ty::Int, None),
+        Op::Assign(Arg::Literal(Literal::Int(7)), Arg::Variable(Ty::Int, 0, Box::new(None)))
+      ]
+    );
+  }
 
-   #[test]
-   fn expression_to_ir() {
-     let expression = Expression::try_from("1 + 2 * 3").unwrap();
-     let mut ir = IntermediateRepresentation::default();
-     let arg = expression.add_to_ir(&mut ir);
-     assert_eq!(
-       ir.statements,
-       vec![]
-     );
-     assert_eq!(arg, Arg::Literal(Literal::Int(7)));
-   }
+  #[test]
+  fn expression_to_ir() {
+    let expression = Expression::try_from("1 + 2 * 3").unwrap();
+    let mut ir = IntermediateRepresentation::default();
+    let arg = expression.add_to_ir(&mut ir);
+    assert_eq!(ir.statements, vec![]);
+    assert_eq!(arg, Arg::Literal(Literal::Int(7)));
+  }
 
-   #[test]
-   fn if_stmt_to_ir() {
-     let if_stmt = CompoundStatement::try_from(
-       "{
+  #[test]
+  fn if_stmt_to_ir() {
+    let if_stmt = CompoundStatement::try_from(
+      "{
          int a;
          int b;
          int max;
@@ -328,31 +322,30 @@ impl<'a> AddToIr<'a> for Program<'a> {
            max = b;
          }
        }",
-     )
-     .unwrap();
-     let mut ir = IntermediateRepresentation::default();
-     if_stmt.add_to_ir(&mut ir);
-     assert_eq!(
-       ir.statements,
-       vec![
-         Decl(&Identifier("a".to_owned()), Int, None),
-         Decl(&Identifier("b".to_owned()), Int, None),
-         Decl(&Identifier("max".to_owned()), Int, None),
-         Gt(Variable(Ty::Int, 0, Box::default()), Variable(Int, 1, Box::default())),
-         Jumpfalse(Reference(Some(Bool), 3), Reference(None, 7)),
-         Assign(Variable(Int, 0, Box::default()), Variable(Int, 2, Box::default())),
-         Jump(Reference(None, 8)),
-         Assign(Variable(Int, 1, Box::default()),
-         Variable(Int, 2, Box::default())),
-         Nope
-       ]
-     )
-   }
+    )
+    .unwrap();
+    let mut ir = IntermediateRepresentation::default();
+    if_stmt.add_to_ir(&mut ir);
+    assert_eq!(
+      ir.statements,
+      vec![
+        Decl(&Identifier("a".to_owned()), Int, None),
+        Decl(&Identifier("b".to_owned()), Int, None),
+        Decl(&Identifier("max".to_owned()), Int, None),
+        Gt(Variable(Ty::Int, 0, Box::default()), Variable(Int, 1, Box::default())),
+        Jumpfalse(Reference(Some(Bool), 3), Reference(None, 7)),
+        Assign(Variable(Int, 0, Box::default()), Variable(Int, 2, Box::default())),
+        Jump(Reference(None, 8)),
+        Assign(Variable(Int, 1, Box::default()), Variable(Int, 2, Box::default())),
+        Nope
+      ]
+    )
+  }
 
- #[test]
- fn comp_stmt_to_ir() {
-   let comp_stmt = CompoundStatement::try_from(
-     "{
+  #[test]
+  fn comp_stmt_to_ir() {
+    let comp_stmt = CompoundStatement::try_from(
+      "{
      int a;
      int b;
      while (a > b) {
@@ -360,30 +353,28 @@ impl<'a> AddToIr<'a> for Program<'a> {
      }
      return a;
    }",
-   )
-   .unwrap();
+    )
+    .unwrap();
 
-   let mut ir = IntermediateRepresentation::default();
-   comp_stmt.add_to_ir(&mut ir);
-   assert_eq!(
-     ir.statements,
-     vec![
-       Decl(&Identifier("a".to_owned()), Int, None),
-       Decl(&Identifier("b".to_owned()), Int, None),
-       Gt(Variable(Int, 0, Box::default()),
-       Variable(Int, 1, Box::default())),
-       Jumpfalse(Reference(Some(Bool), 2),
-       Reference(None, 7)),
-       Plus(Variable(Int, 0, Box::default()), Arg::Literal(Literal::Int(1))),
-       Assign(Reference(Some(Int), 4), Variable(Int, 0, Box::default())),
-       Jump(Reference(None, 2)),
-       Nope,
-       Return(Some(Variable(Int, 0, Box::default())))
-     ]
-   )
- }
+    let mut ir = IntermediateRepresentation::default();
+    comp_stmt.add_to_ir(&mut ir);
+    assert_eq!(
+      ir.statements,
+      vec![
+        Decl(&Identifier("a".to_owned()), Int, None),
+        Decl(&Identifier("b".to_owned()), Int, None),
+        Gt(Variable(Int, 0, Box::default()), Variable(Int, 1, Box::default())),
+        Jumpfalse(Reference(Some(Bool), 2), Reference(None, 7)),
+        Plus(Variable(Int, 0, Box::default()), Arg::Literal(Literal::Int(1))),
+        Assign(Reference(Some(Int), 4), Variable(Int, 0, Box::default())),
+        Jump(Reference(None, 2)),
+        Nope,
+        Return(Some(Variable(Int, 0, Box::default())))
+      ]
+    )
+  }
 
- #[test]
+  #[test]
   fn function_to_ir() {
     let function = FunctionDeclaration::try_from(
       "void main() {
