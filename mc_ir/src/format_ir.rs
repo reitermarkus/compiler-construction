@@ -6,12 +6,9 @@ impl fmt::Display for Arg<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Self::Literal(literal) => literal.to_string().fmt(f),
-      Self::Variable(_, reference, offset) => write!(
-        f,
-        "(&{}, {})",
-        reference,
-        offset.as_ref().as_ref().map(|o| format!("[{}]", o)).unwrap_or_else(|| "lel".to_string())
-      ),
+      Self::Variable(_, reference, offset) => {
+        write!(f, "&{}{}", reference, offset.as_ref().as_ref().map(|o| format!("[{}]", o)).unwrap_or_else(String::new))
+      }
       Self::Reference(_, reference) => write!(f, "t{}", reference),
       Self::FunctionCall(_, identifier, arguments) => {
         write!(f, "{}({})", identifier, arguments.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "))
@@ -24,27 +21,27 @@ impl fmt::Display for Op<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Self::Param(arg, ty, size) => {
-        write!(f, "param {} {} {}", arg, ty, size.map(|s| format!("[{}]", s)).unwrap_or_else(|| "lel".to_string()))
+        write!(f, "param {} {}{}", arg, ty, size.map(|s| format!("[{}]", s)).unwrap_or_else(String::new))
       }
       Self::Decl(arg, ty, size) => {
-        write!(f, "decl {} {} {}", arg, ty, size.map(|s| format!("[{}]", s)).unwrap_or_else(|| "lel".to_string()))
+        write!(f, "decl {} {}{}", arg, ty, size.map(|s| format!("[{}]", s)).unwrap_or_else(String::new))
       }
-      Self::Gt(arg1, arg2) => write!(f, "{} > {}", arg1, arg2),
-      Self::Gte(arg1, arg2) => write!(f, "{} >= {}", arg1, arg2),
-      Self::Lt(arg1, arg2) => write!(f, "{} < {}", arg1, arg2),
-      Self::Lte(arg1, arg2) => write!(f, "{} <= {}", arg1, arg2),
-      Self::Plus(arg1, arg2) => write!(f, "{} + {}", arg1, arg2),
-      Self::Minus(arg1, arg2) => write!(f, "{} - {}", arg1, arg2),
-      Self::Divide(arg1, arg2) => write!(f, "{} / {}", arg1, arg2),
-      Self::Times(arg1, arg2) => write!(f, "{} * {}", arg1, arg2),
-      Self::Eq(arg1, arg2) => write!(f, "{} == {}", arg1, arg2),
-      Self::Neq(arg1, arg2) => write!(f, "{} != {}", arg1, arg2),
-      Self::Land(arg1, arg2) => write!(f, "{} && {}", arg1, arg2),
-      Self::Lor(arg1, arg2) => write!(f, "{} || {}", arg1, arg2),
+      Self::Gt(lhs, rhs) => write!(f, "{} > {}", lhs, rhs),
+      Self::Gte(lhs, rhs) => write!(f, "{} >= {}", lhs, rhs),
+      Self::Lt(lhs, rhs) => write!(f, "{} < {}", lhs, rhs),
+      Self::Lte(lhs, rhs) => write!(f, "{} <= {}", lhs, rhs),
+      Self::Plus(lhs, rhs) => write!(f, "{} + {}", lhs, rhs),
+      Self::Minus(lhs, rhs) => write!(f, "{} - {}", lhs, rhs),
+      Self::Divide(lhs, rhs) => write!(f, "{} / {}", lhs, rhs),
+      Self::Times(lhs, rhs) => write!(f, "{} * {}", lhs, rhs),
+      Self::Eq(lhs, rhs) => write!(f, "{} == {}", lhs, rhs),
+      Self::Neq(lhs, rhs) => write!(f, "{} != {}", lhs, rhs),
+      Self::Land(lhs, rhs) => write!(f, "{} && {}", lhs, rhs),
+      Self::Lor(lhs, rhs) => write!(f, "{} || {}", lhs, rhs),
       Self::Not(arg) => write!(f, "!{}", arg),
       Self::UnaryMinus(arg) => write!(f, "-{}", arg),
-      Self::Assign(arg1, arg2) => write!(f, "{} = {}", arg2, arg1),
-      Self::Jumpfalse(arg1, arg2) => write!(f, "jumpfalse {} {}", arg1, arg2),
+      Self::Assign(lhs, rhs) => write!(f, "{} = {}", rhs, lhs),
+      Self::Jumpfalse(lhs, rhs) => write!(f, "jumpfalse {} {}", lhs, rhs),
       Self::Jump(arg) => write!(f, "jump {}", arg),
       Self::Call(arg) => write!(f, "{}", arg),
       Self::Return(arg) => {
@@ -54,7 +51,7 @@ impl fmt::Display for Op<'_> {
           write!(f, "return;")
         }
       }
-      Self::Nope => write!(f, "nope"),
+      Self::Nope => write!(f, "nop"),
     }
   }
 }
@@ -78,10 +75,8 @@ impl fmt::Display for IntermediateRepresentation<'_> {
           _ => writeln!(f, "{}:\t \t t{} = {}", range.start + i, range.start + i, stmt)?,
         }
       }
-
       writeln!(f)?;
     }
-
     writeln!(f)
   }
 }
