@@ -5,6 +5,31 @@ use std::fmt;
 
 use mc_parser::ast::*;
 
+use crate::storage::*;
+
+#[macro_export]
+macro_rules! l {
+  { $label:expr } => (
+    format!("{}:", $label)
+  );
+}
+
+#[macro_export]
+macro_rules! i {
+  { $instruction:expr } => (
+    format!("  {}", $instruction)
+  );
+  { $instruction:expr; $arg:expr } => (
+    format!("  {:6} {}", $instruction, $arg)
+  );
+  { "movzx"; $lhs:expr, $rhs:expr } => (
+    format!("  {:6} {}, {:#}", "movzx", $lhs, $rhs)
+  );
+  { $instruction:expr; $lhs:expr, $rhs:expr } => (
+    format!("  {:6} {}, {}", $instruction, $lhs, $rhs)
+  );
+}
+
 #[derive(Debug)]
 pub struct Asm {
   pub lines: Vec<String>,
@@ -21,6 +46,52 @@ impl fmt::Display for Asm {
       writeln!(f)?;
     }
 
+    for (float, label) in self.floats.iter() {
+      writeln!(f, "{}", l! { label })?;
+      writeln!(f, "{}", i! { ".float"; float })?;
+    }
+
+    for (string, label) in self.strings.iter() {
+      writeln!(f, "{}", l! { label })?;
+      writeln!(f, "{}", i! { ".string"; format!("{:?}", string) })?;
+    }
+
     Ok(())
+  }
+}
+
+impl Asm {
+  pub fn add_float(&mut self, float: f64) -> Storage {
+    let float = OrderedFloat::from(float);
+
+    let label = if let Some(label) = self.floats.get(&float) {
+      label
+    } else {
+      let float_number = self.floats.len();
+      self.floats.insert(float, format!(".LC{}", float_number));
+      self.floats.get(&float).unwrap()
+    };
+
+    Storage::Label(StorageType::Dword, label.to_owned(), false)
+  }
+
+  pub fn add_string(&mut self, s: &str) -> Storage {
+    let label = if let Some(label) = self.strings.get(s) {
+      label
+    } else {
+      let string_number = self.strings.len();
+      self.strings.insert(s.to_owned(), format!(".LS{}", string_number));
+      self.strings.get(s).unwrap()
+    };
+
+    Storage::Label(StorageType::Dword, label.to_owned(), true)
+  }
+
+  pub fn load_float(&mut self, storage: &Storage) {
+    if matches!(storage, Storage::Fpu(..)) {
+      self.lines.push(i! { "nop" });
+    } else {
+      self.lines.push(i! { "fld"; storage });
+    }
   }
 }
