@@ -530,12 +530,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   let lhs = calc_index_offset(stack, &mut asm, temp, lhs);
                   let rhs = calc_index_offset(stack, &mut asm, temp, rhs);
 
-                  if lhs.storage_type() == StorageType::Byte {
-                    asm.lines.push(i! { "movzx"; temp, lhs });
-                  } else {
-                    asm.lines.push(i! { "mov"; temp, lhs });
-                  }
-
+                  asm.lines.push(i! { "movzx"; temp, lhs });
                   asm.lines.push(i! { set_instruction; temp.as_reg8().0, format!("{:#}", rhs) });
 
                   stack.push_storage_temporary(lhs);
