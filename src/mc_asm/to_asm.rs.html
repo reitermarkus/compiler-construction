@@ -658,15 +658,6 @@
 <span id="658">658</span>
 <span id="659">659</span>
 <span id="660">660</span>
-<span id="661">661</span>
-<span id="662">662</span>
-<span id="663">663</span>
-<span id="664">664</span>
-<span id="665">665</span>
-<span id="666">666</span>
-<span id="667">667</span>
-<span id="668">668</span>
-<span id="669">669</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">collections</span>::<span class="ident">VecDeque</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">mem</span>;
@@ -795,9 +786,14 @@
       }
 
       <span class="kw">match</span> <span class="ident">identifier</span>.<span class="ident">as_ref</span>() {
-        <span class="string">&quot;print_int&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
-          <span class="ident">args_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">StorageType</span>::<span class="ident">Dword</span>.<span class="ident">size</span>();
-          <span class="kw">let</span> <span class="ident">format_string</span> <span class="op">=</span> <span class="ident">asm</span>.<span class="ident">add_string</span>(<span class="string">&quot;%d&quot;</span>);
+        <span class="ident">identifier</span> @ <span class="string">&quot;print_int&quot;</span> <span class="op">|</span> <span class="ident">identifier</span> @ <span class="string">&quot;print_float&quot;</span> <span class="op">|</span> <span class="ident">identifier</span> @ <span class="string">&quot;print&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
+          <span class="kw">let</span> <span class="ident">format_string</span> <span class="op">=</span> <span class="ident">asm</span>.<span class="ident">add_string</span>(<span class="kw">match</span> <span class="ident">identifier</span> {
+            <span class="string">&quot;print_int&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;%d&quot;</span>,
+            <span class="string">&quot;print_float&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;%.2f&quot;</span>,
+            <span class="string">&quot;print&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="string">&quot;%s&quot;</span>,
+            <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
+          });
+          <span class="ident">args_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">format_string</span>.<span class="ident">storage_type</span>().<span class="ident">size</span>();
           <span class="ident">asm</span>.<span class="ident">lines</span>.<span class="ident">push</span>(<span class="macro">i</span><span class="macro">!</span> { <span class="string">&quot;push&quot;</span>; <span class="ident">format_string</span> });
           <span class="ident">asm</span>.<span class="ident">lines</span>.<span class="ident">push</span>(<span class="macro">i</span><span class="macro">!</span> { <span class="string">&quot;call&quot;</span>; <span class="string">&quot;printf&quot;</span> });
         }
@@ -805,15 +801,6 @@
           <span class="ident">args_size</span> <span class="op">+</span><span class="op">=</span> <span class="ident">StorageType</span>::<span class="ident">Dword</span>.<span class="ident">size</span>();
           <span class="ident">asm</span>.<span class="ident">lines</span>.<span class="ident">push</span>(<span class="macro">i</span><span class="macro">!</span> { <span class="string">&quot;push&quot;</span>; <span class="number">10</span> });
           <span class="ident">asm</span>.<span class="ident">lines</span>.<span class="ident">push</span>(<span class="macro">i</span><span class="macro">!</span> { <span class="string">&quot;call&quot;</span>; <span class="string">&quot;putchar&quot;</span>});
-        }
-        <span class="string">&quot;print_float&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
-          <span class="kw">let</span> <span class="ident">format_string</span> <span class="op">=</span> <span class="ident">asm</span>.<span class="ident">add_string</span>(<span class="string">&quot;%.2f&quot;</span>);
-          <span class="ident">asm</span>.<span class="ident">lines</span>.<span class="ident">push</span>(<span class="macro">i</span><span class="macro">!</span> { <span class="string">&quot;push&quot;</span>; <span class="ident">format_string</span> });
-
-          <span class="ident">asm</span>.<span class="ident">lines</span>.<span class="ident">push</span>(<span class="macro">i</span><span class="macro">!</span> { <span class="string">&quot;call&quot;</span>; <span class="string">&quot;printf&quot;</span> });
-        }
-        <span class="string">&quot;print&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
-          <span class="ident">asm</span>.<span class="ident">lines</span>.<span class="ident">push</span>(<span class="macro">i</span><span class="macro">!</span> { <span class="string">&quot;call&quot;</span>; <span class="string">&quot;printf&quot;</span> });
         }
         <span class="string">&quot;read_int&quot;</span> <span class="op">|</span> <span class="string">&quot;read_float&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
           <span class="ident">asm</span>.<span class="ident">builtin_functions</span>.<span class="ident">insert</span>((<span class="kw-2">*</span><span class="kw-2">*</span><span class="ident">identifier</span>).<span class="ident">clone</span>());
@@ -1200,12 +1187,7 @@
                   <span class="kw">let</span> <span class="ident">lhs</span> <span class="op">=</span> <span class="ident">calc_index_offset</span>(<span class="ident">stack</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">asm</span>, <span class="ident">temp</span>, <span class="ident">lhs</span>);
                   <span class="kw">let</span> <span class="ident">rhs</span> <span class="op">=</span> <span class="ident">calc_index_offset</span>(<span class="ident">stack</span>, <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">asm</span>, <span class="ident">temp</span>, <span class="ident">rhs</span>);
 
-                  <span class="kw">if</span> <span class="ident">lhs</span>.<span class="ident">storage_type</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">StorageType</span>::<span class="ident">Byte</span> {
-                    <span class="ident">asm</span>.<span class="ident">lines</span>.<span class="ident">push</span>(<span class="macro">i</span><span class="macro">!</span> { <span class="string">&quot;movzx&quot;</span>; <span class="ident">temp</span>, <span class="ident">lhs</span> });
-                  } <span class="kw">else</span> {
-                    <span class="ident">asm</span>.<span class="ident">lines</span>.<span class="ident">push</span>(<span class="macro">i</span><span class="macro">!</span> { <span class="string">&quot;mov&quot;</span>; <span class="ident">temp</span>, <span class="ident">lhs</span> });
-                  }
-
+                  <span class="ident">asm</span>.<span class="ident">lines</span>.<span class="ident">push</span>(<span class="macro">i</span><span class="macro">!</span> { <span class="string">&quot;movzx&quot;</span>; <span class="ident">temp</span>, <span class="ident">lhs</span> });
                   <span class="ident">asm</span>.<span class="ident">lines</span>.<span class="ident">push</span>(<span class="macro">i</span><span class="macro">!</span> { <span class="ident">set_instruction</span>; <span class="ident">temp</span>.<span class="ident">as_reg8</span>().<span class="number">0</span>, <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{:#}&quot;</span>, <span class="ident">rhs</span>) });
 
                   <span class="ident">stack</span>.<span class="ident">push_storage_temporary</span>(<span class="ident">lhs</span>);
