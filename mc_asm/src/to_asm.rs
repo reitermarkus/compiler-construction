@@ -234,9 +234,12 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
     asm.lines.push("  int 0x80".to_string());
 
     asm.lines.push("main:".to_string());
+    asm.lines.push("  mov  ebp, esp".to_string());
+    asm.lines.push("  sub  esp, 8".to_string());
     asm.lines.push("  push OFFSET FLAT:_sig_handler".to_string());
     asm.lines.push("  push 2 # SIGINT".to_string());
     asm.lines.push("  call signal".to_string());
+    asm.lines.push("  add  esp, 16".to_string());
     asm.lines.push("  jmp  mc_main".to_string());
 
     for statement in self.statements.iter() {
