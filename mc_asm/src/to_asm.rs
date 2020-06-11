@@ -125,9 +125,14 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
       }
 
       match identifier.as_ref() {
-        "print_int" => {
-          args_size += StorageType::Dword.size();
-          let format_string = asm.add_string("%d");
+        identifier @ "print_int" | identifier @ "print_float" | identifier @ "print" => {
+          let format_string = asm.add_string(match identifier {
+            "print_int" => "%d",
+            "print_float" => "%.2f",
+            "print" => "%s",
+            _ => unreachable!(),
+          });
+          args_size += format_string.storage_type().size();
           asm.lines.push(i! { "push"; format_string });
           asm.lines.push(i! { "call"; "printf" });
         }
@@ -135,15 +140,6 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
           args_size += StorageType::Dword.size();
           asm.lines.push(i! { "push"; 10 });
           asm.lines.push(i! { "call"; "putchar"});
-        }
-        "print_float" => {
-          let format_string = asm.add_string("%.2f");
-          asm.lines.push(i! { "push"; format_string });
-
-          asm.lines.push(i! { "call"; "printf" });
-        }
-        "print" => {
-          asm.lines.push(i! { "call"; "printf" });
         }
         "read_int" | "read_float" => {
           asm.builtin_functions.insert((**identifier).clone());
