@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["mc_asm",""]],"mod":[["to_asm",""]]});
+initSidebarItems({"fn":[["mc_asm",""]],"mod":[["asm",""],["register",""],["stack",""],["storage",""],["to_asm",""]],"trait":[["ToAsm",""]]});

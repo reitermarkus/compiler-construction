@@ -342,10 +342,74 @@
 <span id="342">342</span>
 <span id="343">343</span>
 <span id="344">344</span>
+<span id="345">345</span>
+<span id="346">346</span>
+<span id="347">347</span>
+<span id="348">348</span>
+<span id="349">349</span>
+<span id="350">350</span>
+<span id="351">351</span>
+<span id="352">352</span>
+<span id="353">353</span>
+<span id="354">354</span>
+<span id="355">355</span>
+<span id="356">356</span>
+<span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">mc_parser</span>::<span class="ident">ast</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">ir</span>::<span class="kw-2">*</span>;
+<span class="kw">use</span> <span class="ident">mc_symbol_table</span>::<span class="ident">semantic_checks</span>::<span class="ident">FindReturnStatement</span>;
 
 <span class="kw">pub</span> <span class="kw">trait</span> <span class="ident">AddToIr</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
   <span class="kw">fn</span> <span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>, <span class="ident">ir</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">IntermediateRepresentation</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arg</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>;
@@ -353,12 +417,12 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">AddToIr</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Assignment</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
   <span class="kw">fn</span> <span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>, <span class="ident">ir</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">IntermediateRepresentation</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arg</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="kw">let</span> <span class="ident">reference</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">lookup</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identifier</span>).<span class="ident">unwrap</span>();
+    <span class="kw">let</span> (<span class="ident">reference</span>, <span class="ident">ty</span>) <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">lookup</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identifier</span>).<span class="ident">unwrap</span>();
 
     <span class="kw">let</span> <span class="ident">variable</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">index_expression</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">index_expression</span> {
-      <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">reference</span>, <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">index_expression</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>)))
+      <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">ty</span>, <span class="ident">reference</span>, <span class="ident">Box</span>::<span class="ident">new</span>(<span class="prelude-val">Some</span>(<span class="ident">index_expression</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>))))
     } <span class="kw">else</span> {
-      <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">reference</span>, <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">0</span>))))
+      <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">ty</span>, <span class="ident">reference</span>, <span class="ident">Box</span>::<span class="ident">default</span>())
     };
 
     <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">rvalue</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
@@ -371,47 +435,86 @@
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">AddToIr</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Declaration</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
   <span class="kw">fn</span> <span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>, <span class="ident">ir</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">IntermediateRepresentation</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arg</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
-    <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Decl</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identifier</span>, <span class="self">self</span>.<span class="ident">ty</span>, <span class="self">self</span>.<span class="ident">count</span>.<span class="ident">unwrap_or</span>(<span class="number">1</span>)));
+    <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Decl</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identifier</span>, <span class="self">self</span>.<span class="ident">ty</span>, <span class="self">self</span>.<span class="ident">count</span>));
 
     <span class="kw">let</span> <span class="ident">reference</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span>;
-    <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">push</span>(<span class="self">self</span>.<span class="ident">identifier</span>.<span class="ident">clone</span>(), <span class="ident">reference</span>);
-    <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="ident">reference</span>)
+    <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">push</span>(<span class="self">self</span>.<span class="ident">identifier</span>.<span class="ident">clone</span>(), <span class="ident">reference</span>, <span class="self">self</span>.<span class="ident">ty</span>);
+    <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="prelude-val">Some</span>(<span class="self">self</span>.<span class="ident">ty</span>), <span class="ident">reference</span>)
   }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">AddToIr</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Expression</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
   <span class="kw">fn</span> <span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>, <span class="ident">ir</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">IntermediateRepresentation</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arg</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
     <span class="kw">match</span> <span class="self">self</span> {
-      <span class="self">Self</span>::<span class="ident">Literal</span> { <span class="ident">literal</span>, .. } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="ident">literal</span>),
+      <span class="self">Self</span>::<span class="ident">Literal</span> { <span class="ident">literal</span>, .. } <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="ident">literal</span>.<span class="ident">clone</span>()),
       <span class="self">Self</span>::<span class="ident">Variable</span> { <span class="ident">identifier</span>, <span class="ident">index_expression</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">reference</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">lookup</span>(<span class="kw-2">&amp;</span><span class="ident">identifier</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> (<span class="ident">reference</span>, <span class="ident">ty</span>) <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">lookup</span>(<span class="ident">identifier</span>).<span class="ident">unwrap</span>();
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">index_expression</span>) <span class="op">=</span> <span class="ident">index_expression</span> {
-          <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">reference</span>, <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">index_expression</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>)))
+          <span class="kw">let</span> <span class="ident">index_expression</span> <span class="op">=</span> <span class="ident">index_expression</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
+          <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">ty</span>, <span class="ident">reference</span>, <span class="ident">Box</span>::<span class="ident">new</span>(<span class="prelude-val">Some</span>(<span class="ident">index_expression</span>)))
         } <span class="kw">else</span> {
-          <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">reference</span>, <span class="ident">Box</span>::<span class="ident">new</span>(<span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="kw-2">&amp;</span><span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">0</span>))))
+          <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">ty</span>, <span class="ident">reference</span>, <span class="ident">Box</span>::<span class="ident">default</span>())
         }
       }
       <span class="self">Self</span>::<span class="ident">Binary</span> { <span class="ident">op</span>, <span class="ident">lhs</span>, <span class="ident">rhs</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
-        <span class="kw">let</span> <span class="ident">arg1</span> <span class="op">=</span> <span class="ident">lhs</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
-        <span class="kw">let</span> <span class="ident">arg2</span> <span class="op">=</span> <span class="ident">rhs</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
+        <span class="kw">let</span> <span class="ident">lhs</span> <span class="op">=</span> <span class="ident">lhs</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
+        <span class="kw">let</span> <span class="ident">rhs</span> <span class="op">=</span> <span class="ident">rhs</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
 
-        <span class="ident">ir</span>.<span class="ident">push</span>(<span class="kw">match</span> <span class="ident">op</span> {
-          <span class="ident">BinaryOp</span>::<span class="ident">Gt</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Gt</span>(<span class="ident">arg1</span>, <span class="ident">arg2</span>),
-          <span class="ident">BinaryOp</span>::<span class="ident">Gte</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Gte</span>(<span class="ident">arg1</span>, <span class="ident">arg2</span>),
-          <span class="ident">BinaryOp</span>::<span class="ident">Lt</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Lt</span>(<span class="ident">arg1</span>, <span class="ident">arg2</span>),
-          <span class="ident">BinaryOp</span>::<span class="ident">Lte</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Lte</span>(<span class="ident">arg1</span>, <span class="ident">arg2</span>),
-          <span class="ident">BinaryOp</span>::<span class="ident">Plus</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Plus</span>(<span class="ident">arg1</span>, <span class="ident">arg2</span>),
-          <span class="ident">BinaryOp</span>::<span class="ident">Minus</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Minus</span>(<span class="ident">arg1</span>, <span class="ident">arg2</span>),
-          <span class="ident">BinaryOp</span>::<span class="ident">Divide</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Divide</span>(<span class="ident">arg1</span>, <span class="ident">arg2</span>),
-          <span class="ident">BinaryOp</span>::<span class="ident">Times</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Times</span>(<span class="ident">arg1</span>, <span class="ident">arg2</span>),
-          <span class="ident">BinaryOp</span>::<span class="ident">Eq</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Eq</span>(<span class="ident">arg1</span>, <span class="ident">arg2</span>),
-          <span class="ident">BinaryOp</span>::<span class="ident">Neq</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Neq</span>(<span class="ident">arg1</span>, <span class="ident">arg2</span>),
-          <span class="ident">BinaryOp</span>::<span class="ident">Land</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Land</span>(<span class="ident">arg1</span>, <span class="ident">arg2</span>),
-          <span class="ident">BinaryOp</span>::<span class="ident">Lor</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Lor</span>(<span class="ident">arg1</span>, <span class="ident">arg2</span>),
-        });
+        <span class="kw">match</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>) {
+          (<span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="ident">lhs</span>), <span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="ident">rhs</span>)) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">literal_op</span> {
+              (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span>:<span class="ident">path</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">op</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">l</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>:<span class="ident">expr</span>) <span class="op">=</span><span class="op">&gt;</span> {
+                <span class="kw">match</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">op</span> {
+                  <span class="ident">BinaryOp</span>::<span class="ident">Plus</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">l</span> <span class="op">+</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>),
+                  <span class="ident">BinaryOp</span>::<span class="ident">Minus</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">l</span> <span class="op">-</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>),
+                  <span class="ident">BinaryOp</span>::<span class="ident">Times</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">l</span> <span class="op">*</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>),
+                  <span class="ident">BinaryOp</span>::<span class="ident">Divide</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">ty</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">l</span> <span class="op">/</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>),
+                  <span class="ident">BinaryOp</span>::<span class="ident">Gt</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Literal</span>::<span class="ident">Bool</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">l</span> <span class="op">&gt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>),
+                  <span class="ident">BinaryOp</span>::<span class="ident">Gte</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Literal</span>::<span class="ident">Bool</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">l</span> <span class="op">&gt;</span><span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>),
+                  <span class="ident">BinaryOp</span>::<span class="ident">Lt</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Literal</span>::<span class="ident">Bool</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">l</span> <span class="op">&lt;</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>),
+                  <span class="ident">BinaryOp</span>::<span class="ident">Lte</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Literal</span>::<span class="ident">Bool</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">l</span> <span class="op">&lt;</span><span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>),
+                  <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">float_cmp</span>)]</span>
+                  <span class="ident">BinaryOp</span>::<span class="ident">Eq</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Literal</span>::<span class="ident">Bool</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">l</span> <span class="op">=</span><span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>),
+                  <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">float_cmp</span>)]</span>
+                  <span class="ident">BinaryOp</span>::<span class="ident">Neq</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Literal</span>::<span class="ident">Bool</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">l</span> <span class="op">!</span><span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">r</span>),
+                  <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
+                }
+              };
+            };
 
-        <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span>)
+            <span class="kw">let</span> <span class="ident">literal</span> <span class="op">=</span> <span class="kw">match</span> (<span class="ident">lhs</span>, <span class="ident">rhs</span>) {
+              (<span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="ident">l</span>), <span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="ident">r</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">literal_op</span><span class="macro">!</span>(<span class="ident">Literal</span>::<span class="ident">Int</span>, <span class="ident">op</span>, <span class="ident">l</span>, <span class="ident">r</span>),
+              (<span class="ident">Literal</span>::<span class="ident">Float</span>(<span class="ident">l</span>), <span class="ident">Literal</span>::<span class="ident">Float</span>(<span class="ident">r</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="macro">literal_op</span><span class="macro">!</span>(<span class="ident">Literal</span>::<span class="ident">Float</span>, <span class="ident">op</span>, <span class="ident">l</span>, <span class="ident">r</span>),
+              (<span class="ident">Literal</span>::<span class="ident">Bool</span>(<span class="ident">l</span>), <span class="ident">Literal</span>::<span class="ident">Bool</span>(<span class="ident">r</span>)) <span class="op">=</span><span class="op">&gt;</span> <span class="kw">match</span> <span class="ident">op</span> {
+                <span class="ident">BinaryOp</span>::<span class="ident">Land</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Literal</span>::<span class="ident">Bool</span>(<span class="ident">l</span> <span class="kw-2">&amp;</span><span class="op">&amp;</span> <span class="ident">r</span>),
+                <span class="ident">BinaryOp</span>::<span class="ident">Lor</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Literal</span>::<span class="ident">Bool</span>(<span class="ident">l</span> <span class="op">|</span><span class="op">|</span> <span class="ident">r</span>),
+                <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
+              },
+              <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
+            };
+
+            <span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="ident">literal</span>)
+          }
+          (<span class="ident">lhs</span>, <span class="ident">rhs</span>) <span class="op">=</span><span class="op">&gt;</span> {
+            <span class="ident">ir</span>.<span class="ident">push</span>(<span class="kw">match</span> <span class="ident">op</span> {
+              <span class="ident">BinaryOp</span>::<span class="ident">Gt</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Gt</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>),
+              <span class="ident">BinaryOp</span>::<span class="ident">Gte</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Gte</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>),
+              <span class="ident">BinaryOp</span>::<span class="ident">Lt</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Lt</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>),
+              <span class="ident">BinaryOp</span>::<span class="ident">Lte</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Lte</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>),
+              <span class="ident">BinaryOp</span>::<span class="ident">Plus</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Plus</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>),
+              <span class="ident">BinaryOp</span>::<span class="ident">Minus</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Minus</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>),
+              <span class="ident">BinaryOp</span>::<span class="ident">Divide</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Divide</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>),
+              <span class="ident">BinaryOp</span>::<span class="ident">Times</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Times</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>),
+              <span class="ident">BinaryOp</span>::<span class="ident">Eq</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Eq</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>),
+              <span class="ident">BinaryOp</span>::<span class="ident">Neq</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Neq</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>),
+              <span class="ident">BinaryOp</span>::<span class="ident">Land</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Land</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>),
+              <span class="ident">BinaryOp</span>::<span class="ident">Lor</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">Lor</span>(<span class="ident">lhs</span>, <span class="ident">rhs</span>),
+            });
+
+            <span class="ident">ir</span>.<span class="ident">last_ref</span>()
+          }
+        }
       }
       <span class="self">Self</span>::<span class="ident">Unary</span> { <span class="ident">op</span>, <span class="ident">expression</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="ident">expression</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
@@ -421,11 +524,20 @@
           <span class="ident">UnaryOp</span>::<span class="ident">Minus</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">Op</span>::<span class="ident">UnaryMinus</span>(<span class="ident">arg</span>),
         });
 
-        <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span>)
+        <span class="ident">ir</span>.<span class="ident">last_ref</span>()
       }
       <span class="self">Self</span>::<span class="ident">FunctionCall</span> { <span class="ident">identifier</span>, <span class="ident">arguments</span>, .. } <span class="op">=</span><span class="op">&gt;</span> {
         <span class="kw">let</span> <span class="ident">args</span> <span class="op">=</span> <span class="ident">arguments</span>.<span class="ident">iter</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">a</span><span class="op">|</span> <span class="ident">a</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>)).<span class="ident">collect</span>::<span class="op">&lt;</span><span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">Arg</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span>();
-        <span class="ident">Arg</span>::<span class="ident">FunctionCall</span>(<span class="ident">identifier</span>, <span class="ident">args</span>)
+
+        <span class="kw">let</span> <span class="ident">ty</span> <span class="op">=</span> <span class="kw">match</span> <span class="ident">identifier</span>.<span class="ident">as_ref</span>() {
+          <span class="string">&quot;read_int&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">Ty</span>::<span class="ident">Int</span>),
+          <span class="string">&quot;read_float&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Some</span>(<span class="ident">Ty</span>::<span class="ident">Float</span>),
+          <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ir</span>.<span class="ident">functions</span>.<span class="ident">get</span>(<span class="ident">identifier</span>).<span class="ident">and_then</span>(<span class="op">|</span><span class="kw-2">&amp;</span>(<span class="kw">_</span>, <span class="ident">ty</span>)<span class="op">|</span> <span class="ident">ty</span>),
+        };
+
+        <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="ident">Arg</span>::<span class="ident">FunctionCall</span>(<span class="ident">ty</span>, <span class="ident">identifier</span>, <span class="ident">args</span>);
+        <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Call</span>(<span class="ident">arg</span>));
+        <span class="ident">ir</span>.<span class="ident">last_ref</span>()
       }
     }
   }
@@ -436,15 +548,7 @@
     <span class="kw">match</span> <span class="self">self</span> {
       <span class="self">Self</span>::<span class="ident">Assignment</span>(<span class="ident">assignment</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">assignment</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>),
       <span class="self">Self</span>::<span class="ident">Decl</span>(<span class="ident">declaration</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">declaration</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>),
-      <span class="self">Self</span>::<span class="ident">Expression</span>(<span class="ident">expression</span>) <span class="op">=</span><span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Expression</span>::<span class="ident">FunctionCall</span> { .. } <span class="op">=</span> <span class="ident">expression</span> {
-          <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="ident">expression</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
-          <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Call</span>(<span class="ident">arg</span>));
-          <span class="ident">ir</span>.<span class="ident">last_ref</span>()
-        } <span class="kw">else</span> {
-          <span class="ident">expression</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>)
-        }
-      }
+      <span class="self">Self</span>::<span class="ident">Expression</span>(<span class="ident">expression</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">expression</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>),
       <span class="self">Self</span>::<span class="ident">If</span>(<span class="ident">if_stmt</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">if_stmt</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>),
       <span class="self">Self</span>::<span class="ident">While</span>(<span class="ident">while_stmt</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">while_stmt</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>),
       <span class="self">Self</span>::<span class="ident">Ret</span>(<span class="ident">ret_stmt</span>) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">ret_stmt</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>),
@@ -458,37 +562,48 @@
     <span class="kw">let</span> <span class="ident">condition</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">condition</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
 
     <span class="kw">let</span> <span class="ident">jumpfalse_index</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>();
-    <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Jumpfalse</span>(<span class="ident">condition</span>, <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">0</span>)));
+    <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Jumpfalse</span>(<span class="ident">condition</span>, <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="prelude-val">None</span>, <span class="number">0</span>)));
 
+    <span class="kw">let</span> <span class="ident">block_always_returns</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">block</span>.<span class="ident">find_return_statement</span>();
     <span class="self">self</span>.<span class="ident">block</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
 
     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">else_block</span>) <span class="op">=</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">else_block</span> {
       <span class="kw">let</span> <span class="ident">jump_index</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>();
-      <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Jump</span>(<span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">0</span>)));
+
+      <span class="kw">if</span> <span class="op">!</span><span class="ident">block_always_returns</span> {
+        <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Jump</span>(<span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="prelude-val">None</span>, <span class="number">0</span>)));
+      }
 
       <span class="ident">ir</span>.<span class="ident">update_reference</span>(<span class="ident">jumpfalse_index</span>, <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>());
 
       <span class="ident">else_block</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
 
-      <span class="ident">ir</span>.<span class="ident">update_reference</span>(<span class="ident">jump_index</span>, <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>());
+      <span class="kw">if</span> <span class="op">!</span><span class="ident">block_always_returns</span> {
+        <span class="ident">ir</span>.<span class="ident">update_reference</span>(<span class="ident">jump_index</span>, <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>());
+      }
     } <span class="kw">else</span> {
       <span class="ident">ir</span>.<span class="ident">update_reference</span>(<span class="ident">jumpfalse_index</span>, <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>());
     }
 
+    <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Nope</span>);
     <span class="ident">ir</span>.<span class="ident">last_ref</span>()
   }
 }
 
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">AddToIr</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">WhileStatement</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
   <span class="kw">fn</span> <span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>, <span class="ident">ir</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">IntermediateRepresentation</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arg</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
+    <span class="kw">let</span> <span class="ident">condition_ref</span> <span class="op">=</span> <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="prelude-val">None</span>, <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>());
     <span class="kw">let</span> <span class="ident">condition</span> <span class="op">=</span> <span class="self">self</span>.<span class="ident">condition</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
 
     <span class="kw">let</span> <span class="ident">jumpfalse_index</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>();
-    <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Jumpfalse</span>(<span class="ident">condition</span>, <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="number">0</span>)));
+    <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Jumpfalse</span>(<span class="ident">condition</span>, <span class="ident">Arg</span>::<span class="ident">Reference</span>(<span class="prelude-val">None</span>, <span class="number">0</span>)));
 
     <span class="self">self</span>.<span class="ident">block</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
+    <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Jump</span>(<span class="ident">condition_ref</span>));
+
     <span class="ident">ir</span>.<span class="ident">update_reference</span>(<span class="ident">jumpfalse_index</span>, <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>());
 
+    <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Nope</span>);
     <span class="ident">ir</span>.<span class="ident">last_ref</span>()
   }
 }
@@ -512,6 +627,10 @@
 
     <span class="kw">for</span> <span class="ident">stmt</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">statements</span> {
       <span class="ident">stmt</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
+
+      <span class="kw">if</span> <span class="ident">stmt</span>.<span class="ident">find_return_statement</span>() {
+        <span class="kw">break</span>;
+      }
     }
 
     <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">reset</span>(<span class="ident">ptr</span>);
@@ -526,13 +645,16 @@
     <span class="kw">let</span> <span class="ident">start_index</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>();
 
     <span class="kw">for</span> <span class="ident">parameter</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">parameters</span> {
-      <span class="ident">parameter</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
+      <span class="ident">ir</span>.<span class="ident">push</span>(<span class="ident">Op</span>::<span class="ident">Param</span>(<span class="kw-2">&amp;</span><span class="ident">parameter</span>.<span class="ident">identifier</span>, <span class="ident">parameter</span>.<span class="ident">ty</span>, <span class="ident">parameter</span>.<span class="ident">count</span>));
+
+      <span class="kw">let</span> <span class="ident">reference</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>() <span class="op">-</span> <span class="number">1</span>;
+      <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">push</span>(<span class="ident">parameter</span>.<span class="ident">identifier</span>.<span class="ident">clone</span>(), <span class="ident">reference</span>, <span class="ident">parameter</span>.<span class="ident">ty</span>);
     }
 
     <span class="self">self</span>.<span class="ident">body</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
     <span class="kw">let</span> <span class="ident">end_index</span> <span class="op">=</span> <span class="ident">ir</span>.<span class="ident">statements</span>.<span class="ident">len</span>();
 
-    <span class="ident">ir</span>.<span class="ident">add_function</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identifier</span>, <span class="ident">start_index</span>..<span class="ident">end_index</span>);
+    <span class="ident">ir</span>.<span class="ident">add_function</span>(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">identifier</span>, <span class="ident">start_index</span>..<span class="ident">end_index</span>, <span class="self">self</span>.<span class="ident">ty</span>);
 
     <span class="ident">ir</span>.<span class="ident">stack</span>.<span class="ident">reset</span>(<span class="ident">ptr</span>);
     <span class="ident">ir</span>.<span class="ident">last_ref</span>()
@@ -542,6 +664,11 @@
 <span class="kw">impl</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="ident">AddToIr</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">Program</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
   <span class="kw">fn</span> <span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="self">self</span>, <span class="ident">ir</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">IntermediateRepresentation</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Arg</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> {
     <span class="kw">for</span> <span class="ident">function</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">function_declarations</span> {
+      <span class="attribute">#[<span class="ident">allow</span>(<span class="ident">clippy</span>::<span class="ident">reversed_empty_ranges</span>)]</span>
+      <span class="ident">ir</span>.<span class="ident">add_function</span>(<span class="kw-2">&amp;</span><span class="ident">function</span>.<span class="ident">identifier</span>, <span class="number">0</span>..<span class="number">0</span>, <span class="ident">function</span>.<span class="ident">ty</span>);
+    }
+
+    <span class="kw">for</span> <span class="ident">function</span> <span class="kw">in</span> <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="ident">function_declarations</span> {
       <span class="ident">function</span>.<span class="ident">add_to_ir</span>(<span class="ident">ir</span>);
     }
 
@@ -549,143 +676,142 @@
   }
 }
 
-<span class="comment">// #[cfg(test)]</span>
-<span class="comment">// mod tests {</span>
-<span class="comment">//   use std::convert::TryFrom;</span>
-<span class="comment">//</span>
-<span class="comment">//   use super::*;</span>
-<span class="comment">//</span>
-<span class="comment">//   #[test]</span>
-<span class="comment">//   fn assignment_to_ir() {</span>
-<span class="comment">//     let assignment = CompoundStatement::try_from(</span>
-<span class="comment">//       &quot;{</span>
-<span class="comment">//       int x;</span>
-<span class="comment">//       x = 1 + 2 * 3;</span>
-<span class="comment">//       }</span>
-<span class="comment">//       &quot;,</span>
-<span class="comment">//     )</span>
-<span class="comment">//     .unwrap();</span>
-<span class="comment">//</span>
-<span class="comment">//     let mut ir = IntermediateRepresentation::default();</span>
-<span class="comment">//     assignment.add_to_ir(&amp;mut ir);</span>
-<span class="comment">//</span>
-<span class="comment">//     assert_eq!(</span>
-<span class="comment">//       ir.statements,</span>
-<span class="comment">//       vec![</span>
-<span class="comment">//         Op::Times(Arg::Literal(&amp;Literal::Int(2)), Arg::Literal(&amp;Literal::Int(3))),</span>
-<span class="comment">//         Op::Plus(Arg::Literal(&amp;Literal::Int(1)), Arg::Reference(0)),</span>
-<span class="comment">//         Op::Assign(Arg::Reference(1), Arg::Variable(&amp;Identifier::from(&quot;x&quot;))),</span>
-<span class="comment">//       ]</span>
-<span class="comment">//     );</span>
-<span class="comment">//   }</span>
-<span class="comment">//</span>
-<span class="comment">//   #[test]</span>
-<span class="comment">//   fn expression_to_ir() {</span>
-<span class="comment">//     let expression = Expression::try_from(&quot;1 + 2 * 3&quot;).unwrap();</span>
-<span class="comment">//</span>
-<span class="comment">//     let mut ir = IntermediateRepresentation::default();</span>
-<span class="comment">//</span>
-<span class="comment">//     let arg = expression.add_to_ir(&amp;mut ir);</span>
-<span class="comment">//</span>
-<span class="comment">//     assert_eq!(</span>
-<span class="comment">//       ir.statements,</span>
-<span class="comment">//       vec![</span>
-<span class="comment">//         Op::Times(Arg::Literal(&amp;Literal::Int(2)), Arg::Literal(&amp;Literal::Int(3))),</span>
-<span class="comment">//         Op::Plus(Arg::Literal(&amp;Literal::Int(1)), Arg::Reference(0)),</span>
-<span class="comment">//       ]</span>
-<span class="comment">//     );</span>
-<span class="comment">//     assert_eq!(arg, Arg::Reference(1));</span>
-<span class="comment">//   }</span>
-<span class="comment">//</span>
-<span class="comment">//   #[test]</span>
-<span class="comment">//   fn if_stmt_to_ir() {</span>
-<span class="comment">//     let if_stmt = CompoundStatement::try_from(</span>
-<span class="comment">//       &quot;{</span>
-<span class="comment">//         int a;</span>
-<span class="comment">//         int b;</span>
-<span class="comment">//         int max;</span>
-<span class="comment">//         if (a &gt; b) {</span>
-<span class="comment">//           max = a;</span>
-<span class="comment">//         } else {</span>
-<span class="comment">//           max = b;</span>
-<span class="comment">//         }</span>
-<span class="comment">//       }&quot;,</span>
-<span class="comment">//     )</span>
-<span class="comment">//     .unwrap();</span>
-<span class="comment">//</span>
-<span class="comment">//     let mut ir = IntermediateRepresentation::default();</span>
-<span class="comment">//     if_stmt.add_to_ir(&amp;mut ir);</span>
-<span class="comment">//</span>
-<span class="comment">//     assert_eq!(</span>
-<span class="comment">//       ir.statements,</span>
-<span class="comment">//       vec![</span>
-<span class="comment">//         Op::Gt(Arg::Variable(&amp;Identifier::from(&quot;a&quot;)), Arg::Variable(&amp;Identifier::from(&quot;b&quot;))),</span>
-<span class="comment">//         Op::Jumpfalse(Arg::Reference(0), Arg::Reference(4)),</span>
-<span class="comment">//         Op::Assign(Arg::Variable(&amp;Identifier::from(&quot;a&quot;)), Arg::</span>
-<span class="comment">//         &amp;Identifier::from(&quot;max&quot;))),</span>
-<span class="comment">//         Op::Jump(Arg::Reference(5)),</span>
-<span class="comment">//         Op::Assign(Arg::Variable(&amp;Identifier::from(&quot;b&quot;)), Arg::Variable(&amp;Identifier::from(&quot;max&quot;))),</span>
-<span class="comment">//       ]</span>
-<span class="comment">//     )</span>
-<span class="comment">//   }</span>
-<span class="comment">//</span>
-<span class="comment">//   #[test]</span>
-<span class="comment">//   fn comp_stmt_to_ir() {</span>
-<span class="comment">//     let comp_stmt = CompoundStatement::try_from(</span>
-<span class="comment">//       &quot;{</span>
-<span class="comment">//       int a;</span>
-<span class="comment">//       int b;</span>
-<span class="comment">//       while (a &gt; b) {</span>
-<span class="comment">//         a = a + 1;</span>
-<span class="comment">//       }</span>
-<span class="comment">//       return a;</span>
-<span class="comment">//     }&quot;,</span>
-<span class="comment">//     )</span>
-<span class="comment">//     .unwrap();</span>
-<span class="comment">//</span>
-<span class="comment">//     let mut ir = IntermediateRepresentation::default();</span>
-<span class="comment">//     comp_stmt.add_to_ir(&amp;mut ir);</span>
-<span class="comment">//</span>
-<span class="comment">//     assert_eq!(</span>
-<span class="comment">//       ir.statements,</span>
-<span class="comment">//       vec![</span>
-<span class="comment">//         Op::Gt(Arg::Variable(&amp;Identifier::from(&quot;a&quot;)), Arg::Variable(&amp;Identifier::from(&quot;b&quot;))),</span>
-<span class="comment">//         Op::Jumpfalse(Arg::Reference(0), Arg::Reference(4)),</span>
-<span class="comment">//         Op::Plus(Arg::Variable(&amp;Identifier::from(&quot;a&quot;)), Arg::Literal(&amp;Literal::Int(1))),</span>
-<span class="comment">//         Op::Assign(Arg::Reference(2), Arg::Variable(&amp;Identifier::from(&quot;a&quot;))),</span>
-<span class="comment">//         Op::Return(Some(Arg::Variable(&amp;Identifier::from(&quot;a&quot;)))),</span>
-<span class="comment">//       ]</span>
-<span class="comment">//     )</span>
-<span class="comment">//   }</span>
-<span class="comment">//</span>
-<span class="comment">//   #[test]</span>
-<span class="comment">//   fn function_to_ir() {</span>
-<span class="comment">//     let function = FunctionDeclaration::try_from(</span>
-<span class="comment">//       &quot;void main() {</span>
-<span class="comment">//         int x;</span>
-<span class="comment">//         x = 1 + 1;</span>
-<span class="comment">//         int y;</span>
-<span class="comment">//         y = x;</span>
-<span class="comment">//         return;</span>
-<span class="comment">//       }&quot;,</span>
-<span class="comment">//     )</span>
-<span class="comment">//     .unwrap();</span>
-<span class="comment">//</span>
-<span class="comment">//     let mut ir = IntermediateRepresentation::default();</span>
-<span class="comment">//     function.add_to_ir(&amp;mut ir);</span>
-<span class="comment">//</span>
-<span class="comment">//     assert_eq!(</span>
-<span class="comment">//       ir.statements,</span>
-<span class="comment">//       vec![</span>
-<span class="comment">//         Op::Plus(Arg::Literal(&amp;Literal::Int(1)), Arg::Literal(&amp;Literal::Int(1))),</span>
-<span class="comment">//         Op::Assign(Arg::Reference(0), Arg::Variable(&amp;Identifier::from(&quot;x&quot;))),</span>
-<span class="comment">//         Op::Assign(Arg::Variable(&amp;Identifier::from(&quot;x&quot;)), Arg::Variable(&amp;Identifier::from(&quot;y&quot;))),</span>
-<span class="comment">//         Op::Return(None),</span>
-<span class="comment">//       ]</span>
-<span class="comment">//     );</span>
-<span class="comment">//</span>
-<span class="comment">//     assert_eq!(ir.functions.get(&amp;Identifier::from(&quot;main&quot;)), Some(&amp;IrFunction { start: 0, end: 4 }),)</span>
-<span class="comment">//   }</span>
-<span class="comment">// }</span>
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
+<span class="kw">mod</span> <span class="ident">tests</span> {
+  <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">convert</span>::<span class="ident">TryFrom</span>;
+
+  <span class="kw">use</span> <span class="kw">super</span>::<span class="kw-2">*</span>;
+
+  <span class="kw">use</span> <span class="ident">Arg</span>::{<span class="ident">Reference</span>, <span class="ident">Variable</span>};
+
+  <span class="kw">use</span> <span class="ident">Op</span>::<span class="kw-2">*</span>;
+
+  <span class="kw">use</span> <span class="ident">Ty</span>::<span class="kw-2">*</span>;
+
+  <span class="attribute">#[<span class="ident">test</span>]</span>
+  <span class="kw">fn</span> <span class="ident">assignment_to_ir</span>() {
+    <span class="kw">let</span> <span class="ident">assignment</span> <span class="op">=</span> <span class="ident">CompoundStatement</span>::<span class="ident">try_from</span>(
+      <span class="string">&quot;{
+       int x;
+       x = 1 + 2 * 3;
+       }
+       &quot;</span>,
+    )
+    .<span class="ident">unwrap</span>();
+
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ir</span> <span class="op">=</span> <span class="ident">IntermediateRepresentation</span>::<span class="ident">default</span>();
+    <span class="ident">assignment</span>.<span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ir</span>);
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(
+      <span class="ident">ir</span>.<span class="ident">statements</span>,
+      <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="ident">Op</span>::<span class="ident">Decl</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>(<span class="string">&quot;x&quot;</span>.<span class="ident">to_owned</span>()), <span class="ident">Ty</span>::<span class="ident">Int</span>, <span class="prelude-val">None</span>),
+        <span class="ident">Op</span>::<span class="ident">Assign</span>(<span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">7</span>)), <span class="ident">Arg</span>::<span class="ident">Variable</span>(<span class="ident">Ty</span>::<span class="ident">Int</span>, <span class="number">0</span>, <span class="ident">Box</span>::<span class="ident">new</span>(<span class="prelude-val">None</span>)))
+      ]
+    );
+  }
+
+  <span class="attribute">#[<span class="ident">test</span>]</span>
+  <span class="kw">fn</span> <span class="ident">expression_to_ir</span>() {
+    <span class="kw">let</span> <span class="ident">expression</span> <span class="op">=</span> <span class="ident">Expression</span>::<span class="ident">try_from</span>(<span class="string">&quot;1 + 2 * 3&quot;</span>).<span class="ident">unwrap</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ir</span> <span class="op">=</span> <span class="ident">IntermediateRepresentation</span>::<span class="ident">default</span>();
+    <span class="kw">let</span> <span class="ident">arg</span> <span class="op">=</span> <span class="ident">expression</span>.<span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ir</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">ir</span>.<span class="ident">statements</span>, <span class="macro">vec</span><span class="macro">!</span>[]);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">arg</span>, <span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">7</span>)));
+  }
+
+  <span class="attribute">#[<span class="ident">test</span>]</span>
+  <span class="kw">fn</span> <span class="ident">if_stmt_to_ir</span>() {
+    <span class="kw">let</span> <span class="ident">if_stmt</span> <span class="op">=</span> <span class="ident">CompoundStatement</span>::<span class="ident">try_from</span>(
+      <span class="string">&quot;{
+         int a;
+         int b;
+         int max;
+         if (a &gt; b) {
+           max = a;
+         } else {
+           max = b;
+         }
+       }&quot;</span>,
+    )
+    .<span class="ident">unwrap</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ir</span> <span class="op">=</span> <span class="ident">IntermediateRepresentation</span>::<span class="ident">default</span>();
+    <span class="ident">if_stmt</span>.<span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ir</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(
+      <span class="ident">ir</span>.<span class="ident">statements</span>,
+      <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="ident">Decl</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>(<span class="string">&quot;a&quot;</span>.<span class="ident">to_owned</span>()), <span class="ident">Int</span>, <span class="prelude-val">None</span>),
+        <span class="ident">Decl</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>(<span class="string">&quot;b&quot;</span>.<span class="ident">to_owned</span>()), <span class="ident">Int</span>, <span class="prelude-val">None</span>),
+        <span class="ident">Decl</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>(<span class="string">&quot;max&quot;</span>.<span class="ident">to_owned</span>()), <span class="ident">Int</span>, <span class="prelude-val">None</span>),
+        <span class="ident">Gt</span>(<span class="ident">Variable</span>(<span class="ident">Ty</span>::<span class="ident">Int</span>, <span class="number">0</span>, <span class="ident">Box</span>::<span class="ident">default</span>()), <span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">1</span>, <span class="ident">Box</span>::<span class="ident">default</span>())),
+        <span class="ident">Jumpfalse</span>(<span class="ident">Reference</span>(<span class="prelude-val">Some</span>(<span class="ident">Bool</span>), <span class="number">3</span>), <span class="ident">Reference</span>(<span class="prelude-val">None</span>, <span class="number">7</span>)),
+        <span class="ident">Assign</span>(<span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">0</span>, <span class="ident">Box</span>::<span class="ident">default</span>()), <span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">2</span>, <span class="ident">Box</span>::<span class="ident">default</span>())),
+        <span class="ident">Jump</span>(<span class="ident">Reference</span>(<span class="prelude-val">None</span>, <span class="number">8</span>)),
+        <span class="ident">Assign</span>(<span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">1</span>, <span class="ident">Box</span>::<span class="ident">default</span>()), <span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">2</span>, <span class="ident">Box</span>::<span class="ident">default</span>())),
+        <span class="ident">Nope</span>
+      ]
+    )
+  }
+
+  <span class="attribute">#[<span class="ident">test</span>]</span>
+  <span class="kw">fn</span> <span class="ident">comp_stmt_to_ir</span>() {
+    <span class="kw">let</span> <span class="ident">comp_stmt</span> <span class="op">=</span> <span class="ident">CompoundStatement</span>::<span class="ident">try_from</span>(
+      <span class="string">&quot;{
+     int a;
+     int b;
+     while (a &gt; b) {
+       a = a + 1;
+     }
+     return a;
+   }&quot;</span>,
+    )
+    .<span class="ident">unwrap</span>();
+
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ir</span> <span class="op">=</span> <span class="ident">IntermediateRepresentation</span>::<span class="ident">default</span>();
+    <span class="ident">comp_stmt</span>.<span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ir</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(
+      <span class="ident">ir</span>.<span class="ident">statements</span>,
+      <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="ident">Decl</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>(<span class="string">&quot;a&quot;</span>.<span class="ident">to_owned</span>()), <span class="ident">Int</span>, <span class="prelude-val">None</span>),
+        <span class="ident">Decl</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>(<span class="string">&quot;b&quot;</span>.<span class="ident">to_owned</span>()), <span class="ident">Int</span>, <span class="prelude-val">None</span>),
+        <span class="ident">Gt</span>(<span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">0</span>, <span class="ident">Box</span>::<span class="ident">default</span>()), <span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">1</span>, <span class="ident">Box</span>::<span class="ident">default</span>())),
+        <span class="ident">Jumpfalse</span>(<span class="ident">Reference</span>(<span class="prelude-val">Some</span>(<span class="ident">Bool</span>), <span class="number">2</span>), <span class="ident">Reference</span>(<span class="prelude-val">None</span>, <span class="number">7</span>)),
+        <span class="ident">Plus</span>(<span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">0</span>, <span class="ident">Box</span>::<span class="ident">default</span>()), <span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">1</span>))),
+        <span class="ident">Assign</span>(<span class="ident">Reference</span>(<span class="prelude-val">Some</span>(<span class="ident">Int</span>), <span class="number">4</span>), <span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">0</span>, <span class="ident">Box</span>::<span class="ident">default</span>())),
+        <span class="ident">Jump</span>(<span class="ident">Reference</span>(<span class="prelude-val">None</span>, <span class="number">2</span>)),
+        <span class="ident">Nope</span>,
+        <span class="ident">Return</span>(<span class="prelude-val">Some</span>(<span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">0</span>, <span class="ident">Box</span>::<span class="ident">default</span>())))
+      ]
+    )
+  }
+
+  <span class="attribute">#[<span class="ident">test</span>]</span>
+  <span class="kw">fn</span> <span class="ident">function_to_ir</span>() {
+    <span class="kw">let</span> <span class="ident">function</span> <span class="op">=</span> <span class="ident">FunctionDeclaration</span>::<span class="ident">try_from</span>(
+      <span class="string">&quot;void main() {
+        int x;
+        x = 1 + 1;
+        int y;
+        y = x;
+        return;
+      }&quot;</span>,
+    )
+    .<span class="ident">unwrap</span>();
+    <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">ir</span> <span class="op">=</span> <span class="ident">IntermediateRepresentation</span>::<span class="ident">default</span>();
+    <span class="ident">function</span>.<span class="ident">add_to_ir</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">ir</span>);
+    <span class="macro">assert_eq</span><span class="macro">!</span>(
+      <span class="ident">ir</span>.<span class="ident">statements</span>,
+      <span class="macro">vec</span><span class="macro">!</span>[
+        <span class="ident">Decl</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>(<span class="string">&quot;x&quot;</span>.<span class="ident">to_owned</span>()), <span class="ident">Int</span>, <span class="prelude-val">None</span>),
+        <span class="ident">Assign</span>(<span class="ident">Arg</span>::<span class="ident">Literal</span>(<span class="ident">Literal</span>::<span class="ident">Int</span>(<span class="number">2</span>)), <span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">0</span>, <span class="ident">Box</span>::<span class="ident">default</span>())),
+        <span class="ident">Decl</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>(<span class="string">&quot;y&quot;</span>.<span class="ident">to_owned</span>()), <span class="ident">Int</span>, <span class="prelude-val">None</span>),
+        <span class="ident">Assign</span>(<span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">0</span>, <span class="ident">Box</span>::<span class="ident">default</span>()), <span class="ident">Variable</span>(<span class="ident">Int</span>, <span class="number">2</span>, <span class="ident">Box</span>::<span class="ident">default</span>())),
+        <span class="ident">Return</span>(<span class="prelude-val">None</span>)
+      ]
+    );
+
+    <span class="macro">assert_eq</span><span class="macro">!</span>(<span class="ident">ir</span>.<span class="ident">functions</span>.<span class="ident">get</span>(<span class="kw-2">&amp;</span><span class="ident">Identifier</span>::<span class="ident">from</span>(<span class="string">&quot;main&quot;</span>)), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>(<span class="number">0</span>..<span class="number">5</span>, <span class="prelude-val">None</span>)))
+  }
+}
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "mc_ir";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>

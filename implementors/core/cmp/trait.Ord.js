@@ -1,3 +1,4 @@
 (function() {var implementors = {};
+implementors["mc_asm"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html\" title=\"trait core::cmp::Ord\">Ord</a> for <a class=\"enum\" href=\"mc_asm/register/enum.Reg32.html\" title=\"enum mc_asm::register::Reg32\">Reg32</a>","synthetic":false,"types":["mc_asm::register::Reg32"]}];
 implementors["mc_parser"] = [{"text":"impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/cmp/trait.Ord.html\" title=\"trait core::cmp::Ord\">Ord</a> for <a class=\"enum\" href=\"mc_parser/enum.Rule.html\" title=\"enum mc_parser::Rule\">Rule</a>","synthetic":false,"types":["mc_parser::Rule"]}];
 if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

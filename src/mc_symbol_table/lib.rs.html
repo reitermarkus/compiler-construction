@@ -75,15 +75,29 @@
 <span id="75">75</span>
 <span id="76">76</span>
 <span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+<span id="83">83</span>
+<span id="84">84</span>
+<span id="85">85</span>
+<span id="86">86</span>
+<span id="87">87</span>
+<span id="88">88</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="attribute">#![<span class="ident">deny</span>(<span class="ident">missing_debug_implementations</span>, <span class="ident">rust_2018_idioms</span>)]</span>
 <span class="attribute">#[<span class="ident">macro_use</span>]</span>
 <span class="kw">extern</span> <span class="kw">crate</span> <span class="ident">prettytable</span>;
 <span class="kw">use</span> <span class="ident">prettytable</span>::<span class="ident">Table</span>;
 
+<span class="kw">use</span> <span class="ident">mc_parser</span>::<span class="ident">ast</span>::<span class="ident">Program</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">RefCell</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::{<span class="ident">prelude</span>::<span class="kw-2">*</span>, <span class="ident">stdin</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">path</span>::<span class="ident">Path</span>;
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">rc</span>::<span class="ident">Rc</span>;
 
 <span class="kw">mod</span> <span class="ident">format_symbol_table</span>;
 
@@ -96,7 +110,7 @@
 <span class="kw">mod</span> <span class="ident">semantic_error</span>;
 <span class="kw">use</span> <span class="ident">semantic_error</span>::<span class="ident">SemanticError</span>;
 
-<span class="kw">mod</span> <span class="ident">semantic_checks</span>;
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">semantic_checks</span>;
 
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">push_error</span> {
@@ -139,19 +153,27 @@
 
   <span class="kw">let</span> <span class="ident">ast</span> <span class="op">=</span> <span class="ident">mc_parser</span>::<span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="ident">contents</span>).<span class="ident">expect</span>(<span class="string">&quot;failed to parse program&quot;</span>);
 
-  <span class="kw">let</span> <span class="ident">scope</span> <span class="op">=</span> <span class="ident">Scope</span>::<span class="ident">new</span>();
-
-  <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">errors</span>) <span class="op">=</span> <span class="ident">ast</span>.<span class="ident">add_to_scope</span>(<span class="kw-2">&amp;</span><span class="ident">scope</span>) {
-    <span class="kw">for</span> <span class="ident">error</span> <span class="kw">in</span> <span class="ident">errors</span> {
-      <span class="macro">eprintln</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">error</span>);
-    }
-  }
+  <span class="kw">let</span> <span class="ident">scope</span> <span class="op">=</span> <span class="ident">mc_check_semantics</span>(<span class="kw-2">&amp;</span><span class="ident">ast</span>).<span class="ident">expect</span>(<span class="string">&quot;semantic checks failed&quot;</span>);
 
   <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">table</span> <span class="op">=</span> <span class="ident">Table</span>::<span class="ident">new</span>();
   <span class="ident">scope</span>.<span class="ident">borrow</span>().<span class="ident">to_pretty_table</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">table</span>);
   <span class="ident">table</span>.<span class="ident">print</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">out_stream</span>)<span class="question-mark">?</span>;
 
   <span class="prelude-val">Ok</span>(())
+}
+
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mc_check_semantics</span>(<span class="ident">ast</span>: <span class="kw-2">&amp;</span><span class="ident">Program</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Rc</span><span class="op">&lt;</span><span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">Scope</span><span class="op">&gt;</span><span class="op">&gt;</span>, ()<span class="op">&gt;</span> {
+  <span class="kw">let</span> <span class="ident">scope</span> <span class="op">=</span> <span class="ident">Scope</span>::<span class="ident">new</span>();
+
+  <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Err</span>(<span class="ident">errors</span>) <span class="op">=</span> <span class="ident">ast</span>.<span class="ident">add_to_scope</span>(<span class="kw-2">&amp;</span><span class="ident">scope</span>) {
+    <span class="kw">for</span> <span class="ident">error</span> <span class="kw">in</span> <span class="ident">errors</span> {
+      <span class="macro">eprintln</span><span class="macro">!</span>(<span class="string">&quot;{}&quot;</span>, <span class="ident">error</span>);
+    }
+
+    <span class="prelude-val">Err</span>(())
+  } <span class="kw">else</span> {
+    <span class="prelude-val">Ok</span>(<span class="ident">scope</span>)
+  }
 }
 </pre></div>
 </section><section id="search" class="content hidden"></section><section class="footer"></section><script>window.rootPath = "../../";window.currentCrate = "mc_symbol_table";</script><script src="../../aliases.js"></script><script src="../../main.js"></script><script src="../../source-script.js"></script><script src="../../source-files.js"></script><script defer src="../../search-index.js"></script></body></html>
