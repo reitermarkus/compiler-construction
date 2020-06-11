@@ -66,7 +66,9 @@ impl<'a> AddToIr<'a> for Expression<'a> {
                   BinaryOp::Gte => Literal::Bool($l >= $r),
                   BinaryOp::Lt => Literal::Bool($l < $r),
                   BinaryOp::Lte => Literal::Bool($l <= $r),
+                  #[allow(clippy::float_cmp)]
                   BinaryOp::Eq => Literal::Bool($l == $r),
+                  #[allow(clippy::float_cmp)]
                   BinaryOp::Neq => Literal::Bool($l != $r),
                   _ => unreachable!(),
                 }
@@ -254,6 +256,7 @@ impl<'a> AddToIr<'a> for FunctionDeclaration<'a> {
 impl<'a> AddToIr<'a> for Program<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     for function in &self.function_declarations {
+      #[allow(clippy::reversed_empty_ranges)]
       ir.add_function(&function.identifier, 0..0, function.ty);
     }
 
