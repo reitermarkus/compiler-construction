@@ -661,10 +661,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       if stack.variables.is_empty() {
         asm.lines.push(i! { "pop"; Reg32::EBP });
       } else {
-        asm.lines.insert(
-          stack.stack_size_index,
-          i! { "sub"; Reg32::ESP, extend_to_multiple(stack.variables_size, 16) }
-        );
+        let stack_size = extend_to_multiple(stack.variables_size, 16);
+        asm.lines.insert(stack.stack_size_index, i! { "sub"; Reg32::ESP, stack_size });
         asm.lines.push(i! { "leave" });
       }
 
