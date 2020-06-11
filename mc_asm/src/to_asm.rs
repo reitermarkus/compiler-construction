@@ -23,6 +23,27 @@ const fn calculate_alignment(number: usize, n: usize) -> (usize, usize) {
   (multiple - number, multiple)
 }
 
+macro_rules! l {
+  { $label:expr } => {
+    format!("{}:", $label)
+  };
+}
+
+macro_rules! i {
+  { $instruction:expr } => {
+    format!("  {}", $instruction)
+  };
+  { $instruction:expr; $arg:expr } => {
+    format!("  {:6} {}", $instruction, $arg)
+  };
+  { "movzx"; $lhs:expr, $rhs:expr } => {
+    format!("  {:6} {}, {:#}", "movzx", $lhs, $rhs)
+  };
+  { $instruction:expr; $lhs:expr, $rhs:expr } => {
+    format!("  {:6} {}, {}", $instruction, $lhs, $rhs)
+  };
+}
+
 fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>) -> Storage {
   match arg {
     Arg::Variable(_, decl_index, index_offset) => {
@@ -36,7 +57,7 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
             Some(Offset::Register(reg))
           }
           pointer @ Storage::Pointer(..) => {
-            asm.lines.push(format!("  mov    {}, {} # arg", reg, pointer));
+            asm.lines.push(i! { "mov"; reg, pointer });
             Some(Offset::Register(reg))
           }
           u => unreachable!("{:?}", u),
@@ -49,12 +70,12 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
       if parameter && array {
         stack.with_temporary(|_, temp| {
           if let Some(Offset::Register(index_reg)) = pointer.index_offset {
-            asm.lines.push(format!("  lea    {}, [0+{}]", temp, index_reg));
+            asm.lines.push(i! { "lea"; temp, format!("[{}]", index_reg) });
             pointer.index_offset = Some(Offset::Register(temp))
           }
 
           let index_offset = pointer.index_offset.take();
-          asm.lines.push(format!("  mov    {}, {}", reg, pointer));
+          asm.lines.push(i! { "mov"; reg, pointer });
           pointer.base = reg;
           pointer.offset = 0;
           pointer.index_offset = index_offset;
@@ -103,21 +124,21 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         match &argument {
           Storage::Pointer(Pointer { array, ref index_offset, .. }) if *array && index_offset.is_none() => {
             stack.with_temporary(|_, temp| {
-              asm.lines.push(format!("  lea    {}, {}", temp, argument));
-              asm.lines.push(format!("  push   {} # ptr", temp));
+              asm.lines.push(i! { "lea"; temp, argument });
+              asm.lines.push(i! { "push"; temp });
             });
           }
           argument if arg.ty() == Some(Ty::Float) => {
-            load_float(asm, &argument, "push function argument");
+            load_float(asm, &argument);
 
-            asm.lines.push(format!("  lea    esp, [esp-{}]", storage_type.size()));
-            asm.lines.push(format!("  fstp   {} [esp]", storage_type));
+            asm.lines.push(i! { "lea"; Reg32::ESP, format!("[{}-{}]", Reg32::ESP, storage_type.size()) });
+            asm.lines.push(i! { "fstp"; format!("{} [esp]", storage_type) });
           }
           Storage::Register(_, reg) => {
-            asm.lines.push(format!("  push   {} # reg", reg));
+            asm.lines.push(i! { "push"; reg });
           }
           argument => {
-            asm.lines.push(format!("  push   {} # arg", argument));
+            asm.lines.push(i! { "push"; argument });
           }
         }
 
@@ -128,33 +149,33 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
         "print_int" => {
           args_size += StorageType::Dword.size();
           let format_string = add_string(asm, "%d");
-          asm.lines.push(format!("  push   {}", format_string));
-          asm.lines.push("  call   printf".to_string());
+          asm.lines.push(i! { "push"; format_string });
+          asm.lines.push(i! { "call"; "printf" });
         }
         "print_nl" => {
           args_size += StorageType::Dword.size();
-          asm.lines.push("  push   10".to_string());
-          asm.lines.push("  call   putchar".to_string());
+          asm.lines.push(i! { "push"; 10 });
+          asm.lines.push(i! { "call"; "putchar"});
         }
         "print_float" => {
           let format_string = add_string(asm, "%.2f");
-          asm.lines.push(format!("  push   {}", format_string));
+          asm.lines.push(i! { "push"; format_string });
 
-          asm.lines.push("  call   printf".to_string());
+          asm.lines.push(i! { "call"; "printf" });
         }
         "print" => {
-          asm.lines.push("  call   printf".to_string());
+          asm.lines.push(i! { "call"; "printf" });
         }
         "read_int" | "read_float" => {
           asm.builtin_functions.insert((**identifier).clone());
-          asm.lines.push(format!("  call   {}", identifier));
+          asm.lines.push(i! { "call"; identifier });
 
           if identifier.as_ref() == "read_float" {
             ty = Some(Ty::Float);
           }
         }
         _ => {
-          asm.lines.push(format!("  call   {}", map_function_name(identifier.as_ref())));
+          asm.lines.push(i! { "call"; map_function_name(identifier.as_ref()) });
         }
       }
 
@@ -162,10 +183,10 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
 
       if stack_size > 0 {
         if stack_alignment > 0 {
-          asm.lines.insert(alignment_index, format!("  sub    esp, {} # stack alignment", stack_alignment));
+          asm.lines.insert(alignment_index, i! { "sub"; Reg32::ESP, stack_alignment });
         }
 
-        asm.lines.push(format!("  add    esp, {}", stack_size));
+        asm.lines.push(i! { "add"; Reg32::ESP, stack_size });
       }
 
       match &ty {
@@ -207,11 +228,11 @@ fn map_function_name(name: &str) -> String {
   format!("mc_{}", name)
 }
 
-fn load_float(asm: &mut Asm, storage: &Storage, comment: &str) {
+fn load_float(asm: &mut Asm, storage: &Storage) {
   if matches!(storage, Storage::Fpu(..)) {
-    asm.lines.push(format!("  nop # {}", comment));
+    asm.lines.push(i! { "nop" });
   } else {
-    asm.lines.push(format!("  fld    {} # {}", storage, comment));
+    asm.lines.push(i! { "fld"; storage });
   }
 }
 
@@ -225,22 +246,22 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       builtin_functions: Default::default(),
     };
 
-    asm.lines.push("  .intel_syntax noprefix".to_string());
-    asm.lines.push("  .global main".to_string());
+    asm.lines.push(i! { ".intel_syntax"; "noprefix" });
+    asm.lines.push(i! { ".global"; "main" });
 
-    asm.lines.push("_sig_handler:".to_string());
-    asm.lines.push("  mov eax, 1".to_string());
-    asm.lines.push("  mov ebx, 130".to_string());
-    asm.lines.push("  int 0x80".to_string());
+    asm.lines.push(l! { "_sig_handler" });
+    asm.lines.push(i! { "mov"; Reg32::EAX, 1 });
+    asm.lines.push(i! { "mov"; Reg32::EBX, 130 });
+    asm.lines.push(i! { "int"; 0x80 });
 
-    asm.lines.push("main:".to_string());
-    asm.lines.push("  mov  ebp, esp".to_string());
-    asm.lines.push("  sub  esp, 8".to_string());
-    asm.lines.push("  push OFFSET FLAT:_sig_handler".to_string());
-    asm.lines.push("  push 2 # SIGINT".to_string());
-    asm.lines.push("  call signal".to_string());
-    asm.lines.push("  add  esp, 16".to_string());
-    asm.lines.push("  jmp  mc_main".to_string());
+    asm.lines.push(l! { "main" });
+    asm.lines.push(i! { "mov"; Reg32::EBP, Reg32::ESP });
+    asm.lines.push(i! { "sub"; Reg32::ESP, 8 });
+    asm.lines.push(i! { "push"; "OFFSET FLAT:_sig_handler" });
+    asm.lines.push(i! { "push"; 2 });
+    asm.lines.push(i! { "call"; "signal" });
+    asm.lines.push(i! { "add"; Reg32::ESP, 16 });
+    asm.lines.push(i! { "jmp"; "mc_main" });
 
     for statement in self.statements.iter() {
       match statement {
@@ -255,16 +276,16 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
     for (&name, (range, _)) in &self.functions {
       let mut stack = Stack::default();
 
-      asm.lines.push(format!("{}:", map_function_name(name.as_ref())));
+      asm.lines.push(l! { map_function_name(name.as_ref()) });
 
-      asm.lines.push("  push   ebp".to_string());
-      asm.lines.push("  mov    ebp, esp".to_string());
+      asm.lines.push(i! { "push"; Reg32::EBP });
+      asm.lines.push(i! { "mov"; Reg32::EBP, Reg32::ESP });
 
       stack.stack_size_index = asm.lines.len();
 
       for (i, statement) in self.statements.iter().enumerate().skip(range.start).take(range.end - range.start) {
         if let Some(label) = asm.labels.get(&i) {
-          asm.lines.push(format!("{}:", label));
+          asm.lines.push(l! { label });
         }
 
         match statement {
@@ -275,8 +296,8 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
                 let pointer = stack.push(i, storage_type, count.clone().unwrap_or(1), false, count.is_some());
 
-                asm.lines.push(format!("  mov    {}, {}", temp, arg));
-                asm.lines.push(format!("  mov    {}, {}", pointer, pointer.storage_type.map_register(temp)));
+                asm.lines.push(i! { "mov"; temp, arg });
+                asm.lines.push(i! { "mov"; pointer, pointer.storage_type.map_register(temp) });
               });
             }
             storage_type => {
@@ -292,25 +313,25 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
               match variable.ty() {
                 Some(Ty::Float) => {
-                  load_float(&mut asm, &val, "assign FPU");
+                  load_float(&mut asm, &val);
 
                   let var = calc_index_offset(stack, &mut asm, temp, variable);
-                  asm.lines.push(format!("  fstp   {}", var));
+                  asm.lines.push(i! { "fstp"; var });
                   stack.push_storage_temporary(var);
                 }
                 _ => match val {
                   Storage::Pointer(..) => {
                     stack.with_temporary(|stack, temp_val| {
-                      asm.lines.push(format!("  mov    {}, {}", temp_val, val));
+                      asm.lines.push(i! { "mov"; temp_val, val });
 
                       let var = calc_index_offset(stack, &mut asm, temp, variable);
-                      asm.lines.push(format!("  mov    {}, {:#}", var, temp_val));
+                      asm.lines.push(i! { "mov"; var, temp_val });
                       stack.push_storage_temporary(var);
                     });
                   }
                   _ => {
                     let var = calc_index_offset(stack, &mut asm, temp, variable);
-                    asm.lines.push(format!("  mov    {}, {:#}", var, val));
+                    asm.lines.push(i! { "mov"; var, format!("{:#}", val) });
                     stack.push_storage_temporary(var);
                   }
                 },
@@ -325,47 +346,48 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 let result = calc_index_offset(stack, &mut asm, temp, arg);
 
                 if arg.ty() == Some(Ty::Float) {
-                  load_float(&mut asm, &result, "return FPU");
+                  load_float(&mut asm, &result);
                 } else if !matches!(result, Storage::Register(_, Reg32::EAX)) {
                   if result.storage_type() == StorageType::Byte && !matches!(result, Storage::Literal(..)) {
-                    asm.lines.push(format!("  movzx  {}, {:#}", Reg32::EAX, result));
+                    asm.lines.push(i! { "movzx"; Reg32::EAX, result });
                   } else {
-                    asm.lines.push(format!("  mov    {}, {}", Reg32::EAX, result));
+                    asm.lines.push(i! { "mov"; Reg32::EAX, result });
                   };
                 } else {
-                  asm.lines.push("  nop".to_string());
+                  asm.lines.push(i! { "nop" });
                 }
 
                 stack.push_storage_temporary(result);
               });
             }
 
-            asm.lines.push(format!("  jmp    .AWAY_{}", name));
+            let label = format!(".AWAY_{}", name);
+            asm.lines.push(i! { "jmp"; label });
           }
           Op::Not(arg) => {
             stack.with_indexed_temporary(i, |stack, temp: Reg32| {
               let result = calc_index_offset(stack, &mut asm, temp, arg);
-              asm.lines.push(format!("  movzx  {}, {:#}", temp, result));
-              asm.lines.push(format!("  xor    {}, 1", temp))
+              asm.lines.push(i! { "movzx"; temp, result });
+              asm.lines.push(i! { "xor"; temp, 1 })
             });
           }
           Op::UnaryMinus(arg) => match &arg.ty() {
             Some(Ty::Int) => {
               stack.with_indexed_temporary(i, |stack, temp: Reg32| {
                 let register = calc_index_offset(stack, &mut asm, temp, arg);
-                asm.lines.push(format!("  mov    {}, {}", temp, register));
-                asm.lines.push(format!("  neg    {}", temp));
+                asm.lines.push(i! { "mov"; temp, register });
+                asm.lines.push(i! { "neg"; temp });
               });
             }
             Some(ty @ Ty::Float) => {
               stack.with_temporary(|stack, temp| {
                 let register = calc_index_offset(stack, &mut asm, temp, arg);
 
-                load_float(&mut asm, &register, "unary minus FPU");
+                load_float(&mut asm, &register);
 
                 let temp_float = stack.push(i, ty.into(), 1, false, false);
-                asm.lines.push("  fchs".to_string());
-                asm.lines.push(format!("  fstp   {}", temp_float));
+                asm.lines.push(i! { "fchs" });
+                asm.lines.push(i! { "fstp"; temp_float });
               });
             }
             _ => unreachable!(),
@@ -383,7 +405,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               stack.with_temporary(|stack, temp_r| {
                 let eax_backup = if !eax_free {
                   let eax_backup = find_non_eax_edx(&mut stack.temporaries);
-                  asm.lines.push(format!("  mov    {}, eax", eax_backup));
+                  asm.lines.push(i! { "mov"; eax_backup, Reg32::EAX });
                   Some(eax_backup)
                 } else {
                   None
@@ -391,7 +413,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
                 let edx_backup = if !edx_free {
                   let edx_backup = find_non_eax_edx(&mut stack.temporaries);
-                  asm.lines.push(format!("  mov    {}, edx", edx_backup));
+                  asm.lines.push(i! { "mov"; edx_backup, Reg32::EDX });
                   Some(edx_backup)
                 } else {
                   None
@@ -408,26 +430,26 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 let rhs_backup = match rhs {
                   Storage::Register(_, Reg32::EAX) | Storage::Register(_, Reg32::EDX) | Storage::Literal(..) => {
                     let temp = temp_r_backup.unwrap_or(temp_r);
-                    asm.lines.push(format!("  mov    {}, {}", temp, rhs));
+                    asm.lines.push(i! { "mov"; temp, rhs });
                     Some(temp)
                   }
                   _ => None,
                 };
 
                 if !matches!(lhs, Storage::Register(_, Reg32::EAX)) {
-                  asm.lines.push(format!("  mov    eax, {}", lhs));
+                  asm.lines.push(i! { "mov"; Reg32::EAX, lhs });
                 }
 
-                asm.lines.push("  cdq".to_string());
+                asm.lines.push(i! { "cdq" });
 
                 if let Some(rhs_backup) = rhs_backup {
-                  asm.lines.push(format!("  idiv   {}", rhs_backup));
+                  asm.lines.push(i! { "idiv"; rhs_backup });
                 } else {
-                  asm.lines.push(format!("  idiv   {}", rhs));
+                  asm.lines.push(i! { "idiv"; rhs });
                 }
 
                 if temp_l != Reg32::EAX {
-                  asm.lines.push(format!("  mov    {}, eax", temp_l));
+                  asm.lines.push(i! { "mov"; temp_l, Reg32::EAX });
                 }
 
                 if let Some(temp_r_backup) = temp_r_backup {
@@ -435,12 +457,12 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 }
 
                 if let Some(eax_backup) = eax_backup {
-                  asm.lines.push(format!("  mov    eax, {}", eax_backup));
+                  asm.lines.push(i! { "mov"; Reg32::EAX, eax_backup });
                   stack.push_temporary(eax_backup);
                 }
 
                 if let Some(edx_backup) = edx_backup {
-                  asm.lines.push(format!("  mov    edx, {}", edx_backup));
+                  asm.lines.push(i! { "mov"; Reg32::EDX, edx_backup });
                   stack.push_temporary(edx_backup);
                 }
 
@@ -463,11 +485,11 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 stack.with_indexed_temporary(i, |stack, temp_l: Reg32| {
                   stack.with_temporary(|stack, temp_r| {
                     let lhs = calc_index_offset(stack, &mut asm, temp_l, lhs);
-                    asm.lines.push(format!("  mov    {}, {}", temp_l, lhs));
+                    asm.lines.push(i! { "mov"; temp_l, lhs });
                     stack.push_storage_temporary(lhs);
 
                     let rhs = calc_index_offset(stack, &mut asm, temp_r, rhs);
-                    asm.lines.push(format!("  {}    {}, {}", int_instruction, temp_l, rhs));
+                    asm.lines.push(i! { int_instruction; temp_l, rhs });
 
                     stack.push_storage_temporary(rhs);
                   });
@@ -477,14 +499,14 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 stack.with_temporary(|stack, temp| {
                   let lhs = calc_index_offset(stack, &mut asm, temp, lhs);
 
-                  load_float(&mut asm, &lhs, "calc FPU");
+                  load_float(&mut asm, &lhs);
                   stack.push_storage_temporary(lhs);
 
                   let rhs = calc_index_offset(stack, &mut asm, temp, rhs);
-                  asm.lines.push(format!("  {}   {}", float_instruction, rhs));
+                  asm.lines.push(i! { float_instruction; rhs });
 
                   let temp_float = stack.push(i, ty.into(), 1, false, false);
-                  asm.lines.push(format!("  fstp   {}", temp_float));
+                  asm.lines.push(i! { "fstp"; temp_float });
 
                   stack.push_storage_temporary(rhs);
                 });
@@ -515,15 +537,15 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                     let lhs = calc_index_offset(stack, &mut asm, temp_l, lhs);
 
                     if lhs.storage_type() == StorageType::Byte {
-                      asm.lines.push(format!("  movzx  {}, {:#} # cmp", temp_l, lhs));
+                      asm.lines.push(i! { "movzx"; temp_l, lhs });
                     } else {
-                      asm.lines.push(format!("  mov    {}, {} # cmp", temp_l, lhs));
+                      asm.lines.push(i! { "mov"; temp_l, lhs });
                     }
 
                     let rhs = calc_index_offset(stack, &mut asm, temp_r, rhs);
-                    asm.lines.push(format!("  cmp    {}, {}", temp_l, rhs));
+                    asm.lines.push(i! { "cmp"; temp_l, rhs });
 
-                    asm.lines.push(format!("  {}   {}", int_instruction, temp_l.as_reg8().0));
+                    asm.lines.push(i! { int_instruction; temp_l.as_reg8().0 });
 
                     stack.push_storage_temporary(lhs);
                     stack.push_storage_temporary(rhs);
@@ -533,15 +555,15 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
               Some(Ty::Float) => {
                 stack.with_indexed_temporary(i, |stack, temp_l: Reg32| {
                   let lhs = calc_index_offset(stack, &mut asm, temp_l, lhs);
-                  load_float(&mut asm, &lhs, "cmp FPU lhs");
+                  load_float(&mut asm, &lhs);
 
                   let rhs = calc_index_offset(stack, &mut asm, temp_l, rhs);
-                  asm.lines.push(format!("  fld    {} # cmp rhs", rhs));
+                  asm.lines.push(i! { "fld"; rhs });
 
-                  asm.lines.push("  fcomip  st, st(1)".to_string());
-                  asm.lines.push("  fstp    st(0)".to_string());
+                  asm.lines.push(i! { "fcomip"; "st", "st(1)" });
+                  asm.lines.push(i! { "fstp"; "st(0)" });
 
-                  asm.lines.push(format!("  {}   {}", float_instruction, temp_l.as_reg8().0));
+                  asm.lines.push(i! { float_instruction; temp_l.as_reg8().0 });
 
                   stack.push_storage_temporary(lhs);
                   stack.push_storage_temporary(rhs);
@@ -564,12 +586,12 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   let rhs = calc_index_offset(stack, &mut asm, temp, rhs);
 
                   if lhs.storage_type() == StorageType::Byte {
-                    asm.lines.push(format!("  movzx  {}, {:#}", temp, lhs));
+                    asm.lines.push(i! { "movzx"; temp, lhs });
                   } else {
-                    asm.lines.push(format!("  mov    {}, {}", temp, lhs));
+                    asm.lines.push(i! { "mov"; temp, lhs });
                   }
 
-                  asm.lines.push(format!("  {}    {:#}, {:#}", set_instruction, temp.as_reg8().0, rhs));
+                  asm.lines.push(i! { set_instruction; temp.as_reg8().0, format!("{:#}", rhs) });
 
                   stack.push_storage_temporary(lhs);
                   stack.push_storage_temporary(rhs);
@@ -581,27 +603,27 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
           Op::Jumpfalse(cond, Arg::Reference(_, reference)) => match cond {
             Arg::Literal(Literal::Bool(true)) => (),
             Arg::Literal(Literal::Bool(false)) => {
-              asm.lines.push(format!("  jmp    {}", asm.labels.get(reference).unwrap()));
+              asm.lines.push(i! { "jmp"; asm.labels.get(reference).unwrap() });
             }
             arg => {
               stack.with_temporary(|stack, temp| {
                 let result_register = calc_index_offset(stack, &mut asm, temp, arg);
 
-                asm.lines.push(format!("  cmp    {:#}, 0", result_register));
-                asm.lines.push(format!("  je     {}", asm.labels.get(reference).unwrap()));
+                asm.lines.push(i! { "cmp"; format!("{:#}", result_register), 0 });
+                asm.lines.push(i! { "je"; asm.labels.get(reference).unwrap() });
 
                 stack.push_storage_temporary(result_register);
               });
             }
           },
           Op::Jump(Arg::Reference(_, reference)) => {
-            asm.lines.push(format!("  jmp    {}", asm.labels.get(reference).unwrap()));
+            asm.lines.push(i! { "jmp"; asm.labels.get(reference).unwrap() });
           }
           Op::Call(arg) => {
             let saved_registers = stack.used_registers.iter().map(|(&reg, _)| reg).collect::<Vec<_>>();
 
             for reg in saved_registers.iter() {
-              asm.lines.push(format!("  push    {}", reg));
+              asm.lines.push(i! { "push"; reg });
             }
 
             match &arg.ty() {
@@ -609,7 +631,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                 stack.with_temporary(|stack, temp| {
                   calc_index_offset(stack, &mut asm, temp, arg);
                   let temp_float = stack.push(i, ty.into(), 1, false, false);
-                  asm.lines.push(format!("  fstp   {}", temp_float));
+                  asm.lines.push(i! { "fstp"; temp_float });
                 });
               }
               ty => {
@@ -619,34 +641,34 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
                   if ty.is_none() {
                     stack.push_temporary(temp);
                   } else if matches!(result, Storage::Register(_, reg) if reg != temp) {
-                    asm.lines.push(format!("  mov    {}, {}", temp, result));
+                    asm.lines.push(i! { "mov"; temp, result });
                   }
                 });
               }
             }
 
             for reg in saved_registers.iter().rev() {
-              asm.lines.push(format!("  pop    {}", reg));
+              asm.lines.push(i! { "pop"; reg });
             }
           }
-          Op::Nope => asm.lines.push("  nop".to_string()),
+          Op::Nope => asm.lines.push(i! { "nop" }),
           _ => unreachable!(),
         }
       }
 
-      asm.lines.push(format!(".AWAY_{}:", name));
+      asm.lines.push(l! { format!(".AWAY_{}", name) });
 
       if stack.variables.is_empty() {
-        asm.lines.push("  pop    ebp".to_string());
+        asm.lines.push(i! { "pop"; Reg32::EBP });
       } else {
         asm.lines.insert(
           stack.stack_size_index,
-          format!("  sub    esp, {}   # stack variables size", extend_to_multiple(stack.variables_size, 16)),
+          i! { "sub"; Reg32::ESP, extend_to_multiple(stack.variables_size, 16) }
         );
-        asm.lines.push("  leave".to_string());
+        asm.lines.push(i! { "leave" });
       }
 
-      asm.lines.push("  ret".to_string());
+      asm.lines.push(i! { "ret" });
     }
 
     for builtin_function in mem::take(&mut asm.builtin_functions).iter() {
@@ -654,13 +676,13 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
     }
 
     for (float, label) in asm.floats.iter() {
-      asm.lines.push(format!("{}:", label));
-      asm.lines.push(format!("  .float {}", float));
+      asm.lines.push(l! { label });
+      asm.lines.push(i! { ".float"; float });
     }
 
     for (string, label) in asm.strings.iter() {
-      asm.lines.push(format!("{}:", label));
-      asm.lines.push(format!("  .string {:?}", string));
+      asm.lines.push(l! { label });
+      asm.lines.push(i! { ".string"; format!("{:?}", string) });
     }
 
     asm
@@ -668,46 +690,46 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 }
 
 fn add_builtin_function(asm: &mut Asm, function: &str) {
-  asm.lines.push(format!("{}:", function));
+  asm.lines.push(l! { function });
 
   match function {
     "read_int" => {
-      asm.lines.push("  push   ebp".to_string());
-      asm.lines.push("  mov    ebp, esp".to_string());
-      asm.lines.push("  sub    esp, 32".to_string());
-      asm.lines.push("  lea    eax, [ebp-12]".to_string());
-      asm.lines.push("  push   eax".to_string());
+      asm.lines.push(i! { "push"; Reg32::EBP });
+      asm.lines.push(i! { "mov"; Reg32::EBP, Reg32::ESP });
+      asm.lines.push(i! { "sub"; Reg32::ESP, 32 });
+      asm.lines.push(i! { "lea"; Reg32::EAX, "[ebp-12]" });
+      asm.lines.push(i! { "push"; Reg32::EAX });
       let format_string = add_string(asm, "%d");
-      asm.lines.push(format!("  push   {}", format_string));
-      asm.lines.push("  call   __isoc99_scanf".to_string());
-      asm.lines.push("  add    esp, 16".to_string());
-      asm.lines.push("  cmp    eax, 1".to_string());
-      asm.lines.push("  je    .READ_INT_SUCCEEDED".to_string());
-      asm.lines.push("  push   101".to_string());
-      asm.lines.push("  call   exit".to_string());
-      asm.lines.push(".READ_INT_SUCCEEDED:".to_string());
-      asm.lines.push("  mov    eax, DWORD PTR [ebp-12]".to_string());
-      asm.lines.push("  leave".to_string());
-      asm.lines.push("  ret".to_string());
+      asm.lines.push(i! { "push"; format_string });
+      asm.lines.push(i! { "call"; "__isoc99_scanf" });
+      asm.lines.push(i! { "add"; Reg32::ESP, 16 });
+      asm.lines.push(i! { "cmp"; Reg32::EAX, 1 });
+      asm.lines.push(i! { "je"; ".READ_INT_SUCCEEDED" });
+      asm.lines.push(i! { "push"; 101 });
+      asm.lines.push(i! { "call"; "exit" });
+      asm.lines.push(l! { ".READ_INT_SUCCEEDED" });
+      asm.lines.push(i! { "mov"; Reg32::EAX, "DWORD PTR [ebp-12]" });
+      asm.lines.push(i! { "leave" });
+      asm.lines.push(i! { "ret" });
     }
     "read_float" => {
-      asm.lines.push("  push    ebp".to_string());
-      asm.lines.push("  mov     ebp, esp".to_string());
-      asm.lines.push("  sub     esp, 32".to_string());
-      asm.lines.push("  lea     eax, [ebp-12]".to_string());
-      asm.lines.push("  push    eax".to_string());
+      asm.lines.push(i! { "push"; Reg32::EBP });
+      asm.lines.push(i! { "mov"; Reg32::EBP, Reg32::ESP });
+      asm.lines.push(i! { "sub"; Reg32::ESP, 32 });
+      asm.lines.push(i! { "lea"; Reg32::EAX, "[ebp-12]" });
+      asm.lines.push(i! { "push"; Reg32::EAX });
       let format_string = add_string(asm, "%f");
-      asm.lines.push(format!("  push   {}", format_string));
-      asm.lines.push("  call    __isoc99_scanf".to_string());
-      asm.lines.push("  add     esp, 16".to_string());
-      asm.lines.push("  cmp    eax, 1".to_string());
-      asm.lines.push("  je    .READ_FLOAT_SUCCEEDED".to_string());
-      asm.lines.push("  push   101".to_string());
-      asm.lines.push("  call   exit".to_string());
-      asm.lines.push(".READ_FLOAT_SUCCEEDED:".to_string());
-      asm.lines.push("  fld     DWORD PTR [ebp-12]".to_string());
-      asm.lines.push("  leave".to_string());
-      asm.lines.push("  ret".to_string());
+      asm.lines.push(i! { "push"; format_string });
+      asm.lines.push(i! { "call"; "__isoc99_scanf" });
+      asm.lines.push(i! { "add"; Reg32::ESP, 16 });
+      asm.lines.push(i! { "cmp"; Reg32::EAX, 1 });
+      asm.lines.push(i! { "je"; ".READ_FLOAT_SUCCEEDED" });
+      asm.lines.push(i! { "push"; 101 });
+      asm.lines.push(i! { "call"; "exit" });
+      asm.lines.push(l! { ".READ_FLOAT_SUCCEEDED" });
+      asm.lines.push(i! { "fld"; "DWORD PTR [ebp-12]" });
+      asm.lines.push(i! { "leave" });
+      asm.lines.push(i! { "ret" });
     }
     _ => unreachable!(),
   }
