@@ -19,7 +19,7 @@ impl fmt::Display for Reg32 {
       Self::EBX => "ebx",
       Self::ECX => "ecx",
       Self::EDX => "edx",
-      Self::ESP => "ebp",
+      Self::ESP => "esp",
       Self::EBP => "ebp",
       Self::EDI => "edi",
       Self::ESI => "esi",
