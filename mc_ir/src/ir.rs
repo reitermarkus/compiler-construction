@@ -5,7 +5,7 @@ use mc_parser::ast::*;
 
 #[derive(Debug, Default)]
 pub struct HashStack {
-  pub stack: Vec<(Identifier, usize, Ty)>,
+  stack: Vec<(Identifier, usize, Ty)>,
 }
 
 impl HashStack {
