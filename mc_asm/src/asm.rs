@@ -64,26 +64,14 @@ impl Asm {
   pub fn add_float(&mut self, float: f64) -> Storage {
     let float = OrderedFloat::from(float);
 
-    let label = if let Some(label) = self.floats.get(&float) {
-      label
-    } else {
-      let float_number = self.floats.len();
-      self.floats.insert(float, format!(".LC{}", float_number));
-      self.floats.get(&float).unwrap()
-    };
-
+    let float_number = self.floats.len();
+    let label = self.floats.entry(float).or_insert_with(||  format!(".LC{}", float_number));
     Storage::Label(StorageType::Dword, label.to_owned(), false)
   }
 
   pub fn add_string(&mut self, s: &str) -> Storage {
-    let label = if let Some(label) = self.strings.get(s) {
-      label
-    } else {
-      let string_number = self.strings.len();
-      self.strings.insert(s.to_owned(), format!(".LS{}", string_number));
-      self.strings.get(s).unwrap()
-    };
-
+    let string_number = self.strings.len();
+    let label = self.strings.entry(s.to_owned()).or_insert_with(|| format!(".LS{}", string_number));
     Storage::Label(StorageType::Dword, label.to_owned(), true)
   }
 
