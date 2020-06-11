@@ -14,7 +14,7 @@ impl<'a> AddToIr<'a> for Assignment<'a> {
     let variable = if let Some(index_expression) = &self.index_expression {
       Arg::Variable(ty, reference, Box::new(Some(index_expression.add_to_ir(ir))))
     } else {
-      Arg::Variable(ty, reference, Box::new(None))
+      Arg::Variable(ty, reference, Box::default())
     };
 
     let arg = self.rvalue.add_to_ir(ir);
@@ -46,7 +46,7 @@ impl<'a> AddToIr<'a> for Expression<'a> {
           let index_expression = index_expression.add_to_ir(ir);
           Arg::Variable(ty, reference, Box::new(Some(index_expression)))
         } else {
-          Arg::Variable(ty, reference, Box::new(None))
+          Arg::Variable(ty, reference, Box::default())
         }
       }
       Self::Binary { op, lhs, rhs, .. } => {
@@ -263,141 +263,149 @@ impl<'a> AddToIr<'a> for Program<'a> {
   }
 }
 
-// #[cfg(test)]
-// mod tests {
-//   use std::convert::TryFrom;
-//
-//   use super::*;
-//
-//   #[test]
-//   fn assignment_to_ir() {
-//     let assignment = CompoundStatement::try_from(
-//       "{
-//       int x;
-//       x = 1 + 2 * 3;
-//       }
-//       ",
-//     )
-//     .unwrap();
-//
-//     let mut ir = IntermediateRepresentation::default();
-//     assignment.add_to_ir(&mut ir);
-//
-//     assert_eq!(
-//       ir.statements,
-//       vec![
-//         Op::Times(Arg::Literal(&Literal::Int(2)), Arg::Literal(&Literal::Int(3))),
-//         Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Reference(0)),
-//         Op::Assign(Arg::Reference(1), Arg::Variable(&Identifier::from("x"))),
-//       ]
-//     );
-//   }
-//
-//   #[test]
-//   fn expression_to_ir() {
-//     let expression = Expression::try_from("1 + 2 * 3").unwrap();
-//
-//     let mut ir = IntermediateRepresentation::default();
-//
-//     let arg = expression.add_to_ir(&mut ir);
-//
-//     assert_eq!(
-//       ir.statements,
-//       vec![
-//         Op::Times(Arg::Literal(&Literal::Int(2)), Arg::Literal(&Literal::Int(3))),
-//         Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Reference(0)),
-//       ]
-//     );
-//     assert_eq!(arg, Arg::Reference(1));
-//   }
-//
-//   #[test]
-//   fn if_stmt_to_ir() {
-//     let if_stmt = CompoundStatement::try_from(
-//       "{
-//         int a;
-//         int b;
-//         int max;
-//         if (a > b) {
-//           max = a;
-//         } else {
-//           max = b;
-//         }
-//       }",
-//     )
-//     .unwrap();
-//
-//     let mut ir = IntermediateRepresentation::default();
-//     if_stmt.add_to_ir(&mut ir);
-//
-//     assert_eq!(
-//       ir.statements,
-//       vec![
-//         Op::Gt(Arg::Variable(&Identifier::from("a")), Arg::Variable(&Identifier::from("b"))),
-//         Op::Jumpfalse(Arg::Reference(0), Arg::Reference(4)),
-//         Op::Assign(Arg::Variable(&Identifier::from("a")), Arg::
-//         &Identifier::from("max"))),
-//         Op::Jump(Arg::Reference(5)),
-//         Op::Assign(Arg::Variable(&Identifier::from("b")), Arg::Variable(&Identifier::from("max"))),
-//       ]
-//     )
-//   }
-//
-//   #[test]
-//   fn comp_stmt_to_ir() {
-//     let comp_stmt = CompoundStatement::try_from(
-//       "{
-//       int a;
-//       int b;
-//       while (a > b) {
-//         a = a + 1;
-//       }
-//       return a;
-//     }",
-//     )
-//     .unwrap();
-//
-//     let mut ir = IntermediateRepresentation::default();
-//     comp_stmt.add_to_ir(&mut ir);
-//
-//     assert_eq!(
-//       ir.statements,
-//       vec![
-//         Op::Gt(Arg::Variable(&Identifier::from("a")), Arg::Variable(&Identifier::from("b"))),
-//         Op::Jumpfalse(Arg::Reference(0), Arg::Reference(4)),
-//         Op::Plus(Arg::Variable(&Identifier::from("a")), Arg::Literal(&Literal::Int(1))),
-//         Op::Assign(Arg::Reference(2), Arg::Variable(&Identifier::from("a"))),
-//         Op::Return(Some(Arg::Variable(&Identifier::from("a")))),
-//       ]
-//     )
-//   }
-//
-//   #[test]
-//   fn function_to_ir() {
-//     let function = FunctionDeclaration::try_from(
-//       "void main() {
-//         int x;
-//         x = 1 + 1;
-//         int y;
-//         y = x;
-//         return;
-//       }",
-//     )
-//     .unwrap();
-//
-//     let mut ir = IntermediateRepresentation::default();
-//     function.add_to_ir(&mut ir);
-//
-//     assert_eq!(
-//       ir.statements,
-//       vec![
-//         Op::Plus(Arg::Literal(&Literal::Int(1)), Arg::Literal(&Literal::Int(1))),
-//         Op::Assign(Arg::Reference(0), Arg::Variable(&Identifier::from("x"))),
-//         Op::Assign(Arg::Variable(&Identifier::from("x")), Arg::Variable(&Identifier::from("y"))),
-//         Op::Return(None),
-//       ]
-//     );
-//
-//     assert_eq!(ir.functions.get(&Identifier::from("main")), Some(&IrFunction { start: 0, end: 4 }),)
-//   }
-// }
+ #[cfg(test)]
+ mod tests {
+   use std::convert::TryFrom;
+
+   use super::*;
+
+   use Arg::{
+     Reference,
+     Variable
+   };
+
+   use Op::*;
+
+   use Ty::*;
+
+   #[test]
+   fn assignment_to_ir() {
+     let assignment = CompoundStatement::try_from(
+       "{
+       int x;
+       x = 1 + 2 * 3;
+       }
+       ",
+     )
+     .unwrap();
+
+     let mut ir = IntermediateRepresentation::default();
+     assignment.add_to_ir(&mut ir);
+
+     assert_eq!(
+       ir.statements,
+       vec![
+         Op::Decl(&Identifier("x".to_owned()), Ty::Int, None),
+         Op::Assign(Arg::Literal(&Literal::Int(7)), Arg::Variable(Ty::Int, 0, Box::new(None)))
+       ]
+     );
+   }
+
+   #[test]
+   fn expression_to_ir() {
+     let expression = Expression::try_from("1 + 2 * 3").unwrap();
+     let mut ir = IntermediateRepresentation::default();
+     let arg = expression.add_to_ir(&mut ir);
+     assert_eq!(
+       ir.statements,
+       vec![]
+     );
+     assert_eq!(arg, Arg::Literal(&Literal::Int(7)));
+   }
+
+   #[test]
+   fn if_stmt_to_ir() {
+     let if_stmt = CompoundStatement::try_from(
+       "{
+         int a;
+         int b;
+         int max;
+         if (a > b) {
+           max = a;
+         } else {
+           max = b;
+         }
+       }",
+     )
+     .unwrap();
+     let mut ir = IntermediateRepresentation::default();
+     if_stmt.add_to_ir(&mut ir);
+     assert_eq!(
+       ir.statements,
+       vec![
+         Decl(&Identifier("a".to_owned()), Int, None),
+         Decl(&Identifier("b".to_owned()), Int, None),
+         Decl(&Identifier("max".to_owned()), Int, None),
+         Gt(Variable(Ty::Int, 0, Box::default()), Variable(Int, 1, Box::default())),
+         Jumpfalse(Reference(Some(Bool), 3), Reference(None, 7)),
+         Assign(Variable(Int, 0, Box::default()), Variable(Int, 2, Box::default())),
+         Jump(Reference(None, 8)),
+         Assign(Variable(Int, 1, Box::default()),
+         Variable(Int, 2, Box::default())),
+         Nope
+       ]
+     )
+   }
+
+ #[test]
+ fn comp_stmt_to_ir() {
+   let comp_stmt = CompoundStatement::try_from(
+     "{
+     int a;
+     int b;
+     while (a > b) {
+       a = a + 1;
+     }
+     return a;
+   }",
+   )
+   .unwrap();
+
+   let mut ir = IntermediateRepresentation::default();
+   comp_stmt.add_to_ir(&mut ir);
+   assert_eq!(
+     ir.statements,
+     vec![
+       Decl(&Identifier("a".to_owned()), Int, None),
+       Decl(&Identifier("b".to_owned()), Int, None),
+       Gt(Variable(Int, 0, Box::default()),
+       Variable(Int, 1, Box::default())),
+       Jumpfalse(Reference(Some(Bool), 2),
+       Reference(None, 7)),
+       Plus(Variable(Int, 0, Box::default()), Arg::Literal(&Literal::Int(1))),
+       Assign(Reference(Some(Int), 4), Variable(Int, 0, Box::default())),
+       Jump(Reference(None, 2)),
+       Nope,
+       Return(Some(Variable(Int, 0, Box::default())))
+     ]
+   )
+ }
+
+ #[test]
+  fn function_to_ir() {
+    let function = FunctionDeclaration::try_from(
+      "void main() {
+        int x;
+        x = 1 + 1;
+        int y;
+        y = x;
+        return;
+      }",
+    )
+    .unwrap();
+    let mut ir = IntermediateRepresentation::default();
+    function.add_to_ir(&mut ir);
+    assert_eq!(
+      ir.statements,
+      vec![
+        Decl(&Identifier("x".to_owned()), Int, None),
+        Assign(Arg::Literal(&Literal::Int(2)), Variable(Int, 0, Box::default())),
+        Decl(&Identifier("y".to_owned()), Int, None),
+        Assign(Variable(Int, 0, Box::default()), Variable(Int, 2, Box::default())),
+        Return(None)
+      ]
+    );
+
+    assert_eq!(ir.functions.get(&Identifier::from("main")), Some(&(0..5, None)))
+  }
+}
