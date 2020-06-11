@@ -620,8 +620,8 @@ fn add_builtin_function(asm: &mut Asm, function: &str) {
     "read_int" => {
       asm.lines.push(i! { "push"; Reg32::EBP });
       asm.lines.push(i! { "mov"; Reg32::EBP, Reg32::ESP });
-      asm.lines.push(i! { "sub"; Reg32::ESP, 32 });
-      asm.lines.push(i! { "lea"; Reg32::EAX, "[ebp-12]" });
+      asm.lines.push(i! { "sub"; Reg32::ESP, 8 });
+      asm.lines.push(i! { "lea"; Reg32::EAX, "[ebp-4]" });
       asm.lines.push(i! { "push"; Reg32::EAX });
       let format_string = asm.add_string("%d");
       asm.lines.push(i! { "push"; format_string });
@@ -632,15 +632,15 @@ fn add_builtin_function(asm: &mut Asm, function: &str) {
       asm.lines.push(i! { "push"; 101 });
       asm.lines.push(i! { "call"; "exit" });
       asm.lines.push(l! { ".READ_INT_SUCCEEDED" });
-      asm.lines.push(i! { "mov"; Reg32::EAX, "DWORD PTR [ebp-12]" });
+      asm.lines.push(i! { "mov"; Reg32::EAX, "DWORD PTR [ebp-4]" });
       asm.lines.push(i! { "leave" });
       asm.lines.push(i! { "ret" });
     }
     "read_float" => {
       asm.lines.push(i! { "push"; Reg32::EBP });
       asm.lines.push(i! { "mov"; Reg32::EBP, Reg32::ESP });
-      asm.lines.push(i! { "sub"; Reg32::ESP, 32 });
-      asm.lines.push(i! { "lea"; Reg32::EAX, "[ebp-12]" });
+      asm.lines.push(i! { "sub"; Reg32::ESP, 8 });
+      asm.lines.push(i! { "lea"; Reg32::EAX, "[ebp-4]" });
       asm.lines.push(i! { "push"; Reg32::EAX });
       let format_string = asm.add_string("%f");
       asm.lines.push(i! { "push"; format_string });
@@ -651,7 +651,7 @@ fn add_builtin_function(asm: &mut Asm, function: &str) {
       asm.lines.push(i! { "push"; 101 });
       asm.lines.push(i! { "call"; "exit" });
       asm.lines.push(l! { ".READ_FLOAT_SUCCEEDED" });
-      asm.lines.push(i! { "fld"; "DWORD PTR [ebp-12]" });
+      asm.lines.push(i! { "fld"; "DWORD PTR [ebp-4]" });
       asm.lines.push(i! { "leave" });
       asm.lines.push(i! { "ret" });
     }
