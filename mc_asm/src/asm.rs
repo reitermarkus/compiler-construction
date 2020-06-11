@@ -65,7 +65,7 @@ impl Asm {
     let float = OrderedFloat::from(float);
 
     let float_number = self.floats.len();
-    let label = self.floats.entry(float).or_insert_with(||  format!(".LC{}", float_number));
+    let label = self.floats.entry(float).or_insert_with(|| format!(".LC{}", float_number));
     Storage::Label(StorageType::Dword, label.to_owned(), false)
   }
 
