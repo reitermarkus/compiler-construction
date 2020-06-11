@@ -72,7 +72,8 @@ end
 desc 'run all examples'
 task :run, [:example] => [:build_gcc_docker_image, :compile] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
-    sh *run_example(mc, tty: STDIN.tty?)
+    system *run_example(mc, tty: STDIN.tty?)
+    exit($CHILD_STATUS.exitstatus) unless $CHILD_STATUS.success?
   end
 end
 
@@ -118,7 +119,8 @@ task :test, [:example] => [:build_gcc_docker_image, :compile] do |example: '*'|
         message << '─' * 100 << "\n"
 
         raise message
-      end    end
+      end
+    end
   end
 end
 

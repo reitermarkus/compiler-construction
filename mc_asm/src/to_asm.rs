@@ -204,10 +204,6 @@ fn add_string(asm: &mut Asm, s: &str) -> Storage {
 }
 
 fn map_function_name(name: &str) -> String {
-  if name == "main" {
-    return name.to_owned();
-  }
-
   format!("mc_{}", name)
 }
 
@@ -231,6 +227,17 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
 
     asm.lines.push("  .intel_syntax noprefix".to_string());
     asm.lines.push("  .global main".to_string());
+
+    asm.lines.push("_sig_handler:".to_string());
+    asm.lines.push("  mov eax, 1".to_string());
+    asm.lines.push("  mov ebx, 130".to_string());
+    asm.lines.push("  int 0x80".to_string());
+
+    asm.lines.push("main:".to_string());
+    asm.lines.push("  push OFFSET FLAT:_sig_handler".to_string());
+    asm.lines.push("  push 2 # SIGINT".to_string());
+    asm.lines.push("  call signal".to_string());
+    asm.lines.push("  jmp  mc_main".to_string());
 
     for statement in self.statements.iter() {
       match statement {
