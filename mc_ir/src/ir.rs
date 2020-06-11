@@ -28,7 +28,7 @@ impl HashStack {
 
 #[derive(Debug)]
 pub enum Arg<'a> {
-  Literal(&'a Literal),
+  Literal(Literal),
   Variable(Ty, usize, Box<Option<Arg<'a>>>),
   FunctionCall(Option<Ty>, &'a Identifier, Vec<Arg<'a>>),
   Reference(Option<Ty>, usize),
@@ -37,7 +37,7 @@ pub enum Arg<'a> {
 impl<'a> Arg<'a> {
   pub fn ty(&self) -> Option<Ty> {
     match self {
-      Self::Literal(literal) => Some(Ty::from(*literal)),
+      Self::Literal(literal) => Some(Ty::from(literal)),
       Self::Variable(ty, ..) => Some(*ty),
       Self::FunctionCall(ty, ..) => *ty,
       Self::Reference(ty, ..) => *ty,

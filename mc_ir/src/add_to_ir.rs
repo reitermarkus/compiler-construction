@@ -38,7 +38,7 @@ impl<'a> AddToIr<'a> for Declaration<'a> {
 impl<'a> AddToIr<'a> for Expression<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     match self {
-      Self::Literal { literal, .. } => Arg::Literal(literal),
+      Self::Literal { literal, .. } => Arg::Literal(literal.clone()),
       Self::Variable { identifier, index_expression, .. } => {
         let (reference, ty) = ir.stack.lookup(identifier).unwrap();
 
@@ -50,54 +50,56 @@ impl<'a> AddToIr<'a> for Expression<'a> {
         }
       }
       Self::Binary { op, lhs, rhs, .. } => {
-        let arg1 = lhs.add_to_ir(ir);
-        let arg2 = rhs.add_to_ir(ir);
+        let lhs = lhs.add_to_ir(ir);
+        let rhs = rhs.add_to_ir(ir);
 
-        match (&arg1, &arg2) {
-          (Arg::Literal(Literal::Int(l)), Arg::Literal(Literal::Int(r)))
-            if op == &BinaryOp::Plus || op == &BinaryOp::Minus || op == &BinaryOp::Times || op == &BinaryOp::Divide =>
-          {
-            let boxed = Box::new(Literal::Int(match op {
-              BinaryOp::Plus => l + r,
-              BinaryOp::Minus => l - r,
-              BinaryOp::Times => l * r,
-              BinaryOp::Divide => l / r,
+        match (lhs, rhs) {
+          (Arg::Literal(lhs), Arg::Literal(rhs)) => {
+            macro_rules! literal_op {
+              ($ty:path, $op:expr, $l:expr, $r:expr) => {
+                match $op {
+                  BinaryOp::Plus => $ty($l + $r),
+                  BinaryOp::Minus => $ty($l - $r),
+                  BinaryOp::Times => $ty($l * $r),
+                  BinaryOp::Divide => $ty($l / $r),
+                  BinaryOp::Gt => Literal::Bool($l > $r),
+                  BinaryOp::Gte => Literal::Bool($l >= $r),
+                  BinaryOp::Lt => Literal::Bool($l < $r),
+                  BinaryOp::Lte => Literal::Bool($l <= $r),
+                  BinaryOp::Eq => Literal::Bool($l == $r),
+                  BinaryOp::Neq => Literal::Bool($l != $r),
+                  _ => unreachable!(),
+                }
+              };
+            };
+
+            let literal = match (lhs, rhs) {
+              (Literal::Int(l), Literal::Int(r)) => literal_op!(Literal::Int, op, l, r),
+              (Literal::Float(l), Literal::Float(r)) => literal_op!(Literal::Float, op, l, r),
+              (Literal::Bool(l), Literal::Bool(r)) => match op {
+                BinaryOp::Land => Literal::Bool(l && r),
+                BinaryOp::Lor => Literal::Bool(l || r),
+                _ => unreachable!(),
+              },
               _ => unreachable!(),
-            }));
+            };
 
-            // TODO
-
-            Arg::Literal(&*Box::leak(boxed))
+            Arg::Literal(literal)
           }
-          (Arg::Literal(Literal::Float(l)), Arg::Literal(Literal::Float(r)))
-            if op == &BinaryOp::Plus || op == &BinaryOp::Minus || op == &BinaryOp::Times || op == &BinaryOp::Divide =>
-          {
-            let boxed = Box::new(Literal::Float(match op {
-              BinaryOp::Plus => l + r,
-              BinaryOp::Minus => l - r,
-              BinaryOp::Times => l * r,
-              BinaryOp::Divide => l / r,
-              _ => unreachable!(),
-            }));
-
-            // TODO
-
-            Arg::Literal(&*Box::leak(boxed))
-          }
-          _ => {
+          (lhs, rhs) => {
             ir.push(match op {
-              BinaryOp::Gt => Op::Gt(arg1, arg2),
-              BinaryOp::Gte => Op::Gte(arg1, arg2),
-              BinaryOp::Lt => Op::Lt(arg1, arg2),
-              BinaryOp::Lte => Op::Lte(arg1, arg2),
-              BinaryOp::Plus => Op::Plus(arg1, arg2),
-              BinaryOp::Minus => Op::Minus(arg1, arg2),
-              BinaryOp::Divide => Op::Divide(arg1, arg2),
-              BinaryOp::Times => Op::Times(arg1, arg2),
-              BinaryOp::Eq => Op::Eq(arg1, arg2),
-              BinaryOp::Neq => Op::Neq(arg1, arg2),
-              BinaryOp::Land => Op::Land(arg1, arg2),
-              BinaryOp::Lor => Op::Lor(arg1, arg2),
+              BinaryOp::Gt => Op::Gt(lhs, rhs),
+              BinaryOp::Gte => Op::Gte(lhs, rhs),
+              BinaryOp::Lt => Op::Lt(lhs, rhs),
+              BinaryOp::Lte => Op::Lte(lhs, rhs),
+              BinaryOp::Plus => Op::Plus(lhs, rhs),
+              BinaryOp::Minus => Op::Minus(lhs, rhs),
+              BinaryOp::Divide => Op::Divide(lhs, rhs),
+              BinaryOp::Times => Op::Times(lhs, rhs),
+              BinaryOp::Eq => Op::Eq(lhs, rhs),
+              BinaryOp::Neq => Op::Neq(lhs, rhs),
+              BinaryOp::Land => Op::Land(lhs, rhs),
+              BinaryOp::Lor => Op::Lor(lhs, rhs),
             });
 
             ir.last_ref()
@@ -296,7 +298,7 @@ impl<'a> AddToIr<'a> for Program<'a> {
        ir.statements,
        vec![
          Op::Decl(&Identifier("x".to_owned()), Ty::Int, None),
-         Op::Assign(Arg::Literal(&Literal::Int(7)), Arg::Variable(Ty::Int, 0, Box::new(None)))
+         Op::Assign(Arg::Literal(Literal::Int(7)), Arg::Variable(Ty::Int, 0, Box::new(None)))
        ]
      );
    }
@@ -310,7 +312,7 @@ impl<'a> AddToIr<'a> for Program<'a> {
        ir.statements,
        vec![]
      );
-     assert_eq!(arg, Arg::Literal(&Literal::Int(7)));
+     assert_eq!(arg, Arg::Literal(Literal::Int(7)));
    }
 
    #[test]
@@ -372,7 +374,7 @@ impl<'a> AddToIr<'a> for Program<'a> {
        Variable(Int, 1, Box::default())),
        Jumpfalse(Reference(Some(Bool), 2),
        Reference(None, 7)),
-       Plus(Variable(Int, 0, Box::default()), Arg::Literal(&Literal::Int(1))),
+       Plus(Variable(Int, 0, Box::default()), Arg::Literal(Literal::Int(1))),
        Assign(Reference(Some(Int), 4), Variable(Int, 0, Box::default())),
        Jump(Reference(None, 2)),
        Nope,
@@ -399,7 +401,7 @@ impl<'a> AddToIr<'a> for Program<'a> {
       ir.statements,
       vec![
         Decl(&Identifier("x".to_owned()), Int, None),
-        Assign(Arg::Literal(&Literal::Int(2)), Variable(Int, 0, Box::default())),
+        Assign(Arg::Literal(Literal::Int(2)), Variable(Int, 0, Box::default())),
         Decl(&Identifier("y".to_owned()), Int, None),
         Assign(Variable(Int, 0, Box::default()), Variable(Int, 2, Box::default())),
         Return(None)

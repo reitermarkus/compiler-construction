@@ -87,7 +87,7 @@ impl From<&Literal> for Ty {
   }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
   Bool(bool),
   Int(i64),
