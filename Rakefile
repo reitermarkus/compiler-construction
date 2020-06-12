@@ -43,6 +43,14 @@ task :ir, [:example] do |example: '*'|
   end
 end
 
+desc 'generate CFG for all examples'
+task :cfg, [:example] do |example: '*'|
+  Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
+    cfg = mc.sub_ext('.cfg.dot')
+    cargo_run 'mc_cfg_to_dot', '-o', cfg.to_s, mc.to_s
+  end
+end
+
 desc 'generate ASM for all examples'
 task :asm, [:example] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|

@@ -347,6 +347,7 @@ dependencies = [
  "indoc",
  "mc_ir",
  "mc_parser",
+ "mc_symbol_table",
  "petgraph",
  "pretty_assertions",
  "unindent",
