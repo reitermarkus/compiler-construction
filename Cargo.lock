@@ -340,6 +340,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "mc_cfg_to_dot"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "indoc",
+ "mc_ir",
+ "mc_parser",
+ "petgraph",
+ "pretty_assertions",
+ "unindent",
+]
+
+[[package]]
 name = "mc_ir"
 version = "0.1.0"
 dependencies = [

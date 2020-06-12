@@ -1,0 +1,16 @@
+[package]
+name = "mc_cfg_to_dot"
+version = "0.1.0"
+authors = ["Lukas Dötlinger <lukas.doetlinger@student.uibk.ac.at>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.33"
+mc_parser = { path = "../mc_parser" }
+mc_ir = { path = "../mc_ir" }
+petgraph = "0.5.1"
+
+[dev-dependencies]
+indoc = "0.3.5"
+pretty_assertions = "0.6.1"
+unindent = "0.1.5"
