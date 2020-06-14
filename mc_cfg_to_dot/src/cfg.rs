@@ -27,53 +27,63 @@ impl AddToGraph for IntermediateRepresentation<'_> {
 
       while i < range.end {
         match self.statements[i] {
-          Op::Jumpfalse(_, Arg::Reference(_, reference)) => {
-            if let Op::Jump(Arg::Reference(_, back_reference)) = self.statements[reference - 1] {
-              let is_if = back_reference > reference;
-              let is_while = back_reference < reference;
+          Op::Jumpfalse(_, Arg::Reference(_, reference)) => match self.statements[reference - 1] {
+            Op::Jump(Arg::Reference(_, back_reference)) if back_reference < reference => {
+              let block_before = graph.add_node(format_range(&self.statements, start..back_reference));
 
-              if is_if {
-                let if_condition = graph.add_node(format_range(&self.statements, start..(i + 1)));
-
-                for (previous_node, label) in previous_nodes {
-                  graph.add_edge(previous_node, if_condition, label);
-                }
-
-                let if_block = graph.add_node(format_range(&self.statements, (i + 1)..(reference)));
-                let else_block = graph.add_node(format_range(&self.statements, reference..back_reference));
-
-                graph.add_edge(if_condition, if_block, "true".into());
-                graph.add_edge(if_condition, else_block, "false".into());
-
-                previous_nodes = vec![(if_block, "".into()), (else_block, "".into())];
-
-                start = back_reference;
+              for (previous_node, label) in previous_nodes {
+                graph.add_edge(previous_node, block_before, label);
               }
 
-              if is_while {
-                let block_before = graph.add_node(format_range(&self.statements, start..back_reference));
+              let while_condition = graph.add_node(format_range(&self.statements, back_reference..(i + 1)));
 
-                for (previous_node, label) in previous_nodes {
-                  graph.add_edge(previous_node, block_before, label);
-                }
+              graph.add_edge(block_before, while_condition, "".into());
 
-                let while_condition = graph.add_node(format_range(&self.statements, back_reference..(i + 1)));
+              let while_block = graph.add_node(format_range(&self.statements, (i + 1)..reference));
 
-                graph.add_edge(block_before, while_condition, "".into());
+              graph.add_edge(while_condition, while_block, "true".into());
+              graph.add_edge(while_block, while_condition, "".into());
 
-                let while_block = graph.add_node(format_range(&self.statements, (i + 1)..reference));
+              previous_nodes = vec![(while_condition, "false".into())];
 
-                graph.add_edge(while_condition, while_block, "true".into());
-                graph.add_edge(while_block, while_condition, "".into());
+              start = reference;
+              i = start;
+            }
+            _ => {
+              let if_condition = graph.add_node(format_range(&self.statements, start..(i + 1)));
 
-                previous_nodes = vec![(while_condition, "false".into())];
-
-                start = reference;
+              for (previous_node, label) in previous_nodes {
+                graph.add_edge(previous_node, if_condition, label);
               }
-            };
 
-            i = start;
-          }
+              let if_block = graph.add_node(format_range(&self.statements, (i + 1)..reference));
+              graph.add_edge(if_condition, if_block, "true".into());
+
+              match self.statements[reference - 1] {
+                Op::Return(_) => {
+                  previous_nodes = vec![(if_condition, "false".into())];
+
+                  start = reference;
+                  i = start;
+                }
+                Op::Jump(Arg::Reference(_, back_reference)) if back_reference > reference => {
+                  let else_block = graph.add_node(format_range(&self.statements, reference..back_reference));
+                  graph.add_edge(if_condition, else_block, "false".into());
+
+                  previous_nodes = vec![(if_block, "".into()), (else_block, "".into())];
+
+                  start = back_reference;
+                  i = start;
+                }
+                _ => {
+                  previous_nodes = vec![(if_condition, "false".into()), (if_block, "".into())];
+
+                  start = reference;
+                  i = start;
+                }
+              }
+            }
+          },
           _ => {
             i += 1;
           }
