@@ -58,7 +58,7 @@ fn add_statements(
           let if_block = add_statements(previous_nodes, graph, statements, (i + 1)..reference);
 
           match statements[reference - 1] {
-            Op::Return(_) => {
+            Op::Return(..) => {
               previous_nodes.push((if_condition, "false".into()));
 
               start = reference;
@@ -68,13 +68,18 @@ fn add_statements(
               previous_nodes.push((if_condition, "false".into()));
               let else_block = add_statements(previous_nodes, graph, statements, reference..back_reference);
 
-              previous_nodes.extend(vec![(if_block, "".into()), (else_block, "".into())]);
+              previous_nodes.push((if_block, "".into()));
+
+              if !matches!(statements[back_reference - 1], Op::Return(..)) {
+                previous_nodes.push((else_block, "".into()));
+              }
 
               start = back_reference;
               i = start;
             }
             _ => {
-              previous_nodes.extend(vec![(if_condition, "false".into()), (if_block, "".into())]);
+              previous_nodes.push((if_block, "".into()));
+              previous_nodes.push((if_condition, "false".into()));
 
               start = reference;
               i = start;
