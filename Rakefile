@@ -22,10 +22,10 @@ def dot_to_svg(dot, svg)
 end
 
 desc 'generate AST graphs for all examples'
-task :graphs, [:example] do |example: '*'|
+task :ast, [:example] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
-    dot = mc.sub_ext('.dot')
-    svg = mc.sub_ext('.svg')
+    dot = mc.sub_ext('.ast.dot')
+    svg = mc.sub_ext('.ast.svg')
     cargo_run 'mc_ast_to_dot', '-o', dot.to_s, mc.to_s
     dot_to_svg(dot, svg)
   end
