@@ -71,7 +71,7 @@ impl<'a> FromPest<'a> for Ty {
       "int" => Self::Int,
       "float" => Self::Float,
       "string" => Self::String,
-      _ => return Err(ConversionError::Malformed(format!("expected type, found {:?}", pair))),
+      _ => unreachable!(),
     })
   }
 }
@@ -102,14 +102,12 @@ impl<'a> FromPest<'a> for Literal {
   fn from_pest(pest: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let pair = pest.next().ok_or(ConversionError::NoMatch)?;
 
-    let parse_error = |ty| ConversionError::Malformed(format!("failed to parse {:?} as {}", pair.as_str(), ty));
-
     Ok(match pair.as_rule() {
-      Rule::float => Self::Float(pair.as_str().parse::<f64>().map_err(|_| parse_error(Ty::Float))?),
-      Rule::int => Self::Int(pair.as_str().parse::<i64>().map_err(|_| parse_error(Ty::Int))?),
-      Rule::boolean => Self::Bool(pair.as_str().parse::<bool>().map_err(|_| parse_error(Ty::Bool))?),
-      Rule::string => Self::String(pair.into_inner().next().ok_or(ConversionError::NoMatch)?.as_str().to_owned()),
-      _ => return Err(ConversionError::Malformed(format!("expected literal, found {:?}", pair))),
+      Rule::float => Self::Float(pair.as_str().parse::<f64>().unwrap()),
+      Rule::int => Self::Int(pair.as_str().parse::<i64>().unwrap()),
+      Rule::boolean => Self::Bool(pair.as_str().parse::<bool>().unwrap()),
+      Rule::string => Self::String(pair.into_inner().next().unwrap().as_str().to_owned()),
+      _ => unreachable!(),
     })
   }
 }
@@ -155,7 +153,7 @@ impl<'a> FromPest<'a> for UnaryOp {
     Ok(match op.as_rule() {
       Rule::unary_minus => Self::Minus,
       Rule::not => Self::Not,
-      rule => return Err(ConversionError::Malformed(format!("unknown unary operation: {:?}", rule))),
+      _ => unreachable!(),
     })
   }
 }
@@ -216,7 +214,7 @@ impl<'a> FromPest<'a> for BinaryOp {
       Rule::gt => Self::Gt,
       Rule::land => Self::Land,
       Rule::lor => Self::Lor,
-      _ => return Err(ConversionError::Malformed(format!("expected binary operation, found {:?}", op))),
+      _ => unreachable!(),
     })
   }
 }
@@ -424,8 +422,8 @@ impl<'a> FromPest<'a> for Declaration<'a> {
     let span = pair.as_span();
     let mut inner = pair.into_inner();
 
-    let mut dec_type = inner.next().ok_or(ConversionError::NoMatch)?.into_inner();
-    let (ty, count) = match (dec_type.next(), dec_type.next()) {
+    let mut decl_type = inner.next().ok_or(ConversionError::NoMatch)?.into_inner();
+    let (ty, count) = match (decl_type.next(), decl_type.next()) {
       (Some(ty), Some(int)) => (
         Ty::from_pest(&mut Pairs::single(ty))?,
         Some(
@@ -436,7 +434,6 @@ impl<'a> FromPest<'a> for Declaration<'a> {
         ),
       ),
       (Some(ty), None) => (Ty::from_pest(&mut Pairs::single(ty))?, None),
-      (None, None) => return Err(ConversionError::NoMatch),
       _ => unreachable!(),
     };
 
@@ -568,7 +565,7 @@ impl<'a> FromPest<'a> for Statement<'a> {
   fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
     let mut inner = pairs.next().ok_or(ConversionError::NoMatch)?.into_inner();
 
-    Ok(match inner.peek().ok_or(ConversionError::NoMatch)?.as_rule() {
+    Ok(match inner.peek().unwrap().as_rule() {
       Rule::if_stmt => Self::If(Box::new(IfStatement::from_pest(&mut inner)?)),
       Rule::while_stmt => Self::While(Box::new(WhileStatement::from_pest(&mut inner)?)),
       Rule::ret_stmt => Self::Ret(ReturnStatement::from_pest(&mut inner)?),
@@ -576,7 +573,7 @@ impl<'a> FromPest<'a> for Statement<'a> {
       Rule::assignment => Self::Assignment(Box::new(Assignment::from_pest(&mut inner)?)),
       Rule::expression => Self::Expression(Expression::from_pest(&mut inner)?),
       Rule::compound_stmt => Self::Compound(CompoundStatement::from_pest(&mut inner)?),
-      rule => return Err(ConversionError::Malformed(format!("unknown statement: {:?}", rule))),
+      _ => unreachable!(),
     })
   }
 }
@@ -606,7 +603,7 @@ impl<'a> FromPest<'a> for FunctionDeclaration<'a> {
     let identifier = Identifier::from_pest(&mut inner)?;
 
     let parameters = if inner.peek().map(|p| p.as_rule()) == Some(Rule::parameters) {
-      let params = inner.next().ok_or(ConversionError::NoMatch)?.into_inner();
+      let params = inner.next().unwrap().into_inner();
       params.map(|p| Declaration::from_pest(&mut Pairs::single(p))).collect::<Result<Vec<_>, _>>()?
     } else {
       vec![]

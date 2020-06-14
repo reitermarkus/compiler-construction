@@ -1,7 +1,8 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
-use from_pest::{ConversionError, FromPest};
-use pest::Parser;
+use std::convert::TryFrom;
+
+use from_pest::ConversionError;
 use pest_derive::Parser;
 
 pub mod ast;
@@ -12,9 +13,7 @@ use ast::Program;
 pub struct McParser;
 
 pub fn parse(program: &str) -> Result<Program<'_>, ConversionError<String>> {
-  let mut parse_tree =
-    McParser::parse(Rule::program, program).map_err(|err| ConversionError::Malformed(err.to_string()))?;
-  Program::from_pest(&mut parse_tree)
+  Program::try_from(program)
 }
 
 #[cfg(test)]
