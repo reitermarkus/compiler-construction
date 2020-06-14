@@ -27,14 +27,17 @@ pub fn mc_cfg_to_dot(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> s
   let mut ir = IntermediateRepresentation::default();
   ast.add_to_ir(&mut ir);
 
-  println!("{}", ir);
-  println!("{:#?}", ir.to_cfg());
+  let mut graph = CfgGraph::new();
+  ir.add_to_graph(&mut graph);
+  let dot = Dot::with_config(&graph, &[Config::GraphContentOnly]);
 
   writeln!(out_stream, "digraph {{")?;
 
   writeln!(out_stream, r##"    graph [bgcolor="transparent", colorsheme=svg]"##)?;
-  writeln!(out_stream, r##"    node [fontname="sans-serif", color="#c8e6ff", style=filled]"##)?;
+  writeln!(out_stream, r##"    node [fontname="Menlo, monospace", color="#c8e6ff", style=filled, shape=rect]"##)?;
   writeln!(out_stream, r##"    edge [fontname="sans-serif"]"##)?;
+
+  write!(out_stream, "{}", dot)?;
 
   writeln!(out_stream, "}}")
 }

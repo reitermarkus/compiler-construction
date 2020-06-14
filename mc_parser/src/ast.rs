@@ -117,12 +117,15 @@ impl<'a> FromPest<'a> for Literal {
 impl fmt::Display for Literal {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::Bool(boolean) => boolean.to_string(),
-      Self::Int(int) => int.to_string(),
-      Self::Float(float) => float.to_string(),
-      Self::String(string) => string.to_owned(),
+      Self::Bool(boolean) => boolean.fmt(f),
+      Self::Int(int) => int.fmt(f),
+      Self::Float(float) => float.fmt(f),
+      Self::String(string) => {
+        write!(f, "\"")?;
+        string.fmt(f)?;
+        write!(f, "\"")
+      }
     }
-    .fmt(f)
   }
 }
 

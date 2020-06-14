@@ -5,7 +5,7 @@ use crate::ir::*;
 impl fmt::Display for Arg<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::Literal(literal) => literal.to_string().fmt(f),
+      Self::Literal(literal) => literal.fmt(f),
       Self::Variable(_, reference, offset) => {
         write!(f, "&{}{}", reference, offset.as_ref().as_ref().map(|o| format!("[{}]", o)).unwrap_or_else(String::new))
       }

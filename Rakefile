@@ -9,21 +9,25 @@ def cargo_run(*args)
   sh 'cargo', 'run', '--bin', command, '--', *args
 end
 
+def dot_to_svg(dot, svg)
+  sh 'dot', '-T', 'svg', '-o', svg.to_s, dot.to_s
+
+  begin
+    sh 'sed', '-i', '', '-E', 's/\s*(height|width)="[^"]+"\s*/ /g', svg.to_s
+    sh 'svgcleaner', svg.to_s, svg.to_s
+    sh 'xmllint', '--format', svg.to_s, '-o', svg.to_s
+  rescue RuntimeError
+    # Ignore optional commands failing.
+  end
+end
+
 desc 'generate AST graphs for all examples'
 task :graphs, [:example] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
     dot = mc.sub_ext('.dot')
     svg = mc.sub_ext('.svg')
     cargo_run 'mc_ast_to_dot', '-o', dot.to_s, mc.to_s
-    sh 'dot', '-T', 'svg', '-o', svg.to_s, dot.to_s
-
-    begin
-      sh 'sed', '-i', '', '-E', 's/\s*(height|width)="[^"]+"\s*/ /g', svg.to_s
-      sh 'svgcleaner', svg.to_s, svg.to_s
-      sh 'xmllint', '--format', svg.to_s, '-o', svg.to_s
-    rescue RuntimeError
-      # Ignore optional commands failing.
-    end
+    dot_to_svg(dot, svg)
   end
 end
 
@@ -47,7 +51,9 @@ desc 'generate CFG for all examples'
 task :cfg, [:example] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
     cfg = mc.sub_ext('.cfg.dot')
+    svg = mc.sub_ext('.cfg.svg')
     cargo_run 'mc_cfg_to_dot', '-o', cfg.to_s, mc.to_s
+    dot_to_svg(cfg, svg)
   end
 end
 
