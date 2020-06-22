@@ -11,8 +11,8 @@ jobs:
           persist-credentials: false
       - name: Install Dependencies
         run: |
-          apt-get update
-          apt-get install --assume-yes --no-install-recommends gcc-multilib
+          sudo apt-get update
+          sudo apt-get install --assume-yes --no-install-recommends gcc-multilib
       - uses: actions/setup-ruby@v1
         with:
           ruby-version: 2.7
