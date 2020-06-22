@@ -12,7 +12,7 @@ use ast::Program;
 #[grammar = "grammar.pest"]
 pub struct McParser;
 
-pub fn parse<'a>(program: &'a str) -> Result<Program<'a>, ConversionError<String>> {
+pub fn parse(program: &str) -> Result<Program<'_>, ConversionError<String>> {
   Program::try_from(program)
 }
 
