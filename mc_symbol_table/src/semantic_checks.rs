@@ -40,7 +40,10 @@ impl<'a> CheckSemantics<'a> for Assignment<'a> {
 
     match Scope::lookup(scope, &self.identifier) {
       Some(Symbol::Function(..)) => {
-        push_error!(res, SemanticError::WrongUseOfFunction { span: self.span.clone(), identifier: self.identifier.clone() });
+        push_error!(
+          res,
+          SemanticError::WrongUseOfFunction { span: self.span.clone(), identifier: self.identifier.clone() }
+        );
       }
       Some(Symbol::Variable(ty, size)) => {
         extend_errors!(res, check_variable_index(&self.identifier, &self.span, size, &self.index_expression));
@@ -59,7 +62,9 @@ impl<'a> CheckSemantics<'a> for Assignment<'a> {
           }
         };
       }
-      None => push_error!(res, SemanticError::NotDeclared { span: self.span.clone(), identifier: self.identifier.clone() }),
+      None => {
+        push_error!(res, SemanticError::NotDeclared { span: self.span.clone(), identifier: self.identifier.clone() })
+      }
     };
 
     extend_errors!(res, check_variable(scope, &self.identifier, &self.span, &self.index_expression));
@@ -254,7 +259,9 @@ where
   E: AsRef<Expression<'a>>,
 {
   match Scope::lookup(scope, identifier) {
-    Some(Symbol::Function(..)) => Err(vec![SemanticError::WrongUseOfFunction { span: span.clone(), identifier: identifier.clone() }]),
+    Some(Symbol::Function(..)) => {
+      Err(vec![SemanticError::WrongUseOfFunction { span: span.clone(), identifier: identifier.clone() }])
+    }
     Some(Symbol::Variable(.., size)) => check_variable_boxed_index(identifier, span, size, index_expression),
     None => Err(vec![SemanticError::NotDeclared { span: span.clone(), identifier: identifier.clone() }]),
   }
@@ -267,7 +274,12 @@ pub fn index_bounds_check<'a>(
   span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   if index as usize >= size {
-    Err(vec![SemanticError::IndexOutOfBounds { span: span.clone(), identifier: identifier.clone(), size, actual: index }])
+    Err(vec![SemanticError::IndexOutOfBounds {
+      span: span.clone(),
+      identifier: identifier.clone(),
+      size,
+      actual: index,
+    }])
   } else {
     Ok(())
   }
@@ -354,7 +366,9 @@ pub fn check_function_call<'a>(
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match Scope::lookup(scope, identifier) {
     Some(Symbol::Function(..)) => check_function_call_arguments(scope, identifier, span, arguments),
-    Some(Symbol::Variable(..)) => Err(vec![SemanticError::NotAFunction { span: span.clone(), identifier: identifier.clone() }]),
+    Some(Symbol::Variable(..)) => {
+      Err(vec![SemanticError::NotAFunction { span: span.clone(), identifier: identifier.clone() }])
+    }
     None => Err(vec![SemanticError::NotDeclared { span: span.clone(), identifier: identifier.clone() }]),
   }
 }
@@ -485,8 +499,12 @@ pub fn check_unary_operator_compatability<'a>(
   span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match ty {
-    Ty::Bool if *op == UnaryOp::Minus => Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op: *op, ty }]),
-    Ty::Int | Ty::Float if *op == UnaryOp::Not => Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op: *op, ty }]),
+    Ty::Bool if *op == UnaryOp::Minus => {
+      Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op: *op, ty }])
+    }
+    Ty::Int | Ty::Float if *op == UnaryOp::Not => {
+      Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op: *op, ty }])
+    }
     Ty::String => Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op: *op, ty }]),
     _ => Ok(()),
   }
@@ -535,10 +553,18 @@ pub fn check_operator_combination<'a>(
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match unary_op {
     UnaryOp::Not if [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(binary_op) => {
-      Err(vec![SemanticError::OperatorCombinationError { span: span.clone(), unary_op: *unary_op, binary_op: *binary_op }])
+      Err(vec![SemanticError::OperatorCombinationError {
+        span: span.clone(),
+        unary_op: *unary_op,
+        binary_op: *binary_op,
+      }])
     }
     UnaryOp::Minus if ![BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(binary_op) => {
-      Err(vec![SemanticError::OperatorCombinationError { span: span.clone(), unary_op: *unary_op, binary_op: *binary_op }])
+      Err(vec![SemanticError::OperatorCombinationError {
+        span: span.clone(),
+        unary_op: *unary_op,
+        binary_op: *binary_op,
+      }])
     }
     _ => Ok(()),
   }

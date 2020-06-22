@@ -39,7 +39,7 @@ fn main() -> std::io::Result<()> {
       };
 
       Ok(())
-    },
+    }
     Err(err) => {
       eprintln!("{:?}", err);
       exit(1);

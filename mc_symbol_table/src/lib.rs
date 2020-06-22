@@ -1,8 +1,8 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 #[macro_use]
 extern crate prettytable;
-use prettytable::Table;
 use from_pest::ConversionError;
+use prettytable::Table;
 
 use mc_parser::ast::Program;
 use std::cell::RefCell;

@@ -633,8 +633,9 @@ mod test {
     let result = if_statement.check_semantics(&scope);
     let errors = result.expect_err("no errors found");
 
-    assert!(errors
-      .contains(&SemanticError::InvalidConditionType { span: Span::new(&expr, 0, 26).unwrap(), actual: Ty::Int }));
+    assert!(
+      errors.contains(&SemanticError::InvalidConditionType { span: Span::new(&expr, 0, 26).unwrap(), actual: Ty::Int })
+    );
 
     assert_eq!(errors.len(), 1);
   }
@@ -656,8 +657,9 @@ mod test {
     let result = while_statement.check_semantics(&scope);
     let errors = result.expect_err("no errors found");
 
-    assert!(errors
-      .contains(&SemanticError::InvalidConditionType { span: Span::new(&expr, 0, 25).unwrap(), actual: Ty::Int }));
+    assert!(
+      errors.contains(&SemanticError::InvalidConditionType { span: Span::new(&expr, 0, 25).unwrap(), actual: Ty::Int })
+    );
 
     assert_eq!(errors.len(), 1);
   }
