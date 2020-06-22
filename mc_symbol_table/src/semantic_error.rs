@@ -8,98 +8,98 @@ use mc_parser::ast::*;
 pub enum SemanticError<'a> {
   #[allow(dead_code)]
   Type {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     expected: Ty,
     actual: Ty,
   },
   NotDeclared {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     identifier: Identifier,
   },
   AlreadyDeclared {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     identifier: Identifier,
   },
   ArrayError {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     identifier: Identifier,
   },
   IndexOutOfBounds {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     identifier: Identifier,
     size: usize,
     actual: usize,
   },
   WrongUseOfFunction {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     identifier: Identifier,
   },
   NotAFunction {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     identifier: Identifier,
   },
   UnaryOperatorTypeError {
-    span: &'a Span<'a>,
-    op: &'a UnaryOp,
+    span: Span<'a>,
+    op: UnaryOp,
     ty: Ty,
   },
   UnaryOperatorCombinationError {
-    span: &'a Span<'a>,
-    outer: &'a UnaryOp,
-    inner: &'a UnaryOp,
+    span: Span<'a>,
+    outer: UnaryOp,
+    inner: UnaryOp,
   },
   /// Error when a non-void function is missing a return statement.
   MissingReturnStatement {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     identifier: Identifier,
   },
   InvalidAmountOfArguments {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     identifier: Identifier,
     expected: usize,
     actual: usize,
   },
   InvalidArgumentType {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     identifier: Identifier,
     expected: Ty,
     actual: Option<Ty>,
   },
   InvalidDeclarationType {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     identifier: Identifier,
     expected: Ty,
     actual: Ty,
   },
   InvalidReturnType {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     expected: Option<Ty>,
     actual: Option<Ty>,
   },
   InvalidArgument {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     identifier: Identifier,
   },
   OperatorCombinationError {
-    span: &'a Span<'a>,
-    unary_op: &'a UnaryOp,
-    binary_op: &'a BinaryOp,
+    span: Span<'a>,
+    unary_op: UnaryOp,
+    binary_op: BinaryOp,
   },
   BinaryOperatorTypeError {
-    span: &'a Span<'a>,
-    op: &'a BinaryOp,
+    span: Span<'a>,
+    op: BinaryOp,
     lhs_ty: Option<Ty>,
     rhs_ty: Option<Ty>,
   },
   NoMainFunction {
-    span: &'a Span<'a>,
+    span: Span<'a>,
   },
   InvalidConditionType {
-    span: &'a Span<'a>,
+    span: Span<'a>,
     actual: Ty,
   },
   InvalidCondition {
-    span: &'a Span<'a>,
+    span: Span<'a>,
   },
 }
 
@@ -203,7 +203,7 @@ mod test {
     let result = program.check_semantics(&scope);
     let errors = result.expect_err("no errors found");
 
-    assert!(errors.contains(&SemanticError::NoMainFunction { span: &Span::new("", 0, 0).unwrap() }))
+    assert!(errors.contains(&SemanticError::NoMainFunction { span: Span::new("", 0, 0).unwrap() }))
   }
 
   #[test]
@@ -254,7 +254,7 @@ mod test {
     let errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::InvalidReturnType {
-      span: &Span::new("", 0, 0).unwrap(),
+      span: Span::new("", 0, 0).unwrap(),
       expected: Some(Ty::Float),
       actual: Some(Ty::Int)
     }));
@@ -283,7 +283,7 @@ mod test {
     let errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::InvalidArgumentType {
-      span: &Span::new(&expr, 0, 13).unwrap(),
+      span: Span::new(&expr, 0, 13).unwrap(),
       identifier: Identifier::from("pi"),
       expected: Ty::Int,
       actual: Some(Ty::Float)
@@ -315,7 +315,7 @@ mod test {
     let errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::InvalidAmountOfArguments {
-      span: &Span::new(&expr, 0, 11).unwrap(),
+      span: Span::new(&expr, 0, 11).unwrap(),
       identifier: Identifier::from("pi"),
       expected: 3,
       actual: 2
@@ -341,7 +341,7 @@ mod test {
     let mut errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::NotDeclared {
-      span: &Span::new(assignment_str, 0, 7).unwrap(),
+      span: Span::new(assignment_str, 0, 7).unwrap(),
       identifier: Identifier::from("x")
     }));
 
@@ -350,7 +350,7 @@ mod test {
     errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::InvalidDeclarationType {
-      span: &Span::new(assignment_str, 0, 7).unwrap(),
+      span: Span::new(assignment_str, 0, 7).unwrap(),
       identifier: Identifier::from("x"),
       expected: Ty::Int,
       actual: Ty::Float
@@ -378,7 +378,7 @@ mod test {
     let errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::AlreadyDeclared {
-      span: &Span::new(declaration_str, 0, 9).unwrap(),
+      span: Span::new(declaration_str, 0, 9).unwrap(),
       identifier: Identifier::from("x")
     }));
 
@@ -410,7 +410,7 @@ mod test {
     let mut errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::NotDeclared {
-      span: &Span::new("x", 0, 1).unwrap(),
+      span: Span::new("x", 0, 1).unwrap(),
       identifier: Identifier::from("x")
     }));
 
@@ -427,7 +427,7 @@ mod test {
     errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::IndexOutOfBounds {
-      span: &Span::new("x[10]", 2, 4).unwrap(),
+      span: Span::new("x[10]", 2, 4).unwrap(),
       identifier: Identifier::from("x"),
       actual: 10,
       size: 5
@@ -441,7 +441,7 @@ mod test {
     errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::WrongUseOfFunction {
-      span: &Span::new("x[10]", 0, 5).unwrap(),
+      span: Span::new("x[10]", 0, 5).unwrap(),
       identifier: Identifier::from("x")
     }));
 
@@ -469,8 +469,8 @@ mod test {
     let errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::UnaryOperatorTypeError {
-      span: &Span::new(&expr, 0, 9).unwrap(),
-      op: &UnaryOp::Not,
+      span: Span::new(&expr, 0, 9).unwrap(),
+      op: UnaryOp::Not,
       ty: Ty::Int,
     }));
 
@@ -495,14 +495,14 @@ mod test {
     let errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::UnaryOperatorTypeError {
-      span: &Span::new(&expr, 1, 10).unwrap(),
-      op: &UnaryOp::Not,
+      span: Span::new(&expr, 1, 10).unwrap(),
+      op: UnaryOp::Not,
       ty: Ty::Int,
     }));
     assert!(errors.contains(&SemanticError::UnaryOperatorCombinationError {
-      span: &Span::new(&expr, 0, 10).unwrap(),
-      outer: &UnaryOp::Minus,
-      inner: &UnaryOp::Not,
+      span: Span::new(&expr, 0, 10).unwrap(),
+      outer: UnaryOp::Minus,
+      inner: UnaryOp::Not,
     }));
 
     assert_eq!(errors.len(), 2);
@@ -534,13 +534,13 @@ mod test {
     let errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::UnaryOperatorTypeError {
-      span: &Span::new(&expr, 6, 8).unwrap(),
-      op: &UnaryOp::Not,
+      span: Span::new(&expr, 6, 8).unwrap(),
+      op: UnaryOp::Not,
       ty: Ty::Int,
     }));
     assert!(errors.contains(&SemanticError::BinaryOperatorTypeError {
-      span: &Span::new(&expr, 0, 8).unwrap(),
-      op: &BinaryOp::Plus,
+      span: Span::new(&expr, 0, 8).unwrap(),
+      op: BinaryOp::Plus,
       lhs_ty: Some(Ty::String),
       rhs_ty: Some(Ty::Bool),
     }));
@@ -569,8 +569,8 @@ mod test {
     let errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::BinaryOperatorTypeError {
-      span: &Span::new(&expr, 0, 10).unwrap(),
-      op: &BinaryOp::Plus,
+      span: Span::new(&expr, 0, 10).unwrap(),
+      op: BinaryOp::Plus,
       lhs_ty: Some(Ty::String),
       rhs_ty: Some(Ty::String),
     }));
@@ -599,8 +599,8 @@ mod test {
     let errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::BinaryOperatorTypeError {
-      span: &Span::new(&expr, 0, 9).unwrap(),
-      op: &BinaryOp::Plus,
+      span: Span::new(&expr, 0, 9).unwrap(),
+      op: BinaryOp::Plus,
       lhs_ty: None,
       rhs_ty: Some(Ty::Int),
     }));
@@ -634,7 +634,7 @@ mod test {
     let errors = result.expect_err("no errors found");
 
     assert!(errors
-      .contains(&SemanticError::InvalidConditionType { span: &Span::new(&expr, 0, 26).unwrap(), actual: Ty::Int }));
+      .contains(&SemanticError::InvalidConditionType { span: Span::new(&expr, 0, 26).unwrap(), actual: Ty::Int }));
 
     assert_eq!(errors.len(), 1);
   }
@@ -657,7 +657,7 @@ mod test {
     let errors = result.expect_err("no errors found");
 
     assert!(errors
-      .contains(&SemanticError::InvalidConditionType { span: &Span::new(&expr, 0, 25).unwrap(), actual: Ty::Int }));
+      .contains(&SemanticError::InvalidConditionType { span: Span::new(&expr, 0, 25).unwrap(), actual: Ty::Int }));
 
     assert_eq!(errors.len(), 1);
   }

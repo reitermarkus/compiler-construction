@@ -2,12 +2,11 @@
 #[macro_use]
 extern crate prettytable;
 use prettytable::Table;
+use from_pest::ConversionError;
 
 use mc_parser::ast::Program;
 use std::cell::RefCell;
-use std::fs::File;
-use std::io::{prelude::*, stdin};
-use std::path::Path;
+use std::io;
 use std::rc::Rc;
 
 mod format_symbol_table;
@@ -53,36 +52,43 @@ macro_rules! extend_errors {
   };
 }
 
-pub fn mc_symbol_table(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::Result<()> {
-  let mut contents = String::new();
+pub fn mc_symbol_table<'a>(contents: &'a str) -> Result<Table, SuperWauError2000<'a>> {
+  let ast: Program<'a> = mc_parser::parse(contents)?;
 
-  if in_file.as_ref() == Path::new("-") {
-    stdin().read_to_string(&mut contents)?;
-  } else {
-    File::open(in_file)?.read_to_string(&mut contents)?;
-  }
-
-  let ast = mc_parser::parse(&contents).expect("failed to parse program");
-
-  let scope = mc_check_semantics(&ast).expect("semantic checks failed");
+  let scope = mc_check_semantics(&ast)?;
 
   let mut table = Table::new();
   scope.borrow().to_pretty_table(&mut table);
-  table.print(&mut out_stream)?;
-
-  Ok(())
+  Ok(table)
 }
 
-pub fn mc_check_semantics(ast: &Program<'_>) -> Result<Rc<RefCell<Scope>>, ()> {
+pub fn mc_check_semantics<'a, 'b>(ast: &'a Program<'b>) -> Result<Rc<RefCell<Scope>>, Vec<SemanticError<'b>>> {
   let scope = Scope::new();
+  ast.add_to_scope(&scope)?;
+  Ok(scope)
+}
 
-  if let Err(errors) = ast.add_to_scope(&scope) {
-    for error in errors {
-      eprintln!("{}", error);
-    }
+#[derive(Debug)]
+pub enum SuperWauError2000<'a> {
+  Io(io::Error),
+  ParseError(ConversionError<String>),
+  SemanticError(Vec<SemanticError<'a>>),
+}
 
-    Err(())
-  } else {
-    Ok(scope)
+impl<'a> From<io::Error> for SuperWauError2000<'a> {
+  fn from(error: io::Error) -> Self {
+    Self::Io(error)
+  }
+}
+
+impl From<ConversionError<String>> for SuperWauError2000<'_> {
+  fn from(error: ConversionError<String>) -> Self {
+    Self::ParseError(error)
+  }
+}
+
+impl<'a> From<Vec<SemanticError<'a>>> for SuperWauError2000<'a> {
+  fn from(errors: Vec<SemanticError<'a>>) -> Self {
+    Self::SemanticError(errors)
   }
 }

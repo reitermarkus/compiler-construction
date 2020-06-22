@@ -8,12 +8,12 @@ use crate::*;
 use super::extend_errors;
 use crate::semantic_checks::*;
 
-pub trait AddToScope {
-  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>>;
+pub trait AddToScope<'a> {
+  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>>;
 }
 
-impl AddToScope for IfStatement<'_> {
-  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> AddToScope<'a> for IfStatement<'a> {
+  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     let then_scope = Scope::new_child(scope, "if_then");
     let mut res = self.check_semantics(scope);
 
@@ -28,8 +28,8 @@ impl AddToScope for IfStatement<'_> {
   }
 }
 
-impl AddToScope for WhileStatement<'_> {
-  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> AddToScope<'a> for WhileStatement<'a> {
+  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     let mut res = self.check_semantics(scope);
 
     let child_scope = Scope::new_child(scope, "while");
@@ -40,34 +40,34 @@ impl AddToScope for WhileStatement<'_> {
 }
 
 #[allow(unused_variables)]
-impl AddToScope for ReturnStatement<'_> {
-  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> AddToScope<'a> for ReturnStatement<'a> {
+  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     self.check_semantics(scope)
   }
 }
 
-impl AddToScope for Declaration<'_> {
-  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> AddToScope<'a> for Declaration<'a> {
+  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     let res = self.check_semantics(scope);
     (*scope.borrow_mut()).insert(self.identifier.clone(), Symbol::Variable(self.ty, self.count));
     res
   }
 }
 
-impl AddToScope for Assignment<'_> {
-  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> AddToScope<'a> for Assignment<'a> {
+  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     self.check_semantics(scope)
   }
 }
 
-impl AddToScope for Expression<'_> {
-  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> AddToScope<'a> for Expression<'a> {
+  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     self.check_semantics(scope)
   }
 }
 
-impl AddToScope for Statement<'_> {
-  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> AddToScope<'a> for Statement<'a> {
+  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     match self {
       Self::If(statement) => statement.add_to_scope(scope),
       Self::While(statement) => statement.add_to_scope(scope),
@@ -80,8 +80,8 @@ impl AddToScope for Statement<'_> {
   }
 }
 
-impl AddToScope for CompoundStatement<'_> {
-  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> AddToScope<'a> for CompoundStatement<'a> {
+  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     let child_scope = Scope::new_child(scope, "block");
 
     let mut res = Ok(());
@@ -94,8 +94,8 @@ impl AddToScope for CompoundStatement<'_> {
   }
 }
 
-impl AddToScope for FunctionDeclaration<'_> {
-  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> AddToScope<'a> for FunctionDeclaration<'a> {
+  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     let mut res = Ok(());
 
     scope.borrow_mut().return_type = self.ty;
@@ -111,8 +111,8 @@ impl AddToScope for FunctionDeclaration<'_> {
   }
 }
 
-impl AddToScope for Program<'_> {
-  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> AddToScope<'a> for Program<'a> {
+  fn add_to_scope(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     let mut res = Ok(());
 
     for function in &self.function_declarations {

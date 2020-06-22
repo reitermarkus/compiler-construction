@@ -127,7 +127,7 @@ impl fmt::Display for Literal {
   }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum UnaryOp {
   Minus,
   Not,
@@ -158,7 +158,7 @@ impl<'a> FromPest<'a> for UnaryOp {
   }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum BinaryOp {
   Plus,
   Minus,

@@ -8,12 +8,12 @@ use mc_parser::ast::*;
 use super::extend_errors;
 use crate::*;
 
-pub trait CheckSemantics {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>>;
+pub trait CheckSemantics<'a> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>>;
 }
 
-impl CheckSemantics for Expression<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> CheckSemantics<'a> for Expression<'a> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     let mut res = Ok(());
 
     match self {
@@ -34,13 +34,13 @@ impl CheckSemantics for Expression<'_> {
   }
 }
 
-impl CheckSemantics for Assignment<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> CheckSemantics<'a> for Assignment<'a> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     let mut res = Ok(());
 
     match Scope::lookup(scope, &self.identifier) {
       Some(Symbol::Function(..)) => {
-        push_error!(res, SemanticError::WrongUseOfFunction { span: &self.span, identifier: self.identifier.clone() });
+        push_error!(res, SemanticError::WrongUseOfFunction { span: self.span.clone(), identifier: self.identifier.clone() });
       }
       Some(Symbol::Variable(ty, size)) => {
         extend_errors!(res, check_variable_index(&self.identifier, &self.span, size, &self.index_expression));
@@ -50,7 +50,7 @@ impl CheckSemantics for Assignment<'_> {
             push_error!(
               res,
               SemanticError::InvalidDeclarationType {
-                span: &self.span,
+                span: self.span.clone(),
                 identifier: self.identifier.clone(),
                 expected: ty,
                 actual: r_ty,
@@ -59,7 +59,7 @@ impl CheckSemantics for Assignment<'_> {
           }
         };
       }
-      None => push_error!(res, SemanticError::NotDeclared { span: &self.span, identifier: self.identifier.clone() }),
+      None => push_error!(res, SemanticError::NotDeclared { span: self.span.clone(), identifier: self.identifier.clone() }),
     };
 
     extend_errors!(res, check_variable(scope, &self.identifier, &self.span, &self.index_expression));
@@ -70,30 +70,30 @@ impl CheckSemantics for Assignment<'_> {
   }
 }
 
-impl CheckSemantics for Declaration<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> CheckSemantics<'a> for Declaration<'a> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     if Scope::lookup_in_scope(scope, &self.identifier).is_some() {
-      Err(vec![SemanticError::AlreadyDeclared { span: &self.span, identifier: self.identifier.clone() }])
+      Err(vec![SemanticError::AlreadyDeclared { span: self.span.clone(), identifier: self.identifier.clone() }])
     } else {
       Ok(())
     }
   }
 }
 
-impl CheckSemantics for IfStatement<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> CheckSemantics<'a> for IfStatement<'a> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     check_condition(scope, &self.condition, &self.span)
   }
 }
 
-impl CheckSemantics for WhileStatement<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> CheckSemantics<'a> for WhileStatement<'a> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     check_condition(scope, &self.condition, &self.span)
   }
 }
 
-impl CheckSemantics for ReturnStatement<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> CheckSemantics<'a> for ReturnStatement<'a> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     let mut res = Ok(());
 
     let expected_return_type = Scope::return_type(scope);
@@ -108,7 +108,7 @@ impl CheckSemantics for ReturnStatement<'_> {
       push_error!(
         res,
         SemanticError::InvalidReturnType {
-          span: &self.span,
+          span: self.span.clone(),
           expected: expected_return_type,
           actual: actual_return_type,
         }
@@ -119,7 +119,7 @@ impl CheckSemantics for ReturnStatement<'_> {
   }
 }
 
-fn check_main_return_type<'a>(function_declaration: &'a FunctionDeclaration<'a>) -> Result<(), Vec<SemanticError<'a>>> {
+fn check_main_return_type<'a>(function_declaration: &FunctionDeclaration<'a>) -> Result<(), Vec<SemanticError<'a>>> {
   let mut res = Ok(());
 
   if function_declaration.identifier == "main".into() {
@@ -130,7 +130,7 @@ fn check_main_return_type<'a>(function_declaration: &'a FunctionDeclaration<'a>)
       push_error!(
         res,
         SemanticError::InvalidReturnType {
-          span: &function_declaration.span,
+          span: function_declaration.span.clone(),
           actual: actual_return_type,
           expected: expected_return_type
         }
@@ -184,7 +184,7 @@ impl FindReturnStatement for FunctionDeclaration<'_> {
   }
 }
 
-fn check_missing_return<'a>(function_declaration: &'a FunctionDeclaration<'a>) -> Result<(), Vec<SemanticError<'a>>> {
+fn check_missing_return<'a>(function_declaration: &FunctionDeclaration<'a>) -> Result<(), Vec<SemanticError<'a>>> {
   let mut res = Ok(());
 
   if function_declaration.ty.is_some() && !function_declaration.body.find_return_statement() {
@@ -192,7 +192,7 @@ fn check_missing_return<'a>(function_declaration: &'a FunctionDeclaration<'a>) -
       res,
       SemanticError::MissingReturnStatement {
         identifier: function_declaration.identifier.clone(),
-        span: &function_declaration.span
+        span: function_declaration.span.clone()
       }
     );
   }
@@ -200,8 +200,8 @@ fn check_missing_return<'a>(function_declaration: &'a FunctionDeclaration<'a>) -
   res
 }
 
-impl CheckSemantics for FunctionDeclaration<'_> {
-  fn check_semantics(&self, _scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> CheckSemantics<'a> for FunctionDeclaration<'a> {
+  fn check_semantics(&self, _scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     let mut res = Ok(());
 
     extend_errors!(res, check_main_return_type(self));
@@ -211,10 +211,10 @@ impl CheckSemantics for FunctionDeclaration<'_> {
   }
 }
 
-impl CheckSemantics for Program<'_> {
-  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'_>>> {
+impl<'a> CheckSemantics<'a> for Program<'a> {
+  fn check_semantics(&self, scope: &Rc<RefCell<Scope>>) -> Result<(), Vec<SemanticError<'a>>> {
     if !matches!(Scope::lookup(scope, &Identifier::from("main")), Some(Symbol::Function(..))) {
-      return Err(vec![SemanticError::NoMainFunction { span: &self.span }]);
+      return Err(vec![SemanticError::NoMainFunction { span: self.span.clone() }]);
     }
 
     Ok(())
@@ -223,7 +223,7 @@ impl CheckSemantics for Program<'_> {
 
 // Only used to get the return type of an expression.
 // Does not perform semantic checks on the expression.
-pub fn get_expression_type<'a>(scope: &Rc<RefCell<Scope>>, expression: &'a Expression<'a>) -> Option<Ty> {
+pub fn get_expression_type<'a>(scope: &Rc<RefCell<Scope>>, expression: &Expression<'a>) -> Option<Ty> {
   match expression {
     Expression::Literal { literal, .. } => Some(Ty::from(literal)),
     Expression::Variable { identifier, .. } | Expression::FunctionCall { identifier, .. } => {
@@ -247,16 +247,16 @@ pub fn get_expression_type<'a>(scope: &Rc<RefCell<Scope>>, expression: &'a Expre
 pub fn check_variable<'a, E>(
   scope: &Rc<RefCell<Scope>>,
   identifier: &Identifier,
-  span: &'a Span<'_>,
-  index_expression: &'a Option<E>,
+  span: &Span<'a>,
+  index_expression: &Option<E>,
 ) -> Result<(), Vec<SemanticError<'a>>>
 where
   E: AsRef<Expression<'a>>,
 {
   match Scope::lookup(scope, identifier) {
-    Some(Symbol::Function(..)) => Err(vec![SemanticError::WrongUseOfFunction { span, identifier: identifier.clone() }]),
+    Some(Symbol::Function(..)) => Err(vec![SemanticError::WrongUseOfFunction { span: span.clone(), identifier: identifier.clone() }]),
     Some(Symbol::Variable(.., size)) => check_variable_boxed_index(identifier, span, size, index_expression),
-    None => Err(vec![SemanticError::NotDeclared { span, identifier: identifier.clone() }]),
+    None => Err(vec![SemanticError::NotDeclared { span: span.clone(), identifier: identifier.clone() }]),
   }
 }
 
@@ -264,10 +264,10 @@ pub fn index_bounds_check<'a>(
   index: usize,
   size: usize,
   identifier: &Identifier,
-  span: &'a Span<'_>,
+  span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   if index as usize >= size {
-    Err(vec![SemanticError::IndexOutOfBounds { span: &span, identifier: identifier.clone(), size, actual: index }])
+    Err(vec![SemanticError::IndexOutOfBounds { span: span.clone(), identifier: identifier.clone(), size, actual: index }])
   } else {
     Ok(())
   }
@@ -275,9 +275,9 @@ pub fn index_bounds_check<'a>(
 
 pub fn check_variable_boxed_index<'a, E>(
   identifier: &Identifier,
-  span: &'a Span<'_>,
+  span: &Span<'a>,
   size: Option<usize>,
-  index_expression: &'a Option<E>,
+  index_expression: &Option<E>,
 ) -> Result<(), Vec<SemanticError<'a>>>
 where
   E: AsRef<Expression<'a>>,
@@ -290,16 +290,16 @@ where
         Ok(())
       }
     }
-    (None, Some(_)) => Err(vec![SemanticError::ArrayError { span, identifier: identifier.clone() }]),
+    (None, Some(_)) => Err(vec![SemanticError::ArrayError { span: span.clone(), identifier: identifier.clone() }]),
     _ => Ok(()),
   }
 }
 
 pub fn check_variable_index<'a>(
   identifier: &Identifier,
-  span: &'a Span<'_>,
+  span: &Span<'a>,
   size: Option<usize>,
-  index_expression: &'a Option<Expression<'a>>,
+  index_expression: &Option<Expression<'a>>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match (size, index_expression) {
     (Some(size), Some(index_expression)) => {
@@ -309,24 +309,24 @@ pub fn check_variable_index<'a>(
         Ok(())
       }
     }
-    (None, Some(_)) => Err(vec![SemanticError::ArrayError { span, identifier: identifier.clone() }]),
+    (None, Some(_)) => Err(vec![SemanticError::ArrayError { span: span.clone(), identifier: identifier.clone() }]),
     _ => Ok(()),
   }
 }
 
 pub fn check_condition<'a>(
   scope: &Rc<RefCell<Scope>>,
-  condition: &'a Expression<'a>,
-  span: &'a Span<'_>,
+  condition: &Expression<'a>,
+  span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   let mut res = if let Some(condition_ty) = get_expression_type(scope, condition) {
     if condition_ty != Ty::Bool {
-      Err(vec![SemanticError::InvalidConditionType { span, actual: condition_ty }])
+      Err(vec![SemanticError::InvalidConditionType { span: span.clone(), actual: condition_ty }])
     } else {
       Ok(())
     }
   } else {
-    Err(vec![SemanticError::InvalidCondition { span }])
+    Err(vec![SemanticError::InvalidCondition { span: span.clone() }])
   };
 
   extend_errors!(res, condition.check_semantics(scope));
@@ -337,10 +337,10 @@ pub fn check_condition<'a>(
 pub fn check_function_identifier_available<'a>(
   scope: &Rc<RefCell<Scope>>,
   identifier: &Identifier,
-  span: &'a Span<'_>,
+  span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   if Scope::lookup(scope, identifier).is_some() {
-    Err(vec![SemanticError::AlreadyDeclared { span, identifier: identifier.clone() }])
+    Err(vec![SemanticError::AlreadyDeclared { span: span.clone(), identifier: identifier.clone() }])
   } else {
     Ok(())
   }
@@ -349,26 +349,26 @@ pub fn check_function_identifier_available<'a>(
 pub fn check_function_call<'a>(
   scope: &Rc<RefCell<Scope>>,
   identifier: &Identifier,
-  span: &'a Span<'_>,
-  arguments: &'a [Expression<'a>],
+  span: &Span<'a>,
+  arguments: &[Expression<'a>],
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match Scope::lookup(scope, identifier) {
     Some(Symbol::Function(..)) => check_function_call_arguments(scope, identifier, span, arguments),
-    Some(Symbol::Variable(..)) => Err(vec![SemanticError::NotAFunction { span, identifier: identifier.clone() }]),
-    None => Err(vec![SemanticError::NotDeclared { span, identifier: identifier.clone() }]),
+    Some(Symbol::Variable(..)) => Err(vec![SemanticError::NotAFunction { span: span.clone(), identifier: identifier.clone() }]),
+    None => Err(vec![SemanticError::NotDeclared { span: span.clone(), identifier: identifier.clone() }]),
   }
 }
 
 pub fn check_function_call_arguments<'a>(
   scope: &Rc<RefCell<Scope>>,
   identifier: &Identifier,
-  span: &'a Span<'_>,
-  arguments: &'a [Expression<'a>],
+  span: &Span<'a>,
+  arguments: &[Expression<'a>],
 ) -> Result<(), Vec<SemanticError<'a>>> {
   if let Some(Symbol::Function(_, args)) = Scope::lookup(scope, identifier) {
     if args.len() != arguments.len() {
       return Err(vec![SemanticError::InvalidAmountOfArguments {
-        span,
+        span: span.clone(),
         identifier: identifier.clone(),
         expected: args.len(),
         actual: arguments.len(),
@@ -394,19 +394,19 @@ pub fn check_function_call_arguments<'a>(
 pub fn check_function_call_argument_type<'a>(
   scope: &Rc<RefCell<Scope>>,
   symbol_arg: &(Ty, Option<usize>),
-  arg_expression: &'a Expression<'a>,
+  arg_expression: &Expression<'a>,
   identifier: &Identifier,
-  span: &'a Span<'_>,
+  span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   if arg_expression.check_semantics(scope).is_err() {
-    return Err(vec![SemanticError::InvalidArgument { span, identifier: identifier.clone() }]);
+    return Err(vec![SemanticError::InvalidArgument { span: span.clone(), identifier: identifier.clone() }]);
   }
 
   let ty = get_expression_type(scope, arg_expression);
 
   if ty != Some(symbol_arg.0) {
     return Err(vec![SemanticError::InvalidArgumentType {
-      span,
+      span: span.clone(),
       identifier: identifier.clone(),
       expected: symbol_arg.0,
       actual: ty,
@@ -418,9 +418,9 @@ pub fn check_function_call_argument_type<'a>(
 
 pub fn check_unary_expression<'a>(
   scope: &Rc<RefCell<Scope>>,
-  op: &'a UnaryOp,
-  expression: &'a Expression<'a>,
-  span: &'a Span<'_>,
+  op: &UnaryOp,
+  expression: &Expression<'a>,
+  span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   let mut res = Ok(());
 
@@ -457,10 +457,10 @@ pub fn check_unary_expression<'a>(
 
 pub fn check_binary_expression<'a>(
   scope: &Rc<RefCell<Scope>>,
-  op: &'a BinaryOp,
-  lhs: &'a Expression<'a>,
-  rhs: &'a Expression<'a>,
-  span: &'a Span<'_>,
+  op: &BinaryOp,
+  lhs: &Expression<'a>,
+  rhs: &Expression<'a>,
+  span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   let mut res = Ok(());
 
@@ -471,7 +471,7 @@ pub fn check_binary_expression<'a>(
   let rhs_ty = get_expression_type(scope, rhs);
 
   if (lhs_ty != rhs_ty) || lhs_ty.is_none() || rhs_ty.is_none() {
-    push_error!(res, SemanticError::BinaryOperatorTypeError { span, op, lhs_ty, rhs_ty });
+    push_error!(res, SemanticError::BinaryOperatorTypeError { span: span.clone(), op: *op, lhs_ty, rhs_ty });
   } else {
     extend_errors!(res, check_binary_operator_compatibility(op, lhs_ty, rhs_ty, span));
   }
@@ -480,65 +480,65 @@ pub fn check_binary_expression<'a>(
 }
 
 pub fn check_unary_operator_compatability<'a>(
-  op: &'a UnaryOp,
+  op: &UnaryOp,
   ty: Ty,
-  span: &'a Span<'_>,
+  span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match ty {
-    Ty::Bool if *op == UnaryOp::Minus => Err(vec![SemanticError::UnaryOperatorTypeError { span, op, ty }]),
-    Ty::Int | Ty::Float if *op == UnaryOp::Not => Err(vec![SemanticError::UnaryOperatorTypeError { span, op, ty }]),
-    Ty::String => Err(vec![SemanticError::UnaryOperatorTypeError { span, op, ty }]),
+    Ty::Bool if *op == UnaryOp::Minus => Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op: *op, ty }]),
+    Ty::Int | Ty::Float if *op == UnaryOp::Not => Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op: *op, ty }]),
+    Ty::String => Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op: *op, ty }]),
     _ => Ok(()),
   }
 }
 
 pub fn check_binary_operator_compatibility<'a>(
-  op: &'a BinaryOp,
+  op: &BinaryOp,
   lhs_ty: Option<Ty>,
   rhs_ty: Option<Ty>,
-  span: &'a Span<'_>,
+  span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match lhs_ty.expect("no ty") {
     Ty::Bool if [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(op) => {
-      Err(vec![SemanticError::BinaryOperatorTypeError { span, op, lhs_ty, rhs_ty }])
+      Err(vec![SemanticError::BinaryOperatorTypeError { span: span.clone(), op: *op, lhs_ty, rhs_ty }])
     }
     Ty::Int | Ty::Float if [BinaryOp::Land, BinaryOp::Lor].contains(op) => {
-      Err(vec![SemanticError::BinaryOperatorTypeError { span, op, lhs_ty, rhs_ty }])
+      Err(vec![SemanticError::BinaryOperatorTypeError { span: span.clone(), op: *op, lhs_ty, rhs_ty }])
     }
     Ty::String if ![BinaryOp::Eq, BinaryOp::Neq].contains(op) => {
-      Err(vec![SemanticError::BinaryOperatorTypeError { span, op, lhs_ty, rhs_ty }])
+      Err(vec![SemanticError::BinaryOperatorTypeError { span: span.clone(), op: *op, lhs_ty, rhs_ty }])
     }
     _ => Ok(()),
   }
 }
 
 pub fn check_unary_operator_combination<'a>(
-  inner: &'a UnaryOp,
-  outer: &'a UnaryOp,
-  span: &'a Span<'_>,
+  inner: &UnaryOp,
+  outer: &UnaryOp,
+  span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match outer {
     UnaryOp::Not if *inner == UnaryOp::Minus => {
-      Err(vec![SemanticError::UnaryOperatorCombinationError { span, inner, outer }])
+      Err(vec![SemanticError::UnaryOperatorCombinationError { span: span.clone(), inner: *inner, outer: *outer }])
     }
     UnaryOp::Minus if *inner == UnaryOp::Not => {
-      Err(vec![SemanticError::UnaryOperatorCombinationError { span, inner, outer }])
+      Err(vec![SemanticError::UnaryOperatorCombinationError { span: span.clone(), inner: *inner, outer: *outer }])
     }
     _ => Ok(()),
   }
 }
 
 pub fn check_operator_combination<'a>(
-  unary_op: &'a UnaryOp,
-  binary_op: &'a BinaryOp,
-  span: &'a Span<'_>,
+  unary_op: &UnaryOp,
+  binary_op: &BinaryOp,
+  span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match unary_op {
     UnaryOp::Not if [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(binary_op) => {
-      Err(vec![SemanticError::OperatorCombinationError { span, unary_op, binary_op }])
+      Err(vec![SemanticError::OperatorCombinationError { span: span.clone(), unary_op: *unary_op, binary_op: *binary_op }])
     }
     UnaryOp::Minus if ![BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(binary_op) => {
-      Err(vec![SemanticError::OperatorCombinationError { span, unary_op, binary_op }])
+      Err(vec![SemanticError::OperatorCombinationError { span: span.clone(), unary_op: *unary_op, binary_op: *binary_op }])
     }
     _ => Ok(()),
   }

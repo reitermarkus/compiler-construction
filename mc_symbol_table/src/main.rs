@@ -1,7 +1,9 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
 use std::fs::File;
-use std::io::stdout;
+use std::io::{stdin, stdout, Read};
+use std::path::{Path, PathBuf};
+use std::process::exit;
 
 use clap::{value_t, App, Arg};
 use mc_symbol_table::mc_symbol_table;
@@ -17,11 +19,30 @@ fn main() -> std::io::Result<()> {
     .get_matches();
 
   let out_file = value_t!(matches, "output", String).ok();
-  let in_file = value_t!(matches, "file", String).unwrap();
+  let in_file = value_t!(matches, "file", PathBuf).unwrap();
 
-  if let Some(out_file) = out_file.map(File::create) {
-    mc_symbol_table(in_file, out_file?)
+  let mut contents = String::new();
+  if in_file == Path::new("-") {
+    stdin().read_to_string(&mut contents)?;
   } else {
-    mc_symbol_table(in_file, stdout())
+    File::open(in_file)?.read_to_string(&mut contents)?;
+  }
+
+  let table = mc_symbol_table(&contents);
+
+  match table {
+    Ok(table) => {
+      if let Some(out_file) = out_file.map(File::create) {
+        table.print(&mut out_file?)?;
+      } else {
+        table.print(&mut stdout())?;
+      };
+
+      Ok(())
+    },
+    Err(err) => {
+      eprintln!("{:?}", err);
+      exit(1);
+    }
   }
 }

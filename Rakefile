@@ -39,6 +39,14 @@ task :symbol_table, [:example] do |example: '*'|
   end
 end
 
+desc 'show error output for failing examples'
+task :failures, [:example] do |example: '*'|
+  Pathname.glob("#{__dir__}/faliures/#{example}.mc").each do |mc|
+    txt = mc.sub_ext('.txt')
+    cargo_run 'mc_symbol_table', '-o', txt.to_s, mc.to_s
+  end
+end
+
 desc 'generate IR for all examples'
 task :ir, [:example] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
