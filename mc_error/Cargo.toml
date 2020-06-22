@@ -1,0 +1,9 @@
+[package]
+name = "mc_error"
+version = "0.1.0"
+authors = ["Lukas Dötlinger <lukas.doetlinger@student.uibk.ac.at>"]
+edition = "2018"
+
+[dependencies]
+from-pest = "0.3"
+mc_parser = { path = "../mc_parser" }

@@ -354,6 +354,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "mc_error"
+version = "0.1.0"
+dependencies = [
+ "from-pest",
+ "mc_parser",
+]
+
+[[package]]
 name = "mc_ir"
 version = "0.1.0"
 dependencies = [

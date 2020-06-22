@@ -7,4 +7,5 @@ members = [
   "mc_ir",
   "mc_cfg_to_dot",
   "mc_asm",
+  "mc_error",
 ]
