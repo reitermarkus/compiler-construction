@@ -1,4 +1,5 @@
-use std::io::{self, sink};
+use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use mc_symbol_table::mc_symbol_table;
@@ -14,7 +15,8 @@ fn integration_test() -> io::Result<()> {
 
     if mc_file.exists() {
       eprintln!("{}", mc_file.display());
-      mc_symbol_table(mc_file, sink())?;
+      let contents = fs::read_to_string(mc_file)?;
+      mc_symbol_table(&contents).expect("failed to generate symbol table");
     }
   }
 
