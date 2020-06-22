@@ -62,9 +62,7 @@ impl<'a> CheckSemantics<'a> for Assignment<'a> {
           }
         };
       }
-      None => {
-        push_error!(res, SemanticError::NotDeclared { span: self.span.clone(), identifier: self.identifier.clone() })
-      }
+      None => {}
     };
 
     extend_errors!(res, check_variable(scope, &self.identifier, &self.span, &self.index_expression));
