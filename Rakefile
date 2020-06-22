@@ -74,7 +74,7 @@ task :asm, [:example] do |example: '*'|
 end
 
 desc 'compile all examples'
-task :compile, [:example] => [:build_gcc_docker_image] do |example: '*'|
+task :compile, [:example] => [:build_ubuntu_docker_image] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
     dir = Pathname.pwd
     mc = Pathname(mc).relative_path_from(dir)
@@ -88,11 +88,16 @@ def run_example(mc, tty: false)
   dir = Pathname.pwd
   mc = Pathname(mc).relative_path_from(dir)
   bin = mc.sub_ext('.bin')
-  ['docker', 'run', '--rm', '-i', *(tty ? '-t' : nil ), '-v', "#{dir}:/project", '-w', '/project', ENV['MCC_DOCKER_IMAGE'], "./#{bin}"]
+
+  if docker_image = ENV['MCC_DOCKER_IMAGE']
+    ['docker', 'run', '--rm', '-i', *(tty ? '-t' : nil ), '-v', "#{dir}:/project", '-w', '/project', docker_image, "./#{bin}"]
+  else
+    ["./#{dir}/#{bin}"]
+  end
 end
 
 desc 'run all examples'
-task :run, [:example] => [:build_gcc_docker_image, :compile] do |example: '*'|
+task :run, [:example] => [:build_ubuntu_docker_image, :compile] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
     system *run_example(mc, tty: STDIN.tty?)
     exit($CHILD_STATUS.exitstatus) unless $CHILD_STATUS.success?
@@ -100,7 +105,7 @@ task :run, [:example] => [:build_gcc_docker_image, :compile] do |example: '*'|
 end
 
 desc 'test all examples'
-task :test, [:example] => [:build_gcc_docker_image, :compile] do |example: '*'|
+task :test, [:example] => [:build_ubuntu_docker_image, :compile] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
     example_name = mc.sub_ext('').basename
 
@@ -146,8 +151,15 @@ task :test, [:example] => [:build_gcc_docker_image, :compile] do |example: '*'|
   end
 end
 
-desc 'build GCC Docker image'
-task :build_gcc_docker_image do
+desc 'build Ubuntu 20.04 Docker image'
+task :build_ubuntu_docker_image do
+  begin
+    stdout, *_ = Open3.capture3('lsb_release', '-a')
+    next if stdout.match?(/\bUbuntu\s+20.04\b/)
+  rescue Errno::ENOENT
+    # Ignore.
+  end
+
   ENV['MCC_DOCKER_IMAGE'] = 'gcc'
   sh 'docker', 'build', '-t', ENV['MCC_DOCKER_IMAGE'], '-f', 'Dockerfile.gcc', '.'
 end
