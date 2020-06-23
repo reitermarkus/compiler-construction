@@ -5,6 +5,8 @@ use std::process::exit;
 
 use either::Either;
 
+pub mod error;
+
 /// Try opening an input file for reading, otherwise print an error and exit.
 pub fn input(in_file: PathBuf) -> impl Read {
   if in_file == Path::new("-") {

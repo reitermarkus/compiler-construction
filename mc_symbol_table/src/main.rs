@@ -2,6 +2,7 @@
 
 use std::io;
 use std::path::PathBuf;
+use std::process::exit;
 
 use clap::{value_t, App, Arg};
 
@@ -22,7 +23,9 @@ fn main() -> io::Result<()> {
 
   let input = input(in_file);
   let output = output(out_file);
-  mc_symbol_table::cli(input, output)?;
+  if let Err(exit_status) = mc_symbol_table::cli(input, output) {
+    exit(exit_status);
+  }
 
   Ok(())
 }

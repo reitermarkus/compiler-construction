@@ -366,6 +366,7 @@ dependencies = [
  "either",
  "from-pest",
  "mc_parser",
+ "pest",
 ]
 
 [[package]]

@@ -4,6 +4,7 @@ use std::rc::Rc;
 use pest::Span;
 
 use mc_parser::ast::*;
+use mc_common::error::*;
 
 use super::extend_errors;
 use crate::*;

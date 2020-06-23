@@ -7,4 +7,5 @@ edition = "2018"
 [dependencies]
 either = "1"
 from-pest = "0.3"
+pest = "2.1"
 mc_parser = { path = "../mc_parser" }
