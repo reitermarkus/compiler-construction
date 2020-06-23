@@ -776,16 +776,6 @@
 <span id="776">776</span>
 <span id="777">777</span>
 <span id="778">778</span>
-<span id="779">779</span>
-<span id="780">780</span>
-<span id="781">781</span>
-<span id="782">782</span>
-<span id="783">783</span>
-<span id="784">784</span>
-<span id="785">785</span>
-<span id="786">786</span>
-<span id="787">787</span>
-<span id="788">788</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">cell</span>::<span class="ident">RefCell</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">rc</span>::<span class="ident">Rc</span>;
@@ -1272,7 +1262,7 @@
   <span class="kw">let</span> <span class="ident">rhs_ty</span> <span class="op">=</span> <span class="ident">get_expression_type</span>(<span class="ident">scope</span>, <span class="ident">rhs</span>);
 
   <span class="kw">if</span> (<span class="ident">lhs_ty</span> <span class="op">!</span><span class="op">=</span> <span class="ident">rhs_ty</span>) <span class="op">|</span><span class="op">|</span> <span class="ident">lhs_ty</span>.<span class="ident">is_none</span>() <span class="op">|</span><span class="op">|</span> <span class="ident">rhs_ty</span>.<span class="ident">is_none</span>() {
-    <span class="macro">push_error</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">SemanticError</span>::<span class="ident">BinaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>: <span class="ident">op</span>, <span class="ident">lhs_ty</span>, <span class="ident">rhs_ty</span> });
+    <span class="macro">push_error</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">SemanticError</span>::<span class="ident">BinaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>, <span class="ident">lhs_ty</span>, <span class="ident">rhs_ty</span> });
   } <span class="kw">else</span> {
     <span class="macro">extend_errors</span><span class="macro">!</span>(<span class="ident">res</span>, <span class="ident">check_binary_operator_compatibility</span>(<span class="ident">op</span>, <span class="ident">lhs_ty</span>, <span class="ident">rhs_ty</span>, <span class="ident">span</span>));
   }
@@ -1286,13 +1276,11 @@
   <span class="ident">span</span>: <span class="kw-2">&amp;</span><span class="ident">Span</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SemanticError</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
   <span class="kw">match</span> <span class="ident">ty</span> {
-    <span class="ident">Ty</span>::<span class="ident">Bool</span> <span class="kw">if</span> <span class="ident">op</span> <span class="op">=</span><span class="op">=</span> <span class="ident">UnaryOp</span>::<span class="ident">Minus</span> <span class="op">=</span><span class="op">&gt;</span> {
-      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">UnaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>: <span class="ident">op</span>, <span class="ident">ty</span> }])
-    }
+    <span class="ident">Ty</span>::<span class="ident">Bool</span> <span class="kw">if</span> <span class="ident">op</span> <span class="op">=</span><span class="op">=</span> <span class="ident">UnaryOp</span>::<span class="ident">Minus</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">UnaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>, <span class="ident">ty</span> }]),
     <span class="ident">Ty</span>::<span class="ident">Int</span> <span class="op">|</span> <span class="ident">Ty</span>::<span class="ident">Float</span> <span class="kw">if</span> <span class="ident">op</span> <span class="op">=</span><span class="op">=</span> <span class="ident">UnaryOp</span>::<span class="ident">Not</span> <span class="op">=</span><span class="op">&gt;</span> {
-      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">UnaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>: <span class="ident">op</span>, <span class="ident">ty</span> }])
+      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">UnaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>, <span class="ident">ty</span> }])
     }
-    <span class="ident">Ty</span>::<span class="ident">String</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">UnaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>: <span class="ident">op</span>, <span class="ident">ty</span> }]),
+    <span class="ident">Ty</span>::<span class="ident">String</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">UnaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>, <span class="ident">ty</span> }]),
     <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(()),
   }
 }
@@ -1305,13 +1293,13 @@
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SemanticError</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
   <span class="kw">match</span> <span class="ident">lhs_ty</span>.<span class="ident">expect</span>(<span class="string">&quot;no ty&quot;</span>) {
     <span class="ident">Ty</span>::<span class="ident">Bool</span> <span class="kw">if</span> [<span class="ident">BinaryOp</span>::<span class="ident">Divide</span>, <span class="ident">BinaryOp</span>::<span class="ident">Times</span>, <span class="ident">BinaryOp</span>::<span class="ident">Minus</span>, <span class="ident">BinaryOp</span>::<span class="ident">Plus</span>].<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">op</span>) <span class="op">=</span><span class="op">&gt;</span> {
-      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">BinaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>: <span class="ident">op</span>, <span class="ident">lhs_ty</span>, <span class="ident">rhs_ty</span> }])
+      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">BinaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>, <span class="ident">lhs_ty</span>, <span class="ident">rhs_ty</span> }])
     }
     <span class="ident">Ty</span>::<span class="ident">Int</span> <span class="op">|</span> <span class="ident">Ty</span>::<span class="ident">Float</span> <span class="kw">if</span> [<span class="ident">BinaryOp</span>::<span class="ident">Land</span>, <span class="ident">BinaryOp</span>::<span class="ident">Lor</span>].<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">op</span>) <span class="op">=</span><span class="op">&gt;</span> {
-      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">BinaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>: <span class="ident">op</span>, <span class="ident">lhs_ty</span>, <span class="ident">rhs_ty</span> }])
+      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">BinaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>, <span class="ident">lhs_ty</span>, <span class="ident">rhs_ty</span> }])
     }
     <span class="ident">Ty</span>::<span class="ident">String</span> <span class="kw">if</span> <span class="op">!</span>[<span class="ident">BinaryOp</span>::<span class="ident">Eq</span>, <span class="ident">BinaryOp</span>::<span class="ident">Neq</span>].<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">op</span>) <span class="op">=</span><span class="op">&gt;</span> {
-      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">BinaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>: <span class="ident">op</span>, <span class="ident">lhs_ty</span>, <span class="ident">rhs_ty</span> }])
+      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">BinaryOperatorTypeError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">op</span>, <span class="ident">lhs_ty</span>, <span class="ident">rhs_ty</span> }])
     }
     <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(()),
   }
@@ -1324,10 +1312,10 @@
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SemanticError</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
   <span class="kw">match</span> <span class="ident">outer</span> {
     <span class="ident">UnaryOp</span>::<span class="ident">Not</span> <span class="kw">if</span> <span class="ident">inner</span> <span class="op">=</span><span class="op">=</span> <span class="ident">UnaryOp</span>::<span class="ident">Minus</span> <span class="op">=</span><span class="op">&gt;</span> {
-      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">UnaryOperatorCombinationError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">inner</span>: <span class="ident">inner</span>, <span class="ident">outer</span>: <span class="ident">outer</span> }])
+      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">UnaryOperatorCombinationError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">inner</span>, <span class="ident">outer</span> }])
     }
     <span class="ident">UnaryOp</span>::<span class="ident">Minus</span> <span class="kw">if</span> <span class="ident">inner</span> <span class="op">=</span><span class="op">=</span> <span class="ident">UnaryOp</span>::<span class="ident">Not</span> <span class="op">=</span><span class="op">&gt;</span> {
-      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">UnaryOperatorCombinationError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">inner</span>: <span class="ident">inner</span>, <span class="ident">outer</span>: <span class="ident">outer</span> }])
+      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">UnaryOperatorCombinationError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">inner</span>, <span class="ident">outer</span> }])
     }
     <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(()),
   }
@@ -1340,18 +1328,10 @@
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span>(), <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SemanticError</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
   <span class="kw">match</span> <span class="ident">unary_op</span> {
     <span class="ident">UnaryOp</span>::<span class="ident">Not</span> <span class="kw">if</span> [<span class="ident">BinaryOp</span>::<span class="ident">Divide</span>, <span class="ident">BinaryOp</span>::<span class="ident">Times</span>, <span class="ident">BinaryOp</span>::<span class="ident">Minus</span>, <span class="ident">BinaryOp</span>::<span class="ident">Plus</span>].<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">binary_op</span>) <span class="op">=</span><span class="op">&gt;</span> {
-      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">OperatorCombinationError</span> {
-        <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(),
-        <span class="ident">unary_op</span>: <span class="ident">unary_op</span>,
-        <span class="ident">binary_op</span>: <span class="ident">binary_op</span>,
-      }])
+      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">OperatorCombinationError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">unary_op</span>, <span class="ident">binary_op</span> }])
     }
     <span class="ident">UnaryOp</span>::<span class="ident">Minus</span> <span class="kw">if</span> <span class="op">!</span>[<span class="ident">BinaryOp</span>::<span class="ident">Divide</span>, <span class="ident">BinaryOp</span>::<span class="ident">Times</span>, <span class="ident">BinaryOp</span>::<span class="ident">Minus</span>, <span class="ident">BinaryOp</span>::<span class="ident">Plus</span>].<span class="ident">contains</span>(<span class="kw-2">&amp;</span><span class="ident">binary_op</span>) <span class="op">=</span><span class="op">&gt;</span> {
-      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">OperatorCombinationError</span> {
-        <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(),
-        <span class="ident">unary_op</span>: <span class="ident">unary_op</span>,
-        <span class="ident">binary_op</span>: <span class="ident">binary_op</span>,
-      }])
+      <span class="prelude-val">Err</span>(<span class="macro">vec</span><span class="macro">!</span>[<span class="ident">SemanticError</span>::<span class="ident">OperatorCombinationError</span> { <span class="ident">span</span>: <span class="ident">span</span>.<span class="ident">clone</span>(), <span class="ident">unary_op</span>, <span class="ident">binary_op</span> }])
     }
     <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="prelude-val">Ok</span>(()),
   }
