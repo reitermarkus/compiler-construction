@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["mcc",""]]});
+initSidebarItems({"fn":[["cli",""]]});

@@ -84,15 +84,10 @@
 <span id="84">84</span>
 <span id="85">85</span>
 <span id="86">86</span>
-<span id="87">87</span>
-<span id="88">88</span>
-<span id="89">89</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="attribute">#![<span class="ident">deny</span>(<span class="ident">missing_debug_implementations</span>, <span class="ident">rust_2018_idioms</span>)]</span>
 
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">env</span>::<span class="ident">current_dir</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fs</span>::<span class="ident">File</span>;
-<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::{<span class="ident">prelude</span>::<span class="kw-2">*</span>, <span class="ident">stdin</span>};
+<span class="kw">use</span> <span class="ident">std</span>::<span class="ident">io</span>::{<span class="ident">Read</span>, <span class="ident">Write</span>};
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">path</span>::<span class="ident">Path</span>;
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">process</span>::{<span class="ident">exit</span>, <span class="ident">Command</span>, <span class="ident">Stdio</span>};
 
@@ -101,21 +96,15 @@
 <span class="kw">use</span> <span class="ident">mc_ir</span>::<span class="ident">AddToIr</span>;
 <span class="kw">use</span> <span class="ident">mc_ir</span>::<span class="ident">IntermediateRepresentation</span>;
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mcc</span>(
-  <span class="ident">in_file</span>: <span class="kw">impl</span> <span class="ident">AsRef</span><span class="op">&lt;</span><span class="ident">Path</span><span class="op">&gt;</span>,
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">cli</span>(
+  <span class="kw-2">mut</span> <span class="ident">input</span>: <span class="kw">impl</span> <span class="ident">Read</span>,
   <span class="ident">out_file</span>: <span class="kw">impl</span> <span class="ident">AsRef</span><span class="op">&lt;</span><span class="ident">Path</span><span class="op">&gt;</span>,
   <span class="ident">backend</span>: <span class="ident">String</span>,
   <span class="ident">docker_image</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">String</span><span class="op">&gt;</span>,
   <span class="ident">quiet</span>: <span class="ident">bool</span>,
 ) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">std</span>::<span class="ident">io</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> {
   <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">contents</span> <span class="op">=</span> <span class="ident">String</span>::<span class="ident">new</span>();
-
-  <span class="kw">if</span> <span class="ident">in_file</span>.<span class="ident">as_ref</span>() <span class="op">=</span><span class="op">=</span> <span class="ident">Path</span>::<span class="ident">new</span>(<span class="string">&quot;-&quot;</span>) {
-    <span class="ident">stdin</span>().<span class="ident">read_to_string</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">contents</span>)<span class="question-mark">?</span>;
-  } <span class="kw">else</span> {
-    <span class="kw">let</span> <span class="ident">in_file</span> <span class="op">=</span> <span class="ident">in_file</span>.<span class="ident">as_ref</span>().<span class="ident">canonicalize</span>()<span class="question-mark">?</span>;
-    <span class="ident">File</span>::<span class="ident">open</span>(<span class="kw-2">&amp;</span><span class="ident">in_file</span>)<span class="question-mark">?</span>.<span class="ident">read_to_string</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">contents</span>)<span class="question-mark">?</span>;
-  };
+  <span class="ident">input</span>.<span class="ident">read_to_string</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">contents</span>)<span class="question-mark">?</span>;
 
   <span class="kw">let</span> <span class="ident">ast</span> <span class="op">=</span> <span class="ident">mc_parser</span>::<span class="ident">parse</span>(<span class="kw-2">&amp;</span><span class="ident">contents</span>).<span class="ident">expect</span>(<span class="string">&quot;failed to parse program&quot;</span>);
 
@@ -130,6 +119,8 @@
 
   <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">command</span>;
 
+  <span class="kw">let</span> <span class="ident">common_flags</span> <span class="op">=</span> [<span class="string">&quot;-m32&quot;</span>, <span class="string">&quot;-x&quot;</span>, <span class="string">&quot;assembler&quot;</span>, <span class="string">&quot;-&quot;</span>];
+
   <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">docker_image</span>) <span class="op">=</span> <span class="ident">docker_image</span> {
     <span class="ident">command</span> <span class="op">=</span> <span class="ident">Command</span>::<span class="ident">new</span>(<span class="string">&quot;docker&quot;</span>);
 
@@ -138,23 +129,26 @@
     <span class="ident">command</span>.<span class="ident">arg</span>(<span class="string">&quot;-i&quot;</span>);
 
     <span class="ident">command</span>.<span class="ident">arg</span>(<span class="string">&quot;-v&quot;</span>);
-    <span class="ident">command</span>.<span class="ident">arg</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}:/project&quot;</span>, <span class="ident">current_dir</span>().<span class="ident">unwrap</span>().<span class="ident">display</span>()));
+
+    <span class="kw">let</span> <span class="ident">out_file</span> <span class="op">=</span> <span class="ident">out_file</span>.<span class="ident">as_ref</span>();
+    <span class="kw">let</span> <span class="ident">out_dir</span> <span class="op">=</span> <span class="ident">out_file</span>.<span class="ident">parent</span>().<span class="ident">unwrap_or</span>(<span class="kw-2">&amp;</span><span class="ident">out_file</span>).<span class="ident">canonicalize</span>()<span class="question-mark">?</span>;
+    <span class="ident">command</span>.<span class="ident">arg</span>(<span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{}:/project&quot;</span>, <span class="ident">out_dir</span>.<span class="ident">display</span>()));
+    <span class="kw">let</span> <span class="ident">out_file</span> <span class="op">=</span> <span class="ident">out_file</span>.<span class="ident">file_name</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">n</span><span class="op">|</span> <span class="ident">Path</span>::<span class="ident">new</span>(<span class="ident">n</span>)).<span class="ident">unwrap_or</span>(<span class="ident">out_file</span>);
 
     <span class="ident">command</span>.<span class="ident">arg</span>(<span class="string">&quot;-w&quot;</span>);
     <span class="ident">command</span>.<span class="ident">arg</span>(<span class="string">&quot;/project&quot;</span>);
 
     <span class="ident">command</span>.<span class="ident">arg</span>(<span class="ident">docker_image</span>);
     <span class="ident">command</span>.<span class="ident">arg</span>(<span class="ident">backend</span>);
+    <span class="ident">command</span>.<span class="ident">args</span>(<span class="kw-2">&amp;</span><span class="ident">common_flags</span>);
+    <span class="ident">command</span>.<span class="ident">arg</span>(<span class="string">&quot;-o&quot;</span>);
+    <span class="ident">command</span>.<span class="ident">args</span>(<span class="ident">out_file</span>);
   } <span class="kw">else</span> {
-    <span class="ident">command</span> <span class="op">=</span> <span class="ident">Command</span>::<span class="ident">new</span>(<span class="ident">backend</span>)
+    <span class="ident">command</span> <span class="op">=</span> <span class="ident">Command</span>::<span class="ident">new</span>(<span class="ident">backend</span>);
+    <span class="ident">command</span>.<span class="ident">args</span>(<span class="kw-2">&amp;</span><span class="ident">common_flags</span>);
+    <span class="ident">command</span>.<span class="ident">arg</span>(<span class="string">&quot;-o&quot;</span>);
+    <span class="ident">command</span>.<span class="ident">arg</span>(<span class="ident">out_file</span>.<span class="ident">as_ref</span>());
   }
-
-  <span class="ident">command</span>.<span class="ident">arg</span>(<span class="string">&quot;-m32&quot;</span>);
-  <span class="ident">command</span>.<span class="ident">arg</span>(<span class="string">&quot;-o&quot;</span>);
-  <span class="ident">command</span>.<span class="ident">arg</span>(<span class="ident">out_file</span>.<span class="ident">as_ref</span>());
-  <span class="ident">command</span>.<span class="ident">arg</span>(<span class="string">&quot;-x&quot;</span>);
-  <span class="ident">command</span>.<span class="ident">arg</span>(<span class="string">&quot;assembler&quot;</span>);
-  <span class="ident">command</span>.<span class="ident">arg</span>(<span class="string">&quot;-&quot;</span>);
 
   <span class="ident">command</span>.<span class="ident">stdin</span>(<span class="ident">Stdio</span>::<span class="ident">piped</span>());
   <span class="ident">command</span>.<span class="ident">stderr</span>(<span class="ident">stderr</span>);
