@@ -8,7 +8,6 @@ use clap::{value_t, App, Arg};
 
 use mc_common::{input, output};
 
-#[cfg_attr(tarpaulin, skip)]
 fn main() -> io::Result<()> {
   let matches = App::new("mC Symbol Table Viewer")
     .set_term_width(0)

@@ -7,7 +7,6 @@ use clap::{value_t, App, Arg};
 
 use mc_common::input;
 
-#[cfg_attr(tarpaulin, skip)]
 fn main() {
   let matches = App::new("mC Compiler")
     .set_term_width(0)
