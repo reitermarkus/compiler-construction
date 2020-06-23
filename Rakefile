@@ -92,7 +92,7 @@ def run_example(mc, tty: false)
   if docker_image = ENV['MCC_DOCKER_IMAGE']
     ['docker', 'run', '--rm', '-i', *(tty ? '-t' : nil ), '-v', "#{dir}:/project", '-w', '/project', docker_image, "./#{bin}"]
   else
-    ["./#{dir}/#{bin}"]
+    ["./#{bin}"]
   end
 end
 
