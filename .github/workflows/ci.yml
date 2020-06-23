@@ -23,15 +23,6 @@ jobs:
             toolchain: 1.44.0
             override: true
             components: rustfmt, clippy
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-      - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-features --no-fail-fast
       - name: Format
         uses: actions-rs/cargo@v1
         with:
@@ -42,6 +33,15 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings -A clippy::unknown-clippy-lints
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-features --no-fail-fast
       - name: Test Examples
         run: rake test
       - name: Coverage
