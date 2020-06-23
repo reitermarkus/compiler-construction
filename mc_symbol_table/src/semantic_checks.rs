@@ -483,7 +483,7 @@ pub fn check_binary_expression<'a>(
   let rhs_ty = get_expression_type(scope, rhs);
 
   if (lhs_ty != rhs_ty) || lhs_ty.is_none() || rhs_ty.is_none() {
-    push_error!(res, SemanticError::BinaryOperatorTypeError { span: span.clone(), op: op, lhs_ty, rhs_ty });
+    push_error!(res, SemanticError::BinaryOperatorTypeError { span: span.clone(), op, lhs_ty, rhs_ty });
   } else {
     extend_errors!(res, check_binary_operator_compatibility(op, lhs_ty, rhs_ty, span));
   }
@@ -497,13 +497,11 @@ pub fn check_unary_operator_compatability<'a>(
   span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match ty {
-    Ty::Bool if op == UnaryOp::Minus => {
-      Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op: op, ty }])
-    }
+    Ty::Bool if op == UnaryOp::Minus => Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty }]),
     Ty::Int | Ty::Float if op == UnaryOp::Not => {
-      Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op: op, ty }])
+      Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty }])
     }
-    Ty::String => Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op: op, ty }]),
+    Ty::String => Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty }]),
     _ => Ok(()),
   }
 }
@@ -516,13 +514,13 @@ pub fn check_binary_operator_compatibility<'a>(
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match lhs_ty.expect("no ty") {
     Ty::Bool if [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(&op) => {
-      Err(vec![SemanticError::BinaryOperatorTypeError { span: span.clone(), op: op, lhs_ty, rhs_ty }])
+      Err(vec![SemanticError::BinaryOperatorTypeError { span: span.clone(), op, lhs_ty, rhs_ty }])
     }
     Ty::Int | Ty::Float if [BinaryOp::Land, BinaryOp::Lor].contains(&op) => {
-      Err(vec![SemanticError::BinaryOperatorTypeError { span: span.clone(), op: op, lhs_ty, rhs_ty }])
+      Err(vec![SemanticError::BinaryOperatorTypeError { span: span.clone(), op, lhs_ty, rhs_ty }])
     }
     Ty::String if ![BinaryOp::Eq, BinaryOp::Neq].contains(&op) => {
-      Err(vec![SemanticError::BinaryOperatorTypeError { span: span.clone(), op: op, lhs_ty, rhs_ty }])
+      Err(vec![SemanticError::BinaryOperatorTypeError { span: span.clone(), op, lhs_ty, rhs_ty }])
     }
     _ => Ok(()),
   }
@@ -535,10 +533,10 @@ pub fn check_unary_operator_combination<'a>(
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match outer {
     UnaryOp::Not if inner == UnaryOp::Minus => {
-      Err(vec![SemanticError::UnaryOperatorCombinationError { span: span.clone(), inner: inner, outer: outer }])
+      Err(vec![SemanticError::UnaryOperatorCombinationError { span: span.clone(), inner, outer }])
     }
     UnaryOp::Minus if inner == UnaryOp::Not => {
-      Err(vec![SemanticError::UnaryOperatorCombinationError { span: span.clone(), inner: inner, outer: outer }])
+      Err(vec![SemanticError::UnaryOperatorCombinationError { span: span.clone(), inner, outer }])
     }
     _ => Ok(()),
   }
@@ -551,18 +549,10 @@ pub fn check_operator_combination<'a>(
 ) -> Result<(), Vec<SemanticError<'a>>> {
   match unary_op {
     UnaryOp::Not if [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(&binary_op) => {
-      Err(vec![SemanticError::OperatorCombinationError {
-        span: span.clone(),
-        unary_op: unary_op,
-        binary_op: binary_op,
-      }])
+      Err(vec![SemanticError::OperatorCombinationError { span: span.clone(), unary_op, binary_op }])
     }
     UnaryOp::Minus if ![BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(&binary_op) => {
-      Err(vec![SemanticError::OperatorCombinationError {
-        span: span.clone(),
-        unary_op: unary_op,
-        binary_op: binary_op,
-      }])
+      Err(vec![SemanticError::OperatorCombinationError { span: span.clone(), unary_op, binary_op }])
     }
     _ => Ok(()),
   }
