@@ -4,11 +4,11 @@ use crate::ir::*;
 use mc_symbol_table::semantic_checks::FindReturnStatement;
 
 pub trait AddToIr<'a> {
-  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a>;
+  fn add_to_ir(&self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a>;
 }
 
 impl<'a> AddToIr<'a> for Assignment<'a> {
-  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+  fn add_to_ir(&self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     let (reference, ty) = ir.stack.lookup(&self.identifier).unwrap();
 
     let variable = if let Some(index_expression) = &self.index_expression {
@@ -26,7 +26,7 @@ impl<'a> AddToIr<'a> for Assignment<'a> {
 }
 
 impl<'a> AddToIr<'a> for Declaration<'a> {
-  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+  fn add_to_ir(&self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     ir.push(Op::Decl(self.identifier.clone(), self.ty, self.count));
 
     let reference = ir.statements.len() - 1;
@@ -36,7 +36,7 @@ impl<'a> AddToIr<'a> for Declaration<'a> {
 }
 
 impl<'a> AddToIr<'a> for Expression<'a> {
-  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+  fn add_to_ir(&self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     match self {
       Self::Literal { literal, .. } => Arg::Literal(literal.clone()),
       Self::Variable { identifier, index_expression, .. } => {
@@ -136,7 +136,7 @@ impl<'a> AddToIr<'a> for Expression<'a> {
 }
 
 impl<'a> AddToIr<'a> for Statement<'a> {
-  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+  fn add_to_ir(&self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     match self {
       Self::Assignment(assignment) => assignment.add_to_ir(ir),
       Self::Decl(declaration) => declaration.add_to_ir(ir),
@@ -150,7 +150,7 @@ impl<'a> AddToIr<'a> for Statement<'a> {
 }
 
 impl<'a> AddToIr<'a> for IfStatement<'a> {
-  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+  fn add_to_ir(&self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     let condition = self.condition.add_to_ir(ir);
 
     let jumpfalse_index = ir.statements.len();
@@ -183,7 +183,7 @@ impl<'a> AddToIr<'a> for IfStatement<'a> {
 }
 
 impl<'a> AddToIr<'a> for WhileStatement<'a> {
-  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+  fn add_to_ir(&self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     let condition_ref = Arg::Reference(None, ir.statements.len());
     let condition = self.condition.add_to_ir(ir);
 
@@ -201,7 +201,7 @@ impl<'a> AddToIr<'a> for WhileStatement<'a> {
 }
 
 impl<'a> AddToIr<'a> for ReturnStatement<'a> {
-  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+  fn add_to_ir(&self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     if let Some(expression) = &self.expression {
       let to_return = expression.add_to_ir(ir);
       ir.push(Op::Return(Some(to_return)));
@@ -214,7 +214,7 @@ impl<'a> AddToIr<'a> for ReturnStatement<'a> {
 }
 
 impl<'a> AddToIr<'a> for CompoundStatement<'a> {
-  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+  fn add_to_ir(&self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     let ptr = ir.stack.ptr();
 
     for stmt in &self.statements {
@@ -231,7 +231,7 @@ impl<'a> AddToIr<'a> for CompoundStatement<'a> {
 }
 
 impl<'a> AddToIr<'a> for FunctionDeclaration<'a> {
-  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+  fn add_to_ir(&self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     let ptr = ir.stack.ptr();
 
     let start_index = ir.statements.len();
@@ -254,7 +254,7 @@ impl<'a> AddToIr<'a> for FunctionDeclaration<'a> {
 }
 
 impl<'a> AddToIr<'a> for Program<'a> {
-  fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
+  fn add_to_ir(&self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     for function in &self.function_declarations {
       ir.add_function(function.identifier.clone(), 0..0, function.ty);
     }
@@ -296,7 +296,7 @@ mod tests {
     assert_eq!(
       ir.statements,
       vec![
-        Op::Decl(&Identifier::from("x"), Ty::Int, None),
+        Op::Decl(Identifier::from("x"), Ty::Int, None),
         Op::Assign(Arg::Literal(Literal::Int(7)), Arg::Variable(Ty::Int, 0, Box::new(None)))
       ]
     );
@@ -331,9 +331,9 @@ mod tests {
     assert_eq!(
       ir.statements,
       vec![
-        Decl(&Identifier::from("a"), Int, None),
-        Decl(&Identifier::from("b"), Int, None),
-        Decl(&Identifier::from("max"), Int, None),
+        Decl(Identifier::from("a"), Int, None),
+        Decl(Identifier::from("b"), Int, None),
+        Decl(Identifier::from("max"), Int, None),
         Gt(Variable(Ty::Int, 0, Box::default()), Variable(Int, 1, Box::default())),
         Jumpfalse(Reference(Some(Bool), 3), Reference(None, 7)),
         Assign(Variable(Int, 0, Box::default()), Variable(Int, 2, Box::default())),
@@ -363,8 +363,8 @@ mod tests {
     assert_eq!(
       ir.statements,
       vec![
-        Decl(&Identifier::from("a"), Int, None),
-        Decl(&Identifier::from("b"), Int, None),
+        Decl(Identifier::from("a"), Int, None),
+        Decl(Identifier::from("b"), Int, None),
         Gt(Variable(Int, 0, Box::default()), Variable(Int, 1, Box::default())),
         Jumpfalse(Reference(Some(Bool), 2), Reference(None, 7)),
         Plus(Variable(Int, 0, Box::default()), Arg::Literal(Literal::Int(1))),
@@ -393,9 +393,9 @@ mod tests {
     assert_eq!(
       ir.statements,
       vec![
-        Decl(&Identifier::from("x"), Int, None),
+        Decl(Identifier::from("x"), Int, None),
         Assign(Arg::Literal(Literal::Int(2)), Variable(Int, 0, Box::default())),
-        Decl(&Identifier::from("y"), Int, None),
+        Decl(Identifier::from("y"), Int, None),
         Assign(Variable(Int, 0, Box::default()), Variable(Int, 2, Box::default())),
         Return(None)
       ]
