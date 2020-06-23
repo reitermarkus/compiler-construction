@@ -1,3 +1,4 @@
+use std::env;
 use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -15,7 +16,7 @@ fn integration_test() -> io::Result<()> {
       eprintln!("{}", mc_file.display());
       let input = File::open(&mc_file)?;
       let out_file = mc_file.with_extension("bin");
-      mcc::cli(input, out_file, "gcc".into(), Some("gcc".into()), false)?
+      mcc::cli(input, out_file, "gcc".into(), env::var("MCC_DOCKER_IMAGE").ok(), false)?
     }
   }
 

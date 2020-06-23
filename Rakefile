@@ -158,7 +158,7 @@ task :build_ubuntu_docker_image do
     # Ignore.
   end
 
-  ENV['MCC_DOCKER_IMAGE'] = 'gcc'
+  ENV['MCC_DOCKER_IMAGE'] = 'reitermarkus/gcc-multilib'
   sh 'docker', 'build', '-t', ENV['MCC_DOCKER_IMAGE'], '-f', 'Dockerfile.gcc', '.'
 end
 
