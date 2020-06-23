@@ -1,8 +1,10 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
+use std::path::PathBuf;
+
 use clap::{value_t, App, Arg};
 
-use mcc::mcc;
+use mc_common::input;
 
 #[cfg_attr(tarpaulin, skip)]
 fn main() -> std::io::Result<()> {
@@ -28,10 +30,11 @@ fn main() -> std::io::Result<()> {
     .get_matches();
 
   let quiet = matches.is_present("quiet");
-  let out_file = value_t!(matches, "output", String).unwrap_or_else(|_| "a.out".into());
-  let in_file = value_t!(matches, "file", String).unwrap();
+  let out_file = value_t!(matches, "output", PathBuf).unwrap_or_else(|_| "a.out".into());
+  let in_file = value_t!(matches, "file", PathBuf).unwrap();
   let backend = value_t!(matches, "backend", String).unwrap_or_else(|_| "gcc".into());
   let docker_image = value_t!(matches, "docker-image", String).ok();
 
-  mcc(in_file, out_file, backend, docker_image, quiet)
+  let input = input(in_file);
+  mcc::cli(input, out_file, backend, docker_image, quiet)
 }

@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "mc_common",
   "mcc",
   "mc_ast_to_dot",
   "mc_parser",
@@ -7,5 +8,4 @@ members = [
   "mc_ir",
   "mc_cfg_to_dot",
   "mc_asm",
-  "mc_error",
 ]

@@ -76,8 +76,6 @@ end
 desc 'compile all examples'
 task :compile, [:example] => [:build_ubuntu_docker_image] do |example: '*'|
   Pathname.glob("#{__dir__}/examples/#{example}/#{example}.mc").each do |mc|
-    dir = Pathname.pwd
-    mc = Pathname(mc).relative_path_from(dir)
     bin = mc.sub_ext('.bin')
 
     cargo_run 'mcc', mc.to_s, '-o', bin.to_s

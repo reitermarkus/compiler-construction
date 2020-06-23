@@ -1,8 +1,6 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
-use std::env::current_dir;
-use std::fs::File;
-use std::io::{prelude::*, stdin};
+use std::io::{Read, Write};
 use std::path::Path;
 use std::process::{exit, Command, Stdio};
 
@@ -11,21 +9,15 @@ use mc_asm::ToAsm;
 use mc_ir::AddToIr;
 use mc_ir::IntermediateRepresentation;
 
-pub fn mcc(
-  in_file: impl AsRef<Path>,
+pub fn cli(
+  mut input: impl Read,
   out_file: impl AsRef<Path>,
   backend: String,
   docker_image: Option<String>,
   quiet: bool,
 ) -> std::io::Result<()> {
   let mut contents = String::new();
-
-  if in_file.as_ref() == Path::new("-") {
-    stdin().read_to_string(&mut contents)?;
-  } else {
-    let in_file = in_file.as_ref().canonicalize()?;
-    File::open(&in_file)?.read_to_string(&mut contents)?;
-  };
+  input.read_to_string(&mut contents)?;
 
   let ast = mc_parser::parse(&contents).expect("failed to parse program");
 
@@ -40,6 +32,8 @@ pub fn mcc(
 
   let mut command;
 
+  let common_flags = ["-m32", "-x", "assembler", "-"];
+
   if let Some(docker_image) = docker_image {
     command = Command::new("docker");
 
@@ -48,23 +42,26 @@ pub fn mcc(
     command.arg("-i");
 
     command.arg("-v");
-    command.arg(format!("{}:/project", current_dir().unwrap().display()));
+
+    let out_file = out_file.as_ref();
+    let out_dir = out_file.parent().unwrap_or(&out_file).canonicalize()?;
+    command.arg(format!("{}:/project", out_dir.display()));
+    let out_file = out_file.file_name().map(|n| Path::new(n)).unwrap_or(out_file);
 
     command.arg("-w");
     command.arg("/project");
 
     command.arg(docker_image);
     command.arg(backend);
+    command.args(&common_flags);
+    command.arg("-o");
+    command.args(out_file);
   } else {
-    command = Command::new(backend)
+    command = Command::new(backend);
+    command.args(&common_flags);
+    command.arg("-o");
+    command.arg(out_file.as_ref());
   }
-
-  command.arg("-m32");
-  command.arg("-o");
-  command.arg(out_file.as_ref());
-  command.arg("-x");
-  command.arg("assembler");
-  command.arg("-");
 
   command.stdin(Stdio::piped());
   command.stderr(stderr);

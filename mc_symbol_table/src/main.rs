@@ -1,42 +1,11 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
-use std::fs::File;
-use std::io::{self, stdin, stdout, Read, Write};
-use std::path::{Path, PathBuf};
-use std::process::exit;
+use std::io;
+use std::path::PathBuf;
 
 use clap::{value_t, App, Arg};
-use either::Either;
 
-fn input(in_file: PathBuf) -> impl Read {
-  if in_file == Path::new("-") {
-    Either::Left(stdin())
-  } else {
-    match File::open(&in_file) {
-      Ok(in_file) => Either::Right(in_file),
-      Err(err) => {
-        eprintln!("Error opening input file {:?}:", in_file);
-        eprintln!("{}", err);
-        exit(1);
-      }
-    }
-  }
-}
-
-fn output(out_file: Option<PathBuf>) -> impl Write {
-  if let Some(out_file) = out_file {
-    match File::create(&out_file) {
-      Ok(out_file) => Either::Right(out_file),
-      Err(err) => {
-        eprintln!("Error creating output file {:?}:", out_file);
-        eprintln!("{}", err);
-        exit(1);
-      }
-    }
-  } else {
-    Either::Left(stdout())
-  }
-}
+use mc_common::{input, output};
 
 #[cfg_attr(tarpaulin, skip)]
 fn main() -> io::Result<()> {
