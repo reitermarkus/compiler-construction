@@ -6,9 +6,9 @@ use prettytable::Table;
 
 use mc_parser::ast::Program;
 use std::cell::RefCell;
+use std::fmt;
 use std::io;
 use std::rc::Rc;
-use std::fmt;
 
 mod format_symbol_table;
 
@@ -82,16 +82,14 @@ impl fmt::Display for SuperWauError2000<'_> {
       Self::Io(error) => {
         writeln!(f, "IO error encountered:")?;
         writeln!(f, "{}", error)
-      },
-      Self::ParseError(_) => {
-        writeln!(f, "Syntax error encountered:")
-      },
+      }
+      Self::ParseError(_) => writeln!(f, "Syntax error encountered:"),
       Self::SemanticError(errors) => {
         writeln!(f, "Semantic error encountered:")?;
         for e in errors.iter() {
           writeln!(f, "{}", e)?;
         }
-        writeln!(f, "")
+        writeln!(f)
       }
     }
   }
