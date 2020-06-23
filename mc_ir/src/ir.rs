@@ -1,7 +1,11 @@
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::ops::Range;
 
+use mc_common::error::SuperWauError2000;
 use mc_parser::ast::*;
+
+use crate::add_to_ir::AddToIr;
 
 #[derive(Debug, Default)]
 pub struct HashStack<'a> {
@@ -85,6 +89,27 @@ impl<'a> IntermediateRepresentation<'a> {
 
   pub fn add_function(&mut self, identifier: Identifier<'a>, range: Range<usize>, ty: Option<Ty>) {
     self.functions.insert(identifier, (range, ty));
+  }
+}
+
+impl<'a> TryFrom<&'a str> for IntermediateRepresentation<'a> {
+  type Error = SuperWauError2000<'a>;
+
+  fn try_from(contents: &'a str) -> Result<Self, Self::Error> {
+    let ast = mc_parser::parse(contents)?;
+    Self::try_from(ast)
+  }
+}
+
+impl<'a> TryFrom<Program<'a>> for IntermediateRepresentation<'a> {
+  type Error = SuperWauError2000<'a>;
+
+  fn try_from(ast: Program<'a>) -> Result<Self, Self::Error> {
+    mc_symbol_table::check_semantics(&ast)?;
+
+    let mut ir = IntermediateRepresentation::default();
+    ast.add_to_ir(&mut ir);
+    Ok(ir)
   }
 }
 
