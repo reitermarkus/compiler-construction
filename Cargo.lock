@@ -326,6 +326,7 @@ name = "mc_asm"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "mc_common",
  "mc_ir",
  "mc_parser",
  "mc_symbol_table",
@@ -374,6 +375,7 @@ name = "mc_ir"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "mc_common",
  "mc_parser",
  "mc_symbol_table",
 ]

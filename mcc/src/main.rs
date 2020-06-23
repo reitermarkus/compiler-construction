@@ -1,13 +1,14 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
 use std::path::PathBuf;
+use std::process::exit;
 
 use clap::{value_t, App, Arg};
 
 use mc_common::input;
 
 #[cfg_attr(tarpaulin, skip)]
-fn main() -> std::io::Result<()> {
+fn main() {
   let matches = App::new("mC Compiler")
     .set_term_width(0)
     .max_term_width(0)
@@ -36,5 +37,8 @@ fn main() -> std::io::Result<()> {
   let docker_image = value_t!(matches, "docker-image", String).ok();
 
   let input = input(in_file);
-  mcc::cli(input, out_file, backend, docker_image, quiet)
+
+  if let Err(exit_code) = mcc::cli(input, out_file, backend, docker_image, quiet) {
+    exit(exit_code)
+  }
 }

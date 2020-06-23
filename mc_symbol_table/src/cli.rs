@@ -1,23 +1,9 @@
-use std::io::{self, Read, Write};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::io::{Read, Write};
 
 use mc_parser::ast::Program;
+use mc_common::input_to_string;
 
-
-
-pub fn cli(mut input: impl Read, mut output: impl Write) -> Result<(), i32> {
-  fn input_to_string(mut input: impl Read) -> Result<String, i32> {
-    let mut contents = String::new();
-    match input.read_to_string(&mut contents) {
-      Ok(_) => Ok(contents),
-      Err(err) => {
-        eprintln!("Error reading input file: {}", err);
-        Err(1)
-      }
-    }
-  }
-
+pub fn cli(input: impl Read, mut output: impl Write) -> Result<(), i32> {
   fn string_to_ast(contents: &str) -> Result<Program<'_>, i32> {
     match mc_parser::parse(contents) {
       Ok(program) => Ok(program),

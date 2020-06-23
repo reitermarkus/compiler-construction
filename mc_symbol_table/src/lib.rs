@@ -52,7 +52,7 @@ macro_rules! extend_errors {
 }
 
 /// Check semantics of a given `Program` and return the resulting `Scope` or `SemanticError`s.
-pub fn check_semantics<'a, 'b>(ast: &'a Program<'b>) -> Result<Rc<RefCell<Scope>>, SuperWauError2000<'b>> {
+pub fn check_semantics<'a>(ast: &Program<'a>) -> Result<Rc<RefCell<Scope>>, SuperWauError2000<'a>> {
   let scope = Scope::new();
   ast.add_to_scope(&scope)?;
   Ok(scope)

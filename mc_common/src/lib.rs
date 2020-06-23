@@ -38,3 +38,15 @@ pub fn output(out_file: Option<PathBuf>) -> impl Write {
     Either::Left(stdout())
   }
 }
+
+/// Try reading an input to a string, otherwise print an error and exit.
+pub fn input_to_string(mut input: impl Read) -> Result<String, i32> {
+  let mut contents = String::new();
+  match input.read_to_string(&mut contents) {
+    Ok(_) => Ok(contents),
+    Err(err) => {
+      eprintln!("Error reading input file: {}", err);
+      Err(1)
+    }
+  }
+}

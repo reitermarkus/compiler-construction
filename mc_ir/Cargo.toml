@@ -6,5 +6,6 @@ edition = "2018"
 
 [dependencies]
 clap = "2.33"
+mc_common = { path = "../mc_common" }
 mc_parser = { path = "../mc_parser" }
 mc_symbol_table = { path = "../mc_symbol_table" }
