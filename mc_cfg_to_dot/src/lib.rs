@@ -22,7 +22,7 @@ pub fn mc_cfg_to_dot(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> s
 
   let ast = mc_parser::parse(&contents).expect("failed to parse program");
 
-  mc_symbol_table::mc_check_semantics(&ast).expect("semantic checks failed");
+  mc_symbol_table::check_semantics(&ast).expect("semantic checks failed");
 
   let mut ir = IntermediateRepresentation::default();
   ast.add_to_ir(&mut ir);

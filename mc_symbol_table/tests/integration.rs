@@ -1,8 +1,6 @@
-use std::fs;
+use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
-
-use mc_symbol_table::mc_symbol_table;
 
 #[test]
 fn integration_test() -> io::Result<()> {
@@ -15,8 +13,8 @@ fn integration_test() -> io::Result<()> {
 
     if mc_file.exists() {
       eprintln!("{}", mc_file.display());
-      let contents = fs::read_to_string(mc_file)?;
-      mc_symbol_table(&contents).expect("failed to generate symbol table");
+      let in_file = File::open(mc_file)?;
+      mc_symbol_table::cli(in_file, io::sink()).expect("failed to generate symbol table");
     }
   }
 

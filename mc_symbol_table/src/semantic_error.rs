@@ -6,7 +6,6 @@ use mc_parser::ast::*;
 
 #[derive(PartialEq, Debug)]
 pub enum SemanticError<'a> {
-  #[allow(dead_code)]
   Type {
     span: Span<'a>,
     expected: Ty,

@@ -21,7 +21,9 @@ use add_to_scope::AddToScope;
 mod semantic_error;
 use semantic_error::SemanticError;
 
+mod cli;
 pub mod semantic_checks;
+pub use cli::cli;
 
 #[macro_export]
 macro_rules! push_error {
@@ -53,20 +55,18 @@ macro_rules! extend_errors {
   };
 }
 
-pub fn mc_symbol_table<'a>(contents: &'a str) -> Result<Table, SuperWauError2000<'a>> {
-  let ast: Program<'a> = mc_parser::parse(contents)?;
-
-  let scope = mc_check_semantics(&ast)?;
-
-  let mut table = Table::new();
-  scope.borrow().to_pretty_table(&mut table);
-  Ok(table)
-}
-
-pub fn mc_check_semantics<'a, 'b>(ast: &'a Program<'b>) -> Result<Rc<RefCell<Scope>>, Vec<SemanticError<'b>>> {
+/// Check semantics of a given `Program` and return the resulting `Scope` or `SemanticError`s.
+pub fn check_semantics<'a, 'b>(ast: &'a Program<'b>) -> Result<Rc<RefCell<Scope>>, Vec<SemanticError<'b>>> {
   let scope = Scope::new();
   ast.add_to_scope(&scope)?;
   Ok(scope)
+}
+
+/// Generate a symbol table for a given scope.
+pub fn symbol_table(scope: &Scope) -> Table {
+  let mut table = Table::new();
+  scope.to_pretty_table(&mut table);
+  table
 }
 
 #[derive(Debug)]

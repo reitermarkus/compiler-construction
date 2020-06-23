@@ -1,15 +1,45 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
 use std::fs::File;
-use std::io::{stdin, stdout, Read};
+use std::io::{self, stdin, stdout, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
 use clap::{value_t, App, Arg};
-use mc_symbol_table::mc_symbol_table;
+use either::Either;
+
+fn input(in_file: PathBuf) -> impl Read {
+  if in_file == Path::new("-") {
+    Either::Left(stdin())
+  } else {
+    match File::open(&in_file) {
+      Ok(in_file) => Either::Right(in_file),
+      Err(err) => {
+        eprintln!("Error opening input file {:?}:", in_file);
+        eprintln!("{}", err);
+        exit(1);
+      }
+    }
+  }
+}
+
+fn output(out_file: Option<PathBuf>) -> impl Write {
+  if let Some(out_file) = out_file {
+    match File::create(&out_file) {
+      Ok(out_file) => Either::Right(out_file),
+      Err(err) => {
+        eprintln!("Error creating output file {:?}:", out_file);
+        eprintln!("{}", err);
+        exit(1);
+      }
+    }
+  } else {
+    Either::Left(stdout())
+  }
+}
 
 #[cfg_attr(tarpaulin, skip)]
-fn main() -> std::io::Result<()> {
+fn main() -> io::Result<()> {
   let matches = App::new("mC Symbol Table Viewer")
     .set_term_width(0)
     .max_term_width(0)
@@ -18,31 +48,12 @@ fn main() -> std::io::Result<()> {
     .arg(Arg::from_usage("<file> 'input file (use '-' to read from stdin)'"))
     .get_matches();
 
-  let out_file = value_t!(matches, "output", String).ok();
+  let out_file = value_t!(matches, "output", PathBuf).ok();
   let in_file = value_t!(matches, "file", PathBuf).unwrap();
 
-  let mut contents = String::new();
-  if in_file == Path::new("-") {
-    stdin().read_to_string(&mut contents)?;
-  } else {
-    File::open(in_file)?.read_to_string(&mut contents)?;
-  }
+  let input = input(in_file);
+  let output = output(out_file);
+  mc_symbol_table::cli(input, output)?;
 
-  let table = mc_symbol_table(&contents);
-
-  match table {
-    Ok(table) => {
-      if let Some(out_file) = out_file.map(File::create) {
-        table.print(&mut out_file?)?;
-      } else {
-        table.print(&mut stdout())?;
-      };
-
-      Ok(())
-    }
-    Err(err) => {
-      eprintln!("{}", err);
-      exit(1);
-    }
-  }
+  Ok(())
 }
