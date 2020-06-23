@@ -77,7 +77,7 @@
 
 <span class="kw">use</span> <span class="kw">crate</span>::<span class="ident">symbol_table</span>::<span class="ident">Scope</span>;
 
-<span class="kw">impl</span> <span class="ident">Scope</span> {
+<span class="kw">impl</span> <span class="ident">Scope</span><span class="op">&lt;</span><span class="lifetime">&#39;_</span><span class="op">&gt;</span> {
   <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">to_pretty_table</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">table</span>: <span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">Table</span>) {
     <span class="ident">table</span>.<span class="ident">set_format</span>(<span class="kw-2">*</span><span class="ident">FORMAT_BOX_CHARS</span>);
     <span class="ident">table</span>.<span class="ident">set_titles</span>(<span class="macro">row</span><span class="macro">!</span>[<span class="string">&quot;scope&quot;</span>, <span class="string">&quot;symbol&quot;</span>, <span class="string">&quot;type&quot;</span>]);

@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["input","Try opening an input file for reading, otherwise print an error and exit."],["output","Try opening an output file for writing, otherwise print an error and exit."]]});
+initSidebarItems({"fn":[["input","Try opening an input file for reading, otherwise print an error and exit."],["input_to_string","Try reading an input to a string, otherwise print an error and exit."],["output","Try opening an output file for writing, otherwise print an error and exit."]],"mod":[["error",""]]});

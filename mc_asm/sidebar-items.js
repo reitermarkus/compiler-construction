@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["mc_asm",""]],"macro":[["i",""],["l",""]],"mod":[["asm",""],["register",""],["stack",""],["storage",""],["to_asm",""]],"trait":[["ToAsm",""]]});
+initSidebarItems({"fn":[["cli",""]],"macro":[["i","Returns a string formatted as an assembly instruction."],["l","Returns a string formatted as a label."]],"mod":[["asm",""],["register",""],["stack",""],["storage",""],["to_asm",""]],"trait":[["ToAsm",""]]});

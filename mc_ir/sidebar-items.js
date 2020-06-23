@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["Arg",""],["Op",""]],"fn":[["mc_ir",""]],"mod":[["add_to_ir",""],["format_ir",""],["ir",""]],"struct":[["IntermediateRepresentation",""]],"trait":[["AddToIr",""]]});
+initSidebarItems({"enum":[["Arg",""],["Op",""]],"fn":[["cli",""]],"mod":[["add_to_ir",""],["format_ir",""],["ir",""]],"struct":[["IntermediateRepresentation",""]],"trait":[["AddToIr",""]]});

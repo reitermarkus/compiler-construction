@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["mc_ast_to_dot",""]],"mod":[["add_to_graph",""]]});
+initSidebarItems({"fn":[["cli",""],["write_graph",""]],"mod":[["add_to_graph",""]]});
