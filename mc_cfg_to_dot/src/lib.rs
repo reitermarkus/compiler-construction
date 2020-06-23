@@ -1,43 +1,47 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
-use std::fs::File;
-use std::io::{prelude::*, stdin};
-use std::path::Path;
+use std::convert::TryFrom;
+use std::io::{self, Read, Write};
 
 use petgraph::dot::{Config, Dot};
 
+use mc_common::input_to_string;
 use mc_ir::*;
 
 mod cfg;
 use cfg::*;
 
-pub fn mc_cfg_to_dot(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::Result<()> {
-  let mut contents = String::new();
+fn write_graph(mut output: impl Write, graph: CfgGraph) -> io::Result<()> {
+  writeln!(output, "digraph {{")?;
 
-  if in_file.as_ref() == Path::new("-") {
-    stdin().read_to_string(&mut contents)?;
-  } else {
-    File::open(in_file)?.read_to_string(&mut contents)?;
-  }
+  writeln!(output, r##"    graph [bgcolor="transparent", colorsheme=svg]"##)?;
+  writeln!(output, r##"    node [fontname="Menlo, monospace", color="#c8e6ff", style=filled, shape=rect]"##)?;
+  writeln!(output, r##"    edge [fontname="sans-serif"]"##)?;
 
-  let ast = mc_parser::parse(&contents).expect("failed to parse program");
+  write!(output, "{}", Dot::with_config(&graph, &[Config::GraphContentOnly]))?;
 
-  mc_symbol_table::check_semantics(&ast).expect("semantic checks failed");
+  writeln!(output, "}}")
+}
 
-  let mut ir = IntermediateRepresentation::default();
-  ast.add_to_ir(&mut ir);
+pub fn cli(input: impl Read, output: impl Write) -> Result<(), i32> {
+  let contents = input_to_string(input)?;
+
+  let ir = match IntermediateRepresentation::try_from(&*contents) {
+    Ok(ir) => ir,
+    Err(err) => {
+      eprintln!("{}", err);
+      return Err(1);
+    }
+  };
 
   let mut graph = CfgGraph::new();
   ir.add_to_graph(&mut graph);
-  let dot = Dot::with_config(&graph, &[Config::GraphContentOnly]);
 
-  writeln!(out_stream, "digraph {{")?;
-
-  writeln!(out_stream, r##"    graph [bgcolor="transparent", colorsheme=svg]"##)?;
-  writeln!(out_stream, r##"    node [fontname="Menlo, monospace", color="#c8e6ff", style=filled, shape=rect]"##)?;
-  writeln!(out_stream, r##"    edge [fontname="sans-serif"]"##)?;
-
-  write!(out_stream, "{}", dot)?;
-
-  writeln!(out_stream, "}}")
+  match write_graph(output, graph) {
+    Ok(()) => Ok(()),
+    Err(err) => {
+      eprintln!("Error printing graph: {}", err);
+      Err(1)
+    }
+  }
 }

@@ -353,9 +353,8 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "indoc",
+ "mc_common",
  "mc_ir",
- "mc_parser",
- "mc_symbol_table",
  "petgraph",
  "pretty_assertions",
  "unindent",
