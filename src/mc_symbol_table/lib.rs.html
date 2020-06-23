@@ -136,7 +136,9 @@
 <span class="kw">mod</span> <span class="ident">semantic_error</span>;
 <span class="kw">use</span> <span class="ident">semantic_error</span>::<span class="ident">SemanticError</span>;
 
+<span class="kw">mod</span> <span class="ident">cli</span>;
 <span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">semantic_checks</span>;
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">cli</span>::<span class="ident">cli</span>;
 
 <span class="attribute">#[<span class="ident">macro_export</span>]</span>
 <span class="macro">macro_rules</span><span class="macro">!</span> <span class="ident">push_error</span> {
@@ -168,20 +170,18 @@
   };
 }
 
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mc_symbol_table</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>(<span class="ident">contents</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Table</span>, <span class="ident">SuperWauError2000</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span><span class="op">&gt;</span> {
-  <span class="kw">let</span> <span class="ident">ast</span>: <span class="ident">Program</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">mc_parser</span>::<span class="ident">parse</span>(<span class="ident">contents</span>)<span class="question-mark">?</span>;
-
-  <span class="kw">let</span> <span class="ident">scope</span> <span class="op">=</span> <span class="ident">mc_check_semantics</span>(<span class="kw-2">&amp;</span><span class="ident">ast</span>)<span class="question-mark">?</span>;
-
-  <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">table</span> <span class="op">=</span> <span class="ident">Table</span>::<span class="ident">new</span>();
-  <span class="ident">scope</span>.<span class="ident">borrow</span>().<span class="ident">to_pretty_table</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">table</span>);
-  <span class="prelude-val">Ok</span>(<span class="ident">table</span>)
-}
-
-<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">mc_check_semantics</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;b</span><span class="op">&gt;</span>(<span class="ident">ast</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Program</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Rc</span><span class="op">&lt;</span><span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">Scope</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SemanticError</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
+<span class="doccomment">/// Check semantics of a given `Program` and return the resulting `Scope` or `SemanticError`s.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_semantics</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;b</span><span class="op">&gt;</span>(<span class="ident">ast</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a</span> <span class="ident">Program</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">Rc</span><span class="op">&lt;</span><span class="ident">RefCell</span><span class="op">&lt;</span><span class="ident">Scope</span><span class="op">&gt;</span><span class="op">&gt;</span>, <span class="ident">Vec</span><span class="op">&lt;</span><span class="ident">SemanticError</span><span class="op">&lt;</span><span class="lifetime">&#39;b</span><span class="op">&gt;</span><span class="op">&gt;</span><span class="op">&gt;</span> {
   <span class="kw">let</span> <span class="ident">scope</span> <span class="op">=</span> <span class="ident">Scope</span>::<span class="ident">new</span>();
   <span class="ident">ast</span>.<span class="ident">add_to_scope</span>(<span class="kw-2">&amp;</span><span class="ident">scope</span>)<span class="question-mark">?</span>;
   <span class="prelude-val">Ok</span>(<span class="ident">scope</span>)
+}
+
+<span class="doccomment">/// Generate a symbol table for a given scope.</span>
+<span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">symbol_table</span>(<span class="ident">scope</span>: <span class="kw-2">&amp;</span><span class="ident">Scope</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Table</span> {
+  <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">table</span> <span class="op">=</span> <span class="ident">Table</span>::<span class="ident">new</span>();
+  <span class="ident">scope</span>.<span class="ident">to_pretty_table</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="ident">table</span>);
+  <span class="ident">table</span>
 }
 
 <span class="attribute">#[<span class="ident">derive</span>(<span class="ident">Debug</span>)]</span>
