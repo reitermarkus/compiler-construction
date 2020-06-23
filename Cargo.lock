@@ -339,6 +339,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "indoc",
+ "mc_common",
  "mc_parser",
  "pest",
  "petgraph",

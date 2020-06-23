@@ -1,35 +1,39 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
-use std::fs::File;
-use std::io::{prelude::*, stdin};
-use std::path::Path;
+use std::io::{self, Read, Write};
 
 use petgraph::dot::{Config, Dot};
+
+use mc_common::input_to_string;
 
 mod add_to_graph;
 use add_to_graph::{AddToGraph, *};
 
-pub fn mc_ast_to_dot(in_file: impl AsRef<Path>, mut out_stream: impl Write) -> std::io::Result<()> {
-  let mut contents = String::new();
+fn write_graph(mut output: impl Write, graph: AstGraph) -> io::Result<()> {
+  writeln!(output, "digraph {{")?;
 
-  if in_file.as_ref() == Path::new("-") {
-    stdin().read_to_string(&mut contents)?;
-  } else {
-    File::open(in_file)?.read_to_string(&mut contents)?;
-  }
+  writeln!(output, r##"    graph [bgcolor="transparent", colorsheme=svg]"##)?;
+  writeln!(output, r##"    node [fontname="sans-serif", color="#c8e6ff", style=filled]"##)?;
+  writeln!(output, r##"    edge [fontname="sans-serif"]"##)?;
+
+  write!(output, "{}", Dot::with_config(&graph, &[Config::GraphContentOnly]))?;
+
+  writeln!(output, "}}")
+}
+
+pub fn cli(input: impl Read, output: impl Write) -> Result<(), i32> {
+  let contents = input_to_string(input)?;
 
   let ast = mc_parser::parse(&contents).expect("failed to parse program");
 
   let mut graph = AstGraph::new();
   ast.add_to_graph(&mut graph);
 
-  writeln!(out_stream, "digraph {{")?;
-
-  writeln!(out_stream, r##"    graph [bgcolor="transparent", colorsheme=svg]"##)?;
-  writeln!(out_stream, r##"    node [fontname="sans-serif", color="#c8e6ff", style=filled]"##)?;
-  writeln!(out_stream, r##"    edge [fontname="sans-serif"]"##)?;
-
-  write!(out_stream, "{}", Dot::with_config(&graph, &[Config::GraphContentOnly]))?;
-
-  writeln!(out_stream, "}}")
+  match write_graph(output, graph) {
+    Ok(()) => Ok(()),
+    Err(err) => {
+      eprintln!("Error printing graph: {}", err);
+      Err(1)
+    }
+  }
 }
