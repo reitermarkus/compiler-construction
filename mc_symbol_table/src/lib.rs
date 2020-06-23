@@ -52,14 +52,14 @@ macro_rules! extend_errors {
 }
 
 /// Check semantics of a given `Program` and return the resulting `Scope` or `SemanticError`s.
-pub fn check_semantics<'a>(ast: &Program<'a>) -> Result<Rc<RefCell<Scope>>, SuperWauError2000<'a>> {
+pub fn check_semantics<'a>(ast: &Program<'a>) -> Result<Rc<RefCell<Scope<'a>>>, SuperWauError2000<'a>> {
   let scope = Scope::new();
   ast.add_to_scope(&scope)?;
   Ok(scope)
 }
 
 /// Generate a symbol table for a given scope.
-pub fn symbol_table(scope: &Scope) -> Table {
+pub fn symbol_table(scope: &Scope<'_>) -> Table {
   let mut table = Table::new();
   scope.to_pretty_table(&mut table);
   table

@@ -141,16 +141,17 @@ fn calc_index_offset(stack: &mut Stack, asm: &mut Asm, reg: Reg32, arg: &Arg<'_>
           asm.lines.push(i! { "push"; 10 });
           asm.lines.push(i! { "call"; "putchar"});
         }
-        "read_int" | "read_float" => {
-          asm.builtin_functions.insert((**identifier).clone());
+        "read_int" => {
+          asm.builtin_functions.insert("read_int");
           asm.lines.push(i! { "call"; identifier });
-
-          if identifier.as_ref() == "read_float" {
-            ty = Some(Ty::Float);
-          }
+        }
+        "read_float" => {
+          ty = Some(Ty::Float);
+          asm.builtin_functions.insert("read_float");
+          asm.lines.push(i! { "call"; identifier });
         }
         _ => {
-          asm.lines.push(i! { "call"; map_function_name(identifier.as_ref()) });
+          asm.lines.push(i! { "call"; map_function_name(identifier.as_str()) });
         }
       }
 
@@ -214,7 +215,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
       }
     }
 
-    for (&name, (range, _)) in &self.functions {
+    for (name, (range, _)) in &self.functions {
       let mut stack = Stack::default();
 
       asm.lines.push(l! { map_function_name(name.as_ref()) });
@@ -606,7 +607,7 @@ impl<'a> ToAsm for IntermediateRepresentation<'a> {
     }
 
     for builtin_function in mem::take(&mut asm.builtin_functions).iter() {
-      add_builtin_function(&mut asm, builtin_function.as_ref());
+      add_builtin_function(&mut asm, builtin_function);
     }
 
     asm

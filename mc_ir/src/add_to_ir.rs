@@ -27,7 +27,7 @@ impl<'a> AddToIr<'a> for Assignment<'a> {
 
 impl<'a> AddToIr<'a> for Declaration<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
-    ir.push(Op::Decl(&self.identifier, self.ty, self.count));
+    ir.push(Op::Decl(self.identifier.clone(), self.ty, self.count));
 
     let reference = ir.statements.len() - 1;
     ir.stack.push(self.identifier.clone(), reference, self.ty);
@@ -127,7 +127,7 @@ impl<'a> AddToIr<'a> for Expression<'a> {
           _ => ir.functions.get(identifier).and_then(|&(_, ty)| ty),
         };
 
-        let arg = Arg::FunctionCall(ty, identifier, args);
+        let arg = Arg::FunctionCall(ty, identifier.clone(), args);
         ir.push(Op::Call(arg));
         ir.last_ref()
       }
@@ -237,7 +237,7 @@ impl<'a> AddToIr<'a> for FunctionDeclaration<'a> {
     let start_index = ir.statements.len();
 
     for parameter in &self.parameters {
-      ir.push(Op::Param(&parameter.identifier, parameter.ty, parameter.count));
+      ir.push(Op::Param(parameter.identifier.clone(), parameter.ty, parameter.count));
 
       let reference = ir.statements.len() - 1;
       ir.stack.push(parameter.identifier.clone(), reference, parameter.ty);
@@ -246,7 +246,7 @@ impl<'a> AddToIr<'a> for FunctionDeclaration<'a> {
     self.body.add_to_ir(ir);
     let end_index = ir.statements.len();
 
-    ir.add_function(&self.identifier, start_index..end_index, self.ty);
+    ir.add_function(self.identifier.clone(), start_index..end_index, self.ty);
 
     ir.stack.reset(ptr);
     ir.last_ref()
@@ -256,7 +256,7 @@ impl<'a> AddToIr<'a> for FunctionDeclaration<'a> {
 impl<'a> AddToIr<'a> for Program<'a> {
   fn add_to_ir(&'a self, ir: &mut IntermediateRepresentation<'a>) -> Arg<'a> {
     for function in &self.function_declarations {
-      ir.add_function(&function.identifier, 0..0, function.ty);
+      ir.add_function(function.identifier.clone(), 0..0, function.ty);
     }
 
     for function in &self.function_declarations {
@@ -296,7 +296,7 @@ mod tests {
     assert_eq!(
       ir.statements,
       vec![
-        Op::Decl(&Identifier("x".to_owned()), Ty::Int, None),
+        Op::Decl(&Identifier::from("x"), Ty::Int, None),
         Op::Assign(Arg::Literal(Literal::Int(7)), Arg::Variable(Ty::Int, 0, Box::new(None)))
       ]
     );
@@ -331,9 +331,9 @@ mod tests {
     assert_eq!(
       ir.statements,
       vec![
-        Decl(&Identifier("a".to_owned()), Int, None),
-        Decl(&Identifier("b".to_owned()), Int, None),
-        Decl(&Identifier("max".to_owned()), Int, None),
+        Decl(&Identifier::from("a"), Int, None),
+        Decl(&Identifier::from("b"), Int, None),
+        Decl(&Identifier::from("max"), Int, None),
         Gt(Variable(Ty::Int, 0, Box::default()), Variable(Int, 1, Box::default())),
         Jumpfalse(Reference(Some(Bool), 3), Reference(None, 7)),
         Assign(Variable(Int, 0, Box::default()), Variable(Int, 2, Box::default())),
@@ -363,8 +363,8 @@ mod tests {
     assert_eq!(
       ir.statements,
       vec![
-        Decl(&Identifier("a".to_owned()), Int, None),
-        Decl(&Identifier("b".to_owned()), Int, None),
+        Decl(&Identifier::from("a"), Int, None),
+        Decl(&Identifier::from("b"), Int, None),
         Gt(Variable(Int, 0, Box::default()), Variable(Int, 1, Box::default())),
         Jumpfalse(Reference(Some(Bool), 2), Reference(None, 7)),
         Plus(Variable(Int, 0, Box::default()), Arg::Literal(Literal::Int(1))),
@@ -393,9 +393,9 @@ mod tests {
     assert_eq!(
       ir.statements,
       vec![
-        Decl(&Identifier("x".to_owned()), Int, None),
+        Decl(&Identifier::from("x"), Int, None),
         Assign(Arg::Literal(Literal::Int(2)), Variable(Int, 0, Box::default())),
-        Decl(&Identifier("y".to_owned()), Int, None),
+        Decl(&Identifier::from("y"), Int, None),
         Assign(Variable(Int, 0, Box::default()), Variable(Int, 2, Box::default())),
         Return(None)
       ]

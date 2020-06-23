@@ -3,7 +3,7 @@ use prettytable::{format, Table};
 
 use crate::symbol_table::Scope;
 
-impl Scope {
+impl Scope<'_> {
   pub fn to_pretty_table(&self, table: &mut Table) {
     table.set_format(*FORMAT_BOX_CHARS);
     table.set_titles(row!["scope", "symbol", "type"]);

@@ -1,7 +1,6 @@
+use std::fs::File;
 use std::io::{self, sink};
 use std::path::{Path, PathBuf};
-
-use mc_asm::mc_asm;
 
 #[test]
 fn integration_test() -> io::Result<()> {
@@ -14,7 +13,8 @@ fn integration_test() -> io::Result<()> {
 
     if mc_file.exists() {
       eprintln!("{}", mc_file.display());
-      mc_asm(mc_file, sink())?
+      let input = File::open(mc_file)?;
+      mc_asm::cli(input, sink()).unwrap();
     }
   }
 

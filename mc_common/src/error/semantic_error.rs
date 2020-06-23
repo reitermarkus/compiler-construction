@@ -13,29 +13,29 @@ pub enum SemanticError<'a> {
   },
   NotDeclared {
     span: Span<'a>,
-    identifier: Identifier,
+    identifier: Identifier<'a>,
   },
   AlreadyDeclared {
     span: Span<'a>,
-    identifier: Identifier,
+    identifier: Identifier<'a>,
   },
   ArrayError {
     span: Span<'a>,
-    identifier: Identifier,
+    identifier: Identifier<'a>,
   },
   IndexOutOfBounds {
     span: Span<'a>,
-    identifier: Identifier,
+    identifier: Identifier<'a>,
     size: usize,
     actual: usize,
   },
   WrongUseOfFunction {
     span: Span<'a>,
-    identifier: Identifier,
+    identifier: Identifier<'a>,
   },
   NotAFunction {
     span: Span<'a>,
-    identifier: Identifier,
+    identifier: Identifier<'a>,
   },
   UnaryOperatorTypeError {
     span: Span<'a>,
@@ -50,23 +50,23 @@ pub enum SemanticError<'a> {
   /// Error when a non-void function is missing a return statement.
   MissingReturnStatement {
     span: Span<'a>,
-    identifier: Identifier,
+    identifier: Identifier<'a>,
   },
   InvalidAmountOfArguments {
     span: Span<'a>,
-    identifier: Identifier,
+    identifier: Identifier<'a>,
     expected: usize,
     actual: usize,
   },
   InvalidArgumentType {
     span: Span<'a>,
-    identifier: Identifier,
+    identifier: Identifier<'a>,
     expected: Ty,
     actual: Option<Ty>,
   },
   InvalidDeclarationType {
     span: Span<'a>,
-    identifier: Identifier,
+    identifier: Identifier<'a>,
     expected: Ty,
     actual: Ty,
   },
@@ -77,7 +77,7 @@ pub enum SemanticError<'a> {
   },
   InvalidArgument {
     span: Span<'a>,
-    identifier: Identifier,
+    identifier: Identifier<'a>,
   },
   OperatorCombinationError {
     span: Span<'a>,
@@ -182,484 +182,5 @@ impl fmt::Display for SemanticError<'_> {
         write_err!(f, span, "expected type '{}' for condition, found '{}'", Ty::Bool, actual)
       }
     }
-  }
-}
-
-#[cfg(test)]
-mod test {
-  use pest::Span;
-
-  use crate::semantic_checks::CheckSemantics;
-  use crate::*;
-
-  use super::*;
-
-  #[test]
-  fn semantic_program_check() {
-    let program = Program { function_declarations: Vec::new(), span: Span::new("", 0, 0).unwrap() };
-
-    let scope = Scope::new();
-    let result = program.check_semantics(&scope);
-    let errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::NoMainFunction { span: Span::new("", 0, 0).unwrap() }))
-  }
-
-  #[test]
-  fn semantic_function_declaration_check() {
-    let function_declaration = FunctionDeclaration {
-      ty: Some(Ty::Float),
-      identifier: Identifier::from("sum"),
-      parameters: vec![
-        Declaration { ty: Ty::Int, count: None, identifier: Identifier::from("n"), span: Span::new("", 0, 0).unwrap() },
-        Declaration { ty: Ty::Int, count: None, identifier: Identifier::from("m"), span: Span::new("", 0, 0).unwrap() },
-      ],
-      body: CompoundStatement {
-        statements: vec![Statement::Ret(ReturnStatement {
-          expression: Some(Expression::Binary {
-            op: BinaryOp::Plus,
-            lhs: Box::new(Expression::Variable {
-              identifier: Identifier::from("n"),
-              index_expression: None,
-              span: Span::new("", 0, 0).unwrap(),
-            }),
-            rhs: Box::new(Expression::Variable {
-              identifier: Identifier::from("m"),
-              index_expression: None,
-              span: Span::new("", 0, 0).unwrap(),
-            }),
-            span: Span::new("", 0, 0).unwrap(),
-          }),
-          span: Span::new("", 0, 0).unwrap(),
-        })],
-        span: Span::new("", 0, 0).unwrap(),
-      },
-      span: Span::new("", 0, 0).unwrap(),
-    };
-
-    let scope = Scope::new();
-
-    let function_scope = Scope::new_child(&scope, "function");
-    let param_n_id = Identifier::from("n");
-    let param_symbol = Symbol::Variable(Ty::Int, None);
-    let param_m_id = Identifier::from("m");
-
-    function_scope.borrow_mut().insert(param_n_id.clone(), param_symbol.clone());
-    function_scope.borrow_mut().insert(param_m_id.clone(), param_symbol.clone());
-
-    scope.borrow_mut().symbols.insert(Identifier::from("sum"), Symbol::Function(Some(Ty::Float), Vec::new()));
-
-    let result = function_declaration.add_to_scope(&scope.borrow().children[0]);
-    let errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::InvalidReturnType {
-      span: Span::new("", 0, 0).unwrap(),
-      expected: Some(Ty::Float),
-      actual: Some(Ty::Int)
-    }));
-  }
-
-  #[test]
-  fn semantic_expression_funcion_call_type_check() {
-    let expr = "pi(true, 5.0)";
-    let function_call = Expression::FunctionCall {
-      identifier: Identifier::from("pi"),
-      arguments: vec![
-        Expression::Literal { literal: Literal::Bool(true), span: Span::new(&expr, 3, 7).unwrap() },
-        Expression::Literal { literal: Literal::Float(5.0), span: Span::new(&expr, 9, 12).unwrap() },
-      ],
-      span: Span::new(&expr, 0, 13).unwrap(),
-    };
-
-    let scope = Scope::new();
-
-    scope
-      .borrow_mut()
-      .symbols
-      .insert(Identifier::from("pi"), Symbol::Function(Some(Ty::Int), vec![(Ty::Bool, None), (Ty::Int, None)]));
-
-    let result = function_call.check_semantics(&scope);
-    let errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::InvalidArgumentType {
-      span: Span::new(&expr, 0, 13).unwrap(),
-      identifier: Identifier::from("pi"),
-      expected: Ty::Int,
-      actual: Some(Ty::Float)
-    }));
-
-    assert_eq!(errors.len(), 1);
-  }
-
-  #[test]
-  fn semantic_expression_funcion_call_arguments_count_check() {
-    let expr = "pi(true, 5)";
-    let function_call = Expression::FunctionCall {
-      identifier: Identifier::from("pi"),
-      arguments: vec![
-        Expression::Literal { literal: Literal::Bool(true), span: Span::new(&expr, 3, 7).unwrap() },
-        Expression::Literal { literal: Literal::Int(5), span: Span::new(&expr, 9, 10).unwrap() },
-      ],
-      span: Span::new(&expr, 0, 11).unwrap(),
-    };
-
-    let scope = Scope::new();
-
-    scope.borrow_mut().symbols.insert(
-      Identifier::from("pi"),
-      Symbol::Function(Some(Ty::Int), vec![(Ty::Bool, None), (Ty::Int, None), (Ty::Int, None)]),
-    );
-
-    let result = function_call.check_semantics(&scope);
-    let errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::InvalidAmountOfArguments {
-      span: Span::new(&expr, 0, 11).unwrap(),
-      identifier: Identifier::from("pi"),
-      expected: 3,
-      actual: 2
-    }));
-
-    assert_eq!(errors.len(), 1);
-  }
-
-  #[test]
-  fn assignment_type_check() {
-    let assignment_str = "x = 2.0";
-
-    let assignment = Assignment {
-      identifier: Identifier::from("x"),
-      span: Span::new(assignment_str, 0, 7).unwrap(),
-      index_expression: None,
-      rvalue: Expression::Literal { literal: Literal::Float(2.0), span: Span::new(assignment_str, 4, 7).unwrap() },
-    };
-
-    let scope = Scope::new();
-
-    let mut result = assignment.check_semantics(&scope);
-    let mut errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::NotDeclared {
-      span: Span::new(assignment_str, 0, 7).unwrap(),
-      identifier: Identifier::from("x")
-    }));
-
-    scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Variable(Ty::Int, None));
-    result = assignment.check_semantics(&scope);
-    errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::InvalidDeclarationType {
-      span: Span::new(assignment_str, 0, 7).unwrap(),
-      identifier: Identifier::from("x"),
-      expected: Ty::Int,
-      actual: Ty::Float
-    }));
-  }
-
-  #[test]
-  fn semantic_declaration_check() {
-    let declaration_str = "int x = 1";
-
-    let declaration = Declaration {
-      identifier: Identifier::from("x"),
-      span: Span::new(declaration_str, 0, 9).unwrap(),
-      ty: Ty::Int,
-      count: None,
-    };
-
-    let scope = Scope::new();
-
-    let mut result = declaration.check_semantics(&scope);
-    assert_eq!(result, Ok(()));
-
-    scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Variable(Ty::Int, None));
-    result = declaration.check_semantics(&scope);
-    let errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::AlreadyDeclared {
-      span: Span::new(declaration_str, 0, 9).unwrap(),
-      identifier: Identifier::from("x")
-    }));
-
-    let child = Scope::new_child(&scope, "block");
-    result = declaration.check_semantics(&child);
-    assert_eq!(result, Ok(()));
-  }
-
-  #[test]
-  fn semantic_expression_variable_check() {
-    let variable_without_index = Expression::Variable {
-      identifier: Identifier::from("x"),
-      span: Span::new("x", 0, 1).unwrap(),
-      index_expression: None,
-    };
-
-    let variable_with_index = Expression::Variable {
-      identifier: Identifier::from("x"),
-      span: Span::new("x[10]", 0, 5).unwrap(),
-      index_expression: Some(Box::new(Expression::Literal {
-        span: Span::new("x[10]", 2, 4).unwrap(),
-        literal: Literal::Int(10),
-      })),
-    };
-
-    let mut scope = Scope::new();
-
-    let mut result = variable_without_index.check_semantics(&scope);
-    let mut errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::NotDeclared {
-      span: Span::new("x", 0, 1).unwrap(),
-      identifier: Identifier::from("x")
-    }));
-
-    assert_eq!(errors.len(), 1);
-
-    scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Variable(Ty::Int, None));
-    result = variable_without_index.check_semantics(&scope);
-
-    assert_eq!(result, Ok(()));
-
-    scope = Scope::new();
-    scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Variable(Ty::Int, Some(5)));
-    result = variable_with_index.check_semantics(&scope);
-    errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::IndexOutOfBounds {
-      span: Span::new("x[10]", 2, 4).unwrap(),
-      identifier: Identifier::from("x"),
-      actual: 10,
-      size: 5
-    }));
-
-    assert_eq!(errors.len(), 1);
-
-    scope = Scope::new();
-    scope.borrow_mut().symbols.insert(Identifier::from("x"), Symbol::Function(Some(Ty::Int), Vec::new()));
-    result = variable_with_index.check_semantics(&scope);
-    errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::WrongUseOfFunction {
-      span: Span::new("x[10]", 0, 5).unwrap(),
-      identifier: Identifier::from("x")
-    }));
-
-    assert_eq!(errors.len(), 1);
-  }
-
-  #[test]
-  fn semantic_unary_expression_check() {
-    let mut expr = "!variable";
-    let mut unary = Expression::Unary {
-      op: UnaryOp::Not,
-      expression: Box::new(Expression::Variable {
-        identifier: Identifier::from("variable"),
-        index_expression: None,
-        span: Span::new(&expr, 1, 9).unwrap(),
-      }),
-      span: Span::new(&expr, 0, 9).unwrap(),
-    };
-
-    let scope = Scope::new();
-
-    scope.borrow_mut().symbols.insert(Identifier::from("variable"), Symbol::Variable(Ty::Int, None));
-
-    let result = unary.check_semantics(&scope);
-    let errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::UnaryOperatorTypeError {
-      span: Span::new(&expr, 0, 9).unwrap(),
-      op: UnaryOp::Not,
-      ty: Ty::Int,
-    }));
-
-    assert_eq!(errors.len(), 1);
-
-    expr = "-!variable";
-    unary = Expression::Unary {
-      op: UnaryOp::Minus,
-      expression: Box::new(Expression::Unary {
-        op: UnaryOp::Not,
-        expression: Box::new(Expression::Variable {
-          identifier: Identifier::from("variable"),
-          index_expression: None,
-          span: Span::new(&expr, 2, 10).unwrap(),
-        }),
-        span: Span::new(&expr, 1, 10).unwrap(),
-      }),
-      span: Span::new(&expr, 0, 10).unwrap(),
-    };
-
-    let result = unary.check_semantics(&scope);
-    let errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::UnaryOperatorTypeError {
-      span: Span::new(&expr, 1, 10).unwrap(),
-      op: UnaryOp::Not,
-      ty: Ty::Int,
-    }));
-    assert!(errors.contains(&SemanticError::UnaryOperatorCombinationError {
-      span: Span::new(&expr, 0, 10).unwrap(),
-      outer: UnaryOp::Minus,
-      inner: UnaryOp::Not,
-    }));
-
-    assert_eq!(errors.len(), 2);
-  }
-
-  #[test]
-  fn semantic_binary_expression_check() {
-    let mut expr = "var + !5";
-    let mut binary = Expression::Binary {
-      op: BinaryOp::Plus,
-      lhs: Box::new(Expression::Variable {
-        identifier: Identifier::from("var"),
-        index_expression: None,
-        span: Span::new(&expr, 0, 3).unwrap(),
-      }),
-      rhs: Box::new(Expression::Unary {
-        op: UnaryOp::Not,
-        expression: Box::new(Expression::Literal { literal: Literal::Int(5), span: Span::new(&expr, 7, 8).unwrap() }),
-        span: Span::new(&expr, 6, 8).unwrap(),
-      }),
-      span: Span::new(&expr, 0, 8).unwrap(),
-    };
-
-    let scope = Scope::new();
-
-    scope.borrow_mut().symbols.insert(Identifier::from("var"), Symbol::Variable(Ty::String, None));
-
-    let result = binary.check_semantics(&scope);
-    let errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::UnaryOperatorTypeError {
-      span: Span::new(&expr, 6, 8).unwrap(),
-      op: UnaryOp::Not,
-      ty: Ty::Int,
-    }));
-    assert!(errors.contains(&SemanticError::BinaryOperatorTypeError {
-      span: Span::new(&expr, 0, 8).unwrap(),
-      op: BinaryOp::Plus,
-      lhs_ty: Some(Ty::String),
-      rhs_ty: Some(Ty::Bool),
-    }));
-
-    assert_eq!(errors.len(), 2);
-
-    expr = "var + var2";
-    binary = Expression::Binary {
-      op: BinaryOp::Plus,
-      lhs: Box::new(Expression::Variable {
-        identifier: Identifier::from("var"),
-        index_expression: None,
-        span: Span::new(&expr, 0, 3).unwrap(),
-      }),
-      rhs: Box::new(Expression::Variable {
-        identifier: Identifier::from("var2"),
-        index_expression: None,
-        span: Span::new(&expr, 6, 10).unwrap(),
-      }),
-      span: Span::new(&expr, 0, 10).unwrap(),
-    };
-
-    scope.borrow_mut().symbols.insert(Identifier::from("var2"), Symbol::Variable(Ty::String, None));
-
-    let result = binary.check_semantics(&scope);
-    let errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::BinaryOperatorTypeError {
-      span: Span::new(&expr, 0, 10).unwrap(),
-      op: BinaryOp::Plus,
-      lhs_ty: Some(Ty::String),
-      rhs_ty: Some(Ty::String),
-    }));
-
-    assert_eq!(errors.len(), 1);
-  }
-
-  #[test]
-  fn semantic_binary_expression_check_for_void_function_call() {
-    let expr = "lol() + 5";
-    let binary = Expression::Binary {
-      op: BinaryOp::Plus,
-      lhs: Box::new(Expression::FunctionCall {
-        identifier: Identifier::from("lol"),
-        arguments: Vec::new(),
-        span: Span::new(&expr, 0, 5).unwrap(),
-      }),
-      rhs: Box::new(Expression::Literal { literal: Literal::Int(5), span: Span::new(&expr, 8, 9).unwrap() }),
-      span: Span::new(&expr, 0, 9).unwrap(),
-    };
-
-    let scope = Scope::new();
-    scope.borrow_mut().symbols.insert(Identifier::from("lol"), Symbol::Function(None, Vec::new()));
-
-    let result = binary.check_semantics(&scope);
-    let errors = result.expect_err("no errors found");
-
-    assert!(errors.contains(&SemanticError::BinaryOperatorTypeError {
-      span: Span::new(&expr, 0, 9).unwrap(),
-      op: BinaryOp::Plus,
-      lhs_ty: None,
-      rhs_ty: Some(Ty::Int),
-    }));
-
-    assert_eq!(errors.len(), 1);
-  }
-
-  #[test]
-  fn semantic_if_statement_check() {
-    let expr = "if (10 - 9)
-      var = 1;";
-    let if_statement = IfStatement {
-      condition: Expression::Binary {
-        op: BinaryOp::Minus,
-        lhs: Box::new(Expression::Literal { literal: Literal::Int(10), span: Span::new(&expr, 4, 5).unwrap() }),
-        rhs: Box::new(Expression::Literal { literal: Literal::Int(9), span: Span::new(&expr, 9, 10).unwrap() }),
-        span: Span::new(&expr, 4, 10).unwrap(),
-      },
-      block: Statement::Assignment(Box::new(Assignment {
-        identifier: Identifier::from("var"),
-        index_expression: None,
-        rvalue: Expression::Literal { literal: Literal::Int(1), span: Span::new(&expr, 24, 25).unwrap() },
-        span: Span::new(&expr, 18, 25).unwrap(),
-      })),
-      else_block: None,
-      span: Span::new(&expr, 0, 26).unwrap(),
-    };
-
-    let scope = Scope::new();
-    let result = if_statement.check_semantics(&scope);
-    let errors = result.expect_err("no errors found");
-
-    assert!(
-      errors.contains(&SemanticError::InvalidConditionType { span: Span::new(&expr, 0, 26).unwrap(), actual: Ty::Int })
-    );
-
-    assert_eq!(errors.len(), 1);
-  }
-
-  #[test]
-  fn semantic_while_and_return_statement_check() {
-    let expr = "while (0)
-      return 1;";
-    let while_statement = WhileStatement {
-      condition: Expression::Literal { literal: Literal::Int(0), span: Span::new(&expr, 7, 8).unwrap() },
-      block: Statement::Ret(ReturnStatement {
-        expression: Some(Expression::Literal { literal: Literal::Int(1), span: Span::new(&expr, 23, 24).unwrap() }),
-        span: Span::new(&expr, 16, 24).unwrap(),
-      }),
-      span: Span::new(&expr, 0, 25).unwrap(),
-    };
-
-    let scope = Scope::new();
-    let result = while_statement.check_semantics(&scope);
-    let errors = result.expect_err("no errors found");
-
-    assert!(
-      errors.contains(&SemanticError::InvalidConditionType { span: Span::new(&expr, 0, 25).unwrap(), actual: Ty::Int })
-    );
-
-    assert_eq!(errors.len(), 1);
   }
 }

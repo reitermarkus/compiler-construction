@@ -222,8 +222,8 @@ impl<'a> FromPest<'a> for BinaryOp {
 #[derive(PartialEq, Debug)]
 pub enum Expression<'a> {
   Literal { literal: Literal, span: Span<'a> },
-  Variable { identifier: Identifier, index_expression: Option<Box<Expression<'a>>>, span: Span<'a> },
-  FunctionCall { identifier: Identifier, arguments: Vec<Expression<'a>>, span: Span<'a> },
+  Variable { identifier: Identifier<'a>, index_expression: Option<Box<Expression<'a>>>, span: Span<'a> },
+  FunctionCall { identifier: Identifier<'a>, arguments: Vec<Expression<'a>>, span: Span<'a> },
   Unary { op: UnaryOp, expression: Box<Expression<'a>>, span: Span<'a> },
   Binary { op: BinaryOp, lhs: Box<Expression<'a>>, rhs: Box<Expression<'a>>, span: Span<'a> },
 }
@@ -340,39 +340,57 @@ impl<'a> FromPest<'a> for Expression<'a> {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct Identifier(pub String);
+pub struct Identifier<'a> {
+  string: &'a str,
+}
 
-impl AsRef<str> for &Identifier {
+impl Identifier<'_> {
+  pub fn as_str(&self) -> &str {
+    self.string
+  }
+}
+
+impl AsRef<str> for Identifier<'_> {
   fn as_ref(&self) -> &str {
-    &self.0
+    self.string
   }
 }
 
-impl fmt::Display for Identifier {
+impl fmt::Display for Identifier<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.0.fmt(f)
+    self.string.fmt(f)
   }
 }
 
-impl FromPest<'_> for Identifier {
+impl<'a> FromPest<'a> for Identifier<'a> {
   type Rule = Rule;
   type FatalError = String;
 
-  fn from_pest(pairs: &mut Pairs<'_, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
-    let identifier = pairs.next().ok_or(ConversionError::NoMatch)?.as_str();
-    Ok(Self(identifier.into()))
+  fn from_pest(pairs: &mut Pairs<'a, Self::Rule>) -> Result<Self, ConversionError<Self::FatalError>> {
+    let identifier = pairs.next().ok_or(ConversionError::NoMatch)?;
+
+    match identifier.as_rule() {
+      Rule::identifier => Ok(Self::from(identifier)),
+      _ => unreachable!(),
+    }
   }
 }
 
-impl From<&str> for Identifier {
-  fn from(identifier: &str) -> Self {
-    Identifier(identifier.into())
+impl<'a> From<Pair<'a, Rule>> for Identifier<'a> {
+  fn from(identifier: Pair<'a, Rule>) -> Self {
+    Identifier::from(identifier.as_str())
+  }
+}
+
+impl<'a> From<&'a str> for Identifier<'a> {
+  fn from(identifier: &'a str) -> Self {
+    Identifier { string: identifier }
   }
 }
 
 #[derive(PartialEq, Debug)]
 pub struct Assignment<'a> {
-  pub identifier: Identifier,
+  pub identifier: Identifier<'a>,
   pub index_expression: Option<Expression<'a>>,
   pub rvalue: Expression<'a>,
   pub span: Span<'a>,
@@ -407,7 +425,7 @@ impl<'a> FromPest<'a> for Assignment<'a> {
 pub struct Declaration<'a> {
   pub ty: Ty,
   pub count: Option<usize>,
-  pub identifier: Identifier,
+  pub identifier: Identifier<'a>,
   pub span: Span<'a>,
 }
 
@@ -581,7 +599,7 @@ impl<'a> FromPest<'a> for Statement<'a> {
 #[derive(PartialEq, Debug)]
 pub struct FunctionDeclaration<'a> {
   pub ty: Option<Ty>,
-  pub identifier: Identifier,
+  pub identifier: Identifier<'a>,
   pub parameters: Vec<Declaration<'a>>,
   pub body: CompoundStatement<'a>,
   pub span: Span<'a>,

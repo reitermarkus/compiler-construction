@@ -8,15 +8,15 @@ use std::ops::{Deref, DerefMut};
 use mc_parser::ast::*;
 
 #[derive(Default)]
-pub struct Scope {
+pub struct Scope<'a> {
   pub name: Option<String>,
-  pub parent: Option<Rc<RefCell<Scope>>>,
-  pub symbols: SymbolTable,
+  pub parent: Option<Rc<RefCell<Scope<'a>>>>,
+  pub symbols: SymbolTable<'a>,
   pub return_type: Option<Ty>,
-  pub children: Vec<Rc<RefCell<Scope>>>,
+  pub children: Vec<Rc<RefCell<Scope<'a>>>>,
 }
 
-impl fmt::Debug for Scope {
+impl fmt::Debug for Scope<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     f.debug_struct("Scope")
       .field("name", &self.name)
@@ -28,7 +28,7 @@ impl fmt::Debug for Scope {
   }
 }
 
-impl fmt::Display for Scope {
+impl fmt::Display for Scope<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     if let Some(parent) = &self.parent {
       let parent = parent.borrow();
@@ -46,7 +46,7 @@ impl fmt::Display for Scope {
   }
 }
 
-impl Scope {
+impl<'a> Scope<'a> {
   pub fn new() -> Rc<RefCell<Self>> {
     let mut scope = Scope::default();
 
@@ -72,11 +72,11 @@ impl Scope {
     Rc::clone(parent.children.last().unwrap())
   }
 
-  pub fn insert(&mut self, identifier: Identifier, symbol: Symbol) {
+  pub fn insert(&mut self, identifier: Identifier<'a>, symbol: Symbol) {
     self.symbols.insert(identifier, symbol);
   }
 
-  pub fn lookup(scope: &Rc<RefCell<Self>>, identifier: &Identifier) -> Option<Symbol> {
+  pub fn lookup(scope: &Rc<RefCell<Self>>, identifier: &Identifier<'a>) -> Option<Symbol> {
     let scope = scope.borrow();
 
     if let Some(symbol) = scope.symbols.get(identifier) {
@@ -90,7 +90,7 @@ impl Scope {
     }
   }
 
-  pub fn lookup_in_scope(scope: &Rc<RefCell<Self>>, identifier: &Identifier) -> Option<Symbol> {
+  pub fn lookup_in_scope(scope: &Rc<RefCell<Self>>, identifier: &Identifier<'a>) -> Option<Symbol> {
     let scope = scope.borrow();
 
     if let Some(symbol) = scope.symbols.get(identifier) {
@@ -153,19 +153,19 @@ impl fmt::Display for Symbol {
 }
 
 #[derive(Default, Debug)]
-pub struct SymbolTable {
-  pub table: HashMap<Identifier, Symbol>,
+pub struct SymbolTable<'a> {
+  pub table: HashMap<Identifier<'a>, Symbol>,
 }
 
-impl Deref for SymbolTable {
-  type Target = HashMap<Identifier, Symbol>;
+impl<'a> Deref for SymbolTable<'a> {
+  type Target = HashMap<Identifier<'a>, Symbol>;
 
   fn deref(&self) -> &Self::Target {
     &self.table
   }
 }
 
-impl DerefMut for SymbolTable {
+impl<'a> DerefMut for SymbolTable<'a> {
   fn deref_mut(&mut self) -> &mut Self::Target {
     &mut self.table
   }

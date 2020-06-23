@@ -4,16 +4,16 @@ use std::ops::Range;
 use mc_parser::ast::*;
 
 #[derive(Debug, Default)]
-pub struct HashStack {
-  stack: Vec<(Identifier, usize, Ty)>,
+pub struct HashStack<'a> {
+  stack: Vec<(Identifier<'a>, usize, Ty)>,
 }
 
-impl HashStack {
-  pub fn push(&mut self, identifier: Identifier, reference: usize, ty: Ty) {
+impl<'a> HashStack<'a> {
+  pub fn push(&mut self, identifier: Identifier<'a>, reference: usize, ty: Ty) {
     self.stack.push((identifier, reference, ty));
   }
 
-  pub fn lookup(&self, identifier: &Identifier) -> Option<(usize, Ty)> {
+  pub fn lookup(&self, identifier: &Identifier<'_>) -> Option<(usize, Ty)> {
     self.stack.iter().rev().find(|(id, _, _)| id == identifier).map(|&(_, reference, ty)| (reference, ty))
   }
 
@@ -30,7 +30,7 @@ impl HashStack {
 pub enum Arg<'a> {
   Literal(Literal),
   Variable(Ty, usize, Box<Option<Arg<'a>>>),
-  FunctionCall(Option<Ty>, &'a Identifier, Vec<Arg<'a>>),
+  FunctionCall(Option<Ty>, Identifier<'a>, Vec<Arg<'a>>),
   Reference(Option<Ty>, usize),
 }
 
@@ -58,9 +58,9 @@ impl<'a> PartialEq for Arg<'a> {
 
 #[derive(Default, Debug)]
 pub struct IntermediateRepresentation<'a> {
-  pub stack: HashStack,
+  pub stack: HashStack<'a>,
   pub statements: Vec<Op<'a>>,
-  pub functions: HashMap<&'a Identifier, (Range<usize>, Option<Ty>)>,
+  pub functions: HashMap<Identifier<'a>, (Range<usize>, Option<Ty>)>,
 }
 
 impl<'a> IntermediateRepresentation<'a> {
@@ -83,15 +83,15 @@ impl<'a> IntermediateRepresentation<'a> {
     }
   }
 
-  pub fn add_function(&mut self, identifier: &'a Identifier, range: Range<usize>, ty: Option<Ty>) {
+  pub fn add_function(&mut self, identifier: Identifier<'a>, range: Range<usize>, ty: Option<Ty>) {
     self.functions.insert(identifier, (range, ty));
   }
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Op<'a> {
-  Param(&'a Identifier, Ty, Option<usize>),
-  Decl(&'a Identifier, Ty, Option<usize>),
+  Param(Identifier<'a>, Ty, Option<usize>),
+  Decl(Identifier<'a>, Ty, Option<usize>),
   Gt(Arg<'a>, Arg<'a>),
   Gte(Arg<'a>, Arg<'a>),
   Lt(Arg<'a>, Arg<'a>),
