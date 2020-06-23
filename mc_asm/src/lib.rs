@@ -2,9 +2,9 @@
 
 use std::io::{Read, Write};
 
+use mc_common::input_to_string;
 use mc_ir::AddToIr;
 use mc_ir::IntermediateRepresentation;
-use mc_common::input_to_string;
 
 mod asm;
 mod register;

@@ -3,8 +3,8 @@ use std::rc::Rc;
 
 use pest::Span;
 
-use mc_parser::ast::*;
 use mc_common::error::*;
+use mc_parser::ast::*;
 
 use super::extend_errors;
 use crate::*;
@@ -777,7 +777,6 @@ mod tests {
     expect_error!(Expression, "true + 5", Some("operator '+' cannot be used with types 'bool' and 'int'"));
   }
 }
-
 
 #[cfg(test)]
 mod test {

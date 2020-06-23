@@ -6,9 +6,9 @@ use std::process::{Command, Stdio};
 
 use mc_asm::ToAsm;
 
+use mc_common::input_to_string;
 use mc_ir::AddToIr;
 use mc_ir::IntermediateRepresentation;
-use mc_common::input_to_string;
 
 pub fn cli(
   input: impl Read,
@@ -82,7 +82,7 @@ pub fn cli(
   };
 
   let mut stdin = child.stdin.take().unwrap();
-  if let Err(err) =  write!(&mut stdin, "{}", asm) {
+  if let Err(err) = write!(&mut stdin, "{}", asm) {
     eprintln!("Failed writing stdin to command {:?}: {}", command, err);
     return Err(1);
   }
@@ -102,7 +102,7 @@ pub fn cli(
       None => {
         eprintln!("Command {:?} failed.", command);
         Err(1)
-      },
+      }
     };
   }
 

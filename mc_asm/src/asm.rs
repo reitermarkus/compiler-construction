@@ -60,7 +60,7 @@ pub struct Asm {
   pub strings: BTreeMap<String, String>,
   /// All *floats*, that will be in the output of the assembly file.
   pub floats: BTreeMap<OrderedFloat<f64>, String>,
-    /// All built-in functions, that will be in the output of the assembly file like `read_int`, `read_float` or `print_nl`.
+  /// All built-in functions, that will be in the output of the assembly file like `read_int`, `read_float` or `print_nl`.
   pub builtin_functions: HashSet<&'static str>,
 }
 
