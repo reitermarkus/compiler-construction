@@ -12,7 +12,7 @@ pub enum StorageType {
 }
 
 impl From<&Ty> for StorageType {
-  /// Gets the [`StorageType`](crate::ast::Ty) from the [`Ty`](crate::ast::Ty).
+  /// Gets the [`StorageType`](storage::StorageType) from the [`Ty`](crate::ast::Ty).
   fn from(ty: &Ty) -> Self {
     match ty {
       Ty::Float => Self::Dword,
