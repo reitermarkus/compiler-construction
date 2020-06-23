@@ -4,9 +4,9 @@
 
 # Dependencies
 
-- Rust
+- Rust (>= 1.44)
 - Graphviz
-- Ruby & Rake
+- Ruby (>= 2.6) & Rake
 
 
 # Building
@@ -47,3 +47,6 @@ rake ir
 ```
 rake asm
 ```
+
+
+# Known Issues

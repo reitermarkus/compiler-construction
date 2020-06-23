@@ -13,9 +13,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --assume-yes --no-install-recommends gcc-multilib
-      - uses: actions/setup-ruby@v1
+      - name: Install Ruby
+        uses: actions/setup-ruby@v1
         with:
-          ruby-version: 2.7
+          ruby-version: 2.6
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: 1.44.0
+            override: true
+            components: rustfmt, clippy
       - name: Build
         uses: actions-rs/cargo@v1
         with:
@@ -35,9 +42,8 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings -A clippy::unknown-clippy-lints
-      - name: Run Examples
+      - name: Test Examples
         run: rake test
-        shell: bash
       - name: Coverage
         uses: actions-rs/tarpaulin@v0.1
         with:
