@@ -314,16 +314,6 @@ impl<'a> Expression<'a> {
 
     Ok((expr, outer_span))
   }
-
-  pub fn get_span(&self) -> &Span<'a> {
-    match self {
-      Self::Literal { span, .. } => span,
-      Self::Variable { span, .. } => span,
-      Self::Unary { span, .. } => span,
-      Self::Binary { span, .. } => span,
-      Self::FunctionCall { span, .. } => span,
-    }
-  }
 }
 
 impl_try_from_str!(Expression, Rule::expression);
