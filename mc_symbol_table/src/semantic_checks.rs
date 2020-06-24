@@ -229,7 +229,7 @@ impl<'a> CheckSemantics<'a> for Program<'a> {
 // Does not perform semantic checks on the expression.
 pub fn get_expression_type<'a>(scope: &Rc<RefCell<Scope<'a>>>, expression: &Expression<'a>) -> Option<Ty> {
   match expression {
-    Expression::Literal { literal, .. } => Some(Ty::from(literal)),
+    Expression::Literal { literal, .. } => Some(literal.ty()),
     Expression::Variable { identifier, .. } | Expression::FunctionCall { identifier, .. } => {
       match Scope::lookup(scope, identifier) {
         Some(Symbol::Variable(ty, ..)) => Some(ty),
@@ -439,7 +439,7 @@ pub fn check_unary_expression<'a>(
 
   match expression {
     Expression::Literal { literal, .. } => {
-      extend_errors!(res, check_unary_operator_compatability(op, Ty::from(literal), span));
+      extend_errors!(res, check_unary_operator_compatability(op, literal.ty(), span));
     }
     Expression::Variable { identifier, index_expression, .. } => {
       extend_errors!(res, check_variable(scope, identifier, span, index_expression));

@@ -41,7 +41,7 @@ pub enum Arg<'a> {
 impl<'a> Arg<'a> {
   pub fn ty(&self) -> Option<Ty> {
     match self {
-      Self::Literal(literal) => Some(Ty::from(literal)),
+      Self::Literal(literal) => Some(literal.ty()),
       Self::Variable(ty, ..) => Some(*ty),
       Self::FunctionCall(ty, ..) => *ty,
       Self::Reference(ty, ..) => *ty,
