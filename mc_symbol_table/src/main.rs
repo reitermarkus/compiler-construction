@@ -1,6 +1,5 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
-use std::io;
 use std::path::PathBuf;
 use std::process::exit;
 
@@ -8,7 +7,7 @@ use clap::{value_t, App, Arg};
 
 use mc_common::{input, output};
 
-fn main() -> io::Result<()> {
+fn main() {
   let matches = App::new("mC Symbol Table Viewer")
     .set_term_width(0)
     .max_term_width(0)
@@ -25,6 +24,4 @@ fn main() -> io::Result<()> {
   if let Err(exit_status) = mc_symbol_table::cli(input, output) {
     exit(exit_status);
   }
-
-  Ok(())
 }

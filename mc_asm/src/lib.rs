@@ -1,9 +1,9 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
+use std::convert::TryFrom;
 use std::io::{Read, Write};
 
 use mc_common::input_to_string;
-use mc_ir::AddToIr;
 use mc_ir::IntermediateRepresentation;
 
 mod asm;
@@ -17,15 +17,13 @@ pub use to_asm::ToAsm;
 pub fn cli(input: impl Read, mut output: impl Write) -> Result<(), i32> {
   let contents = input_to_string(input)?;
 
-  let ast = mc_parser::parse(&contents).expect("failed to parse program");
-
-  if let Err(err) = mc_symbol_table::check_semantics(&ast) {
-    eprintln!("{}", err);
-    return Err(1);
-  }
-
-  let mut ir = IntermediateRepresentation::default();
-  ast.add_to_ir(&mut ir);
+  let ir = match IntermediateRepresentation::try_from(&*contents) {
+    Ok(ir) => ir,
+    Err(err) => {
+      eprintln!("{}", err);
+      return Err(1);
+    }
+  };
 
   let asm = ir.to_asm();
 
