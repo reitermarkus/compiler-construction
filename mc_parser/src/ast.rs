@@ -235,6 +235,16 @@ impl<'a> AsRef<Expression<'a>> for Expression<'a> {
 }
 
 impl<'a> Expression<'a> {
+  pub fn span(&self) -> &Span<'a> {
+    match self {
+      Self::Literal { span, .. } => span,
+      Self::Variable { span, ..} => span,
+      Self::FunctionCall { span, ..} => span,
+      Self::Unary { span, .. } => span,
+      Self::Binary { span, .. } => span,
+    }
+  }
+
   fn consume(
     pair: Pair<'a, Rule>,
     climber: &PrecClimber<Rule>,

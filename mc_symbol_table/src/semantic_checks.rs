@@ -43,7 +43,7 @@ impl<'a> CheckSemantics<'a> for Assignment<'a> {
       Some(Symbol::Function(..)) => {
         push_error!(
           res,
-          SemanticError::WrongUseOfFunction { span: self.span.clone(), identifier: self.identifier.clone() }
+          SemanticError::FunctionAssignment { span: self.span.clone(), identifier: self.identifier.clone() }
         );
       }
       Some(Symbol::Variable(ty, size)) => {
@@ -62,11 +62,13 @@ impl<'a> CheckSemantics<'a> for Assignment<'a> {
             );
           }
         };
-      }
-      None => {}
-    };
 
-    extend_errors!(res, check_variable(scope, &self.identifier, &self.span, &self.index_expression));
+        extend_errors!(res, check_variable(scope, &self.identifier, &self.span, &self.index_expression));
+      }
+      None => {
+        extend_errors!(res, check_variable(scope, &self.identifier, &self.span, &self.index_expression));
+      }
+    };
 
     extend_errors!(res, self.rvalue.check_semantics(scope));
 
@@ -259,7 +261,7 @@ where
 {
   match Scope::lookup(scope, identifier) {
     Some(Symbol::Function(..)) => {
-      Err(vec![SemanticError::WrongUseOfFunction { span: span.clone(), identifier: identifier.clone() }])
+      Err(vec![SemanticError::WrongUseOfFunctionAsVariable { span: span.clone(), identifier: identifier.clone() }])
     }
     Some(Symbol::Variable(.., size)) => check_variable_boxed_index(identifier, span, size, index_expression),
     None => Err(vec![SemanticError::NotDeclared { span: span.clone(), identifier: identifier.clone() }]),
@@ -393,7 +395,7 @@ pub fn check_function_call_arguments<'a>(
     for r in args
       .iter()
       .zip(arguments.iter())
-      .map(|(arg, argument)| check_function_call_argument_type(scope, arg, argument, identifier, span))
+      .map(|(arg, argument)| check_function_call_argument_type(scope, arg, argument, identifier))
     {
       extend_errors!(res, r);
     }
@@ -409,24 +411,21 @@ pub fn check_function_call_argument_type<'a>(
   symbol_arg: &(Ty, Option<usize>),
   arg_expression: &Expression<'a>,
   identifier: &Identifier<'a>,
-  span: &Span<'a>,
 ) -> Result<(), Vec<SemanticError<'a>>> {
-  if arg_expression.check_semantics(scope).is_err() {
-    return Err(vec![SemanticError::InvalidArgument { span: span.clone(), identifier: identifier.clone() }]);
-  }
+  let mut res = arg_expression.check_semantics(scope);
 
   let ty = get_expression_type(scope, arg_expression);
 
   if ty != Some(symbol_arg.0) {
-    return Err(vec![SemanticError::InvalidArgumentType {
-      span: span.clone(),
+    push_error!(res, SemanticError::InvalidArgumentType {
+      span: arg_expression.span().clone(),
       identifier: identifier.clone(),
       expected: symbol_arg.0,
       actual: ty,
-    }]);
+    });
   }
 
-  Ok(())
+  res
 }
 
 pub fn check_unary_expression<'a>(
@@ -875,7 +874,7 @@ mod test {
     let errors = result.expect_err("no errors found");
 
     assert!(errors.contains(&SemanticError::InvalidArgumentType {
-      span: Span::new(&expr, 0, 13).unwrap(),
+      span: Span::new(&expr, 9, 12).unwrap(),
       identifier: Identifier::from("pi"),
       expected: Ty::Int,
       actual: Some(Ty::Float)
@@ -1032,7 +1031,7 @@ mod test {
     result = variable_with_index.check_semantics(&scope);
     errors = result.expect_err("no errors found");
 
-    assert!(errors.contains(&SemanticError::WrongUseOfFunction {
+    assert!(errors.contains(&SemanticError::WrongUseOfFunctionAsVariable {
       span: Span::new("x[10]", 0, 5).unwrap(),
       identifier: Identifier::from("x")
     }));

@@ -30,11 +30,14 @@ pub enum SemanticError<'a> {
     size: usize,
     actual: usize,
   },
-  WrongUseOfFunction {
+  WrongUseOfFunctionAsVariable {
     span: Span<'a>,
     identifier: Identifier<'a>,
   },
-  NotAFunction {
+  FunctionAssignment {
+    span: Span<'a>,
+    identifier: Identifier<'a>,
+  },  NotAFunction {
     span: Span<'a>,
     identifier: Identifier<'a>,
   },
@@ -76,10 +79,6 @@ pub enum SemanticError<'a> {
     expected: Option<Ty>,
     actual: Option<Ty>,
   },
-  InvalidArgument {
-    span: Span<'a>,
-    identifier: Identifier<'a>,
-  },
   OperatorCombinationError {
     span: Span<'a>,
     unary_op: UnaryOp,
@@ -108,8 +107,11 @@ macro_rules! write_err {
     let (start_line, start_col) = $span.start_pos().line_col();
     let (end_line, end_col) = $span.end_pos().line_col();
 
-    for (line_number, line) in (start_line..=end_line).zip($span.lines()) {
-      write!($f, "{}: {}", line_number.to_string().blue(), line);
+    let line_count = end_line + 1 - start_line;
+    let skip_lines = if line_count <= 3 { 0 } else { line_count - 3 };
+
+    for (line_number, line) in (start_line..=end_line).zip($span.lines()).skip(skip_lines) {
+      write!($f, "{}: {}", line_number.to_string().blue(), line)?;
     }
 
     let line_number_len = (start_line as f64 + 1.0).log10().ceil() as usize;
@@ -136,7 +138,8 @@ impl fmt::Display for SemanticError<'_> {
       Self::IndexOutOfBounds { span, identifier, size, actual } => {
         write_err!(f, span, "index {} out of bound for '{}' with size {}", actual, identifier, size)
       }
-      Self::WrongUseOfFunction { span, identifier } => write_err!(f, span, "wrong use of function '{}'", identifier),
+      Self::WrongUseOfFunctionAsVariable { span, identifier } => write_err!(f, span, "wrong use of function '{}' as variable", identifier),
+      Self::FunctionAssignment { span, identifier } => write_err!(f, span, "cannot assign to function '{}'", identifier),
       Self::NotAFunction { span, identifier } => write_err!(f, span, "'{}' is not a function", identifier),
       Self::InvalidAmountOfArguments { span, identifier, expected, actual } => write_err!(
         f,
@@ -164,9 +167,6 @@ impl fmt::Display for SemanticError<'_> {
         expected.as_ref().map(|ty| ty.to_string()).unwrap_or_else(|| "void".into()),
         actual.as_ref().map(|ty| ty.to_string()).unwrap_or_else(|| "void".into())
       ),
-      Self::InvalidArgument { span, identifier } => {
-        write_err!(f, span, "invalid argument supplied to function '{}'", identifier)
-      }
       Self::UnaryOperatorTypeError { span, op, ty } => {
         write_err!(f, span, "operator '{}' cannot be used with type '{}'", op, ty)
       }
