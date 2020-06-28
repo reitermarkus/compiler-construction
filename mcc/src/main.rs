@@ -36,7 +36,6 @@ fn main() {
   let docker_image = value_t!(matches, "docker-image", String).ok();
 
   let input = input(in_file);
-
   if let Err(exit_code) = mcc::cli(input, out_file, backend, docker_image, quiet) {
     exit(exit_code)
   }

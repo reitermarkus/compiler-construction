@@ -12,7 +12,7 @@
 # Building
 
 ```
-cargo build
+cargo build [--release]
 ```
 
 

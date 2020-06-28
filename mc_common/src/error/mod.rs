@@ -2,6 +2,7 @@ use std::fmt;
 use std::io;
 
 use from_pest::ConversionError;
+use colored::*;
 
 mod semantic_error;
 pub use semantic_error::SemanticError;
@@ -22,8 +23,9 @@ impl fmt::Display for SuperWauError2000<'_> {
       }
       Self::ParseError(_) => writeln!(f, "Syntax error encountered:"),
       Self::SemanticError(errors) => {
-        writeln!(f, "Semantic error encountered:")?;
+        writeln!(f, "{}", "Semantic error(s) encountered:".bold().red())?;
         for e in errors.iter() {
+          writeln!(f)?;
           writeln!(f, "{}", e)?;
         }
         writeln!(f)

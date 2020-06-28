@@ -1,6 +1,7 @@
 use std::fmt;
 
 use pest::Span;
+use colored::*;
 
 use mc_parser::ast::*;
 
@@ -106,8 +107,18 @@ macro_rules! write_err {
   ($f:expr, $span:expr, $($args:expr),*) => {{
     let (start_line, start_col) = $span.start_pos().line_col();
     let (end_line, end_col) = $span.end_pos().line_col();
-    write!($f, "{}:{}-{}:{} ", start_line, start_col, end_line, end_col)?;
-    write!($f, $($args,)*)
+
+    for (line_number, line) in (start_line..=end_line).zip($span.lines()) {
+      write!($f, "{}: {}", line_number.to_string().blue(), line);
+    }
+
+    let line_number_len = (start_line as f64 + 1.0).log10().ceil() as usize;
+    let span_len = end_col - start_col;
+
+    write!($f, "{0: <indentation$}", "", indentation = start_col - 1 + line_number_len + 2)?;
+
+    write!($f, "{} ", format!("{0:^<1$}", "", span_len).red())?;
+    write!($f, "{}", format!($($args,)*).red())
   }}
 }
 
@@ -144,7 +155,7 @@ impl fmt::Display for SemanticError<'_> {
         actual.as_ref().map(|ty| ty.to_string()).unwrap_or_else(|| "void".into())
       ),
       Self::InvalidDeclarationType { span, identifier, expected, actual } => {
-        write_err!(f, span, "variable '{}' expected type {}, found {}", identifier, expected, actual)
+        write_err!(f, span, "cannot assign {} to variable '{}' of type {}", actual, identifier, expected)
       }
       Self::InvalidReturnType { span, expected, actual } => write_err!(
         f,
