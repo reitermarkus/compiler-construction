@@ -1,8 +1,8 @@
 use std::fmt;
 use std::io;
 
-use from_pest::ConversionError;
 use colored::*;
+use from_pest::ConversionError;
 
 mod semantic_error;
 pub use semantic_error::SemanticError;

@@ -1,7 +1,7 @@
 use std::fmt;
 
-use pest::Span;
 use colored::*;
+use pest::Span;
 
 use mc_parser::ast::*;
 
@@ -37,7 +37,8 @@ pub enum SemanticError<'a> {
   FunctionAssignment {
     span: Span<'a>,
     identifier: Identifier<'a>,
-  },  NotAFunction {
+  },
+  NotAFunction {
     span: Span<'a>,
     identifier: Identifier<'a>,
   },
@@ -138,8 +139,12 @@ impl fmt::Display for SemanticError<'_> {
       Self::IndexOutOfBounds { span, identifier, size, actual } => {
         write_err!(f, span, "index {} out of bound for '{}' with size {}", actual, identifier, size)
       }
-      Self::WrongUseOfFunctionAsVariable { span, identifier } => write_err!(f, span, "wrong use of function '{}' as variable", identifier),
-      Self::FunctionAssignment { span, identifier } => write_err!(f, span, "cannot assign to function '{}'", identifier),
+      Self::WrongUseOfFunctionAsVariable { span, identifier } => {
+        write_err!(f, span, "wrong use of function '{}' as variable", identifier)
+      }
+      Self::FunctionAssignment { span, identifier } => {
+        write_err!(f, span, "cannot assign to function '{}'", identifier)
+      }
       Self::NotAFunction { span, identifier } => write_err!(f, span, "'{}' is not a function", identifier),
       Self::InvalidAmountOfArguments { span, identifier, expected, actual } => write_err!(
         f,

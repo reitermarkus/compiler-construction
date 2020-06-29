@@ -417,12 +417,15 @@ pub fn check_function_call_argument_type<'a>(
   let ty = get_expression_type(scope, arg_expression);
 
   if ty != Some(symbol_arg.0) {
-    push_error!(res, SemanticError::InvalidArgumentType {
-      span: arg_expression.span().clone(),
-      identifier: identifier.clone(),
-      expected: symbol_arg.0,
-      actual: ty,
-    });
+    push_error!(
+      res,
+      SemanticError::InvalidArgumentType {
+        span: arg_expression.span().clone(),
+        identifier: identifier.clone(),
+        expected: symbol_arg.0,
+        actual: ty,
+      }
+    );
   }
 
   res
