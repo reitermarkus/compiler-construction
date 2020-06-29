@@ -184,9 +184,26 @@
 <span id="184">184</span>
 <span id="185">185</span>
 <span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="kw">use</span> <span class="ident">std</span>::<span class="ident">fmt</span>;
 
+<span class="kw">use</span> <span class="ident">colored</span>::<span class="kw-2">*</span>;
 <span class="kw">use</span> <span class="ident">pest</span>::<span class="ident">Span</span>;
 
 <span class="kw">use</span> <span class="ident">mc_parser</span>::<span class="ident">ast</span>::<span class="kw-2">*</span>;
@@ -216,7 +233,11 @@
     <span class="ident">size</span>: <span class="ident">usize</span>,
     <span class="ident">actual</span>: <span class="ident">usize</span>,
   },
-  <span class="ident">WrongUseOfFunction</span> {
+  <span class="ident">WrongUseOfFunctionAsVariable</span> {
+    <span class="ident">span</span>: <span class="ident">Span</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
+    <span class="ident">identifier</span>: <span class="ident">Identifier</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
+  },
+  <span class="ident">FunctionAssignment</span> {
     <span class="ident">span</span>: <span class="ident">Span</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
     <span class="ident">identifier</span>: <span class="ident">Identifier</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
   },
@@ -262,10 +283,6 @@
     <span class="ident">expected</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ty</span><span class="op">&gt;</span>,
     <span class="ident">actual</span>: <span class="prelude-ty">Option</span><span class="op">&lt;</span><span class="ident">Ty</span><span class="op">&gt;</span>,
   },
-  <span class="ident">InvalidArgument</span> {
-    <span class="ident">span</span>: <span class="ident">Span</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
-    <span class="ident">identifier</span>: <span class="ident">Identifier</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
-  },
   <span class="ident">OperatorCombinationError</span> {
     <span class="ident">span</span>: <span class="ident">Span</span><span class="op">&lt;</span><span class="lifetime">&#39;a</span><span class="op">&gt;</span>,
     <span class="ident">unary_op</span>: <span class="ident">UnaryOp</span>,
@@ -293,8 +310,21 @@
   (<span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>:<span class="ident">expr</span>, <span class="macro-nonterminal">$</span><span class="macro-nonterminal">span</span>:<span class="ident">expr</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>:<span class="ident">expr</span>),<span class="kw-2">*</span>) <span class="op">=</span><span class="op">&gt;</span> {{
     <span class="kw">let</span> (<span class="ident">start_line</span>, <span class="ident">start_col</span>) <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">span</span>.<span class="ident">start_pos</span>().<span class="ident">line_col</span>();
     <span class="kw">let</span> (<span class="ident">end_line</span>, <span class="ident">end_col</span>) <span class="op">=</span> <span class="macro-nonterminal">$</span><span class="macro-nonterminal">span</span>.<span class="ident">end_pos</span>().<span class="ident">line_col</span>();
-    <span class="macro">write</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>, <span class="string">&quot;{}:{}-{}:{} &quot;</span>, <span class="ident">start_line</span>, <span class="ident">start_col</span>, <span class="ident">end_line</span>, <span class="ident">end_col</span>)<span class="question-mark">?</span>;
-    <span class="macro">write</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>, $(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>,)<span class="kw-2">*</span>)
+
+    <span class="kw">let</span> <span class="ident">line_count</span> <span class="op">=</span> <span class="ident">end_line</span> <span class="op">+</span> <span class="number">1</span> <span class="op">-</span> <span class="ident">start_line</span>;
+    <span class="kw">let</span> <span class="ident">skip_lines</span> <span class="op">=</span> <span class="kw">if</span> <span class="ident">line_count</span> <span class="op">&lt;</span><span class="op">=</span> <span class="number">3</span> { <span class="number">0</span> } <span class="kw">else</span> { <span class="ident">line_count</span> <span class="op">-</span> <span class="number">3</span> };
+
+    <span class="kw">for</span> (<span class="ident">line_number</span>, <span class="ident">line</span>) <span class="kw">in</span> (<span class="ident">start_line</span>..<span class="op">=</span><span class="ident">end_line</span>).<span class="ident">zip</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">span</span>.<span class="ident">lines</span>()).<span class="ident">skip</span>(<span class="ident">skip_lines</span>) {
+      <span class="macro">write</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>, <span class="string">&quot;{}: {}&quot;</span>, <span class="ident">line_number</span>.<span class="ident">to_string</span>().<span class="ident">blue</span>(), <span class="ident">line</span>)<span class="question-mark">?</span>;
+    }
+
+    <span class="kw">let</span> <span class="ident">line_number_len</span> <span class="op">=</span> (<span class="ident">start_line</span> <span class="kw">as</span> <span class="ident">f64</span> <span class="op">+</span> <span class="number">1.0</span>).<span class="ident">log10</span>().<span class="ident">ceil</span>() <span class="kw">as</span> <span class="ident">usize</span>;
+    <span class="kw">let</span> <span class="ident">span_len</span> <span class="op">=</span> <span class="ident">end_col</span> <span class="op">-</span> <span class="ident">start_col</span>;
+
+    <span class="macro">write</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>, <span class="string">&quot;{0: &lt;indentation$}&quot;</span>, <span class="string">&quot;&quot;</span>, <span class="ident">indentation</span> <span class="op">=</span> <span class="ident">start_col</span> <span class="op">-</span> <span class="number">1</span> <span class="op">+</span> <span class="ident">line_number_len</span> <span class="op">+</span> <span class="number">2</span>)<span class="question-mark">?</span>;
+
+    <span class="macro">write</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>, <span class="string">&quot;{} &quot;</span>, <span class="macro">format</span><span class="macro">!</span>(<span class="string">&quot;{0:^&lt;1$}&quot;</span>, <span class="string">&quot;&quot;</span>, <span class="ident">span_len</span>).<span class="ident">red</span>())<span class="question-mark">?</span>;
+    <span class="macro">write</span><span class="macro">!</span>(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">f</span>, <span class="string">&quot;{}&quot;</span>, <span class="macro">format</span><span class="macro">!</span>($(<span class="macro-nonterminal">$</span><span class="macro-nonterminal">args</span>,)<span class="kw-2">*</span>).<span class="ident">red</span>())
   }}
 }
 
@@ -312,7 +342,12 @@
       <span class="self">Self</span>::<span class="ident">IndexOutOfBounds</span> { <span class="ident">span</span>, <span class="ident">identifier</span>, <span class="ident">size</span>, <span class="ident">actual</span> } <span class="op">=</span><span class="op">&gt;</span> {
         <span class="macro">write_err</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="ident">span</span>, <span class="string">&quot;index {} out of bound for &#39;{}&#39; with size {}&quot;</span>, <span class="ident">actual</span>, <span class="ident">identifier</span>, <span class="ident">size</span>)
       }
-      <span class="self">Self</span>::<span class="ident">WrongUseOfFunction</span> { <span class="ident">span</span>, <span class="ident">identifier</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write_err</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="ident">span</span>, <span class="string">&quot;wrong use of function &#39;{}&#39;&quot;</span>, <span class="ident">identifier</span>),
+      <span class="self">Self</span>::<span class="ident">WrongUseOfFunctionAsVariable</span> { <span class="ident">span</span>, <span class="ident">identifier</span> } <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="macro">write_err</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="ident">span</span>, <span class="string">&quot;wrong use of function &#39;{}&#39; as variable&quot;</span>, <span class="ident">identifier</span>)
+      }
+      <span class="self">Self</span>::<span class="ident">FunctionAssignment</span> { <span class="ident">span</span>, <span class="ident">identifier</span> } <span class="op">=</span><span class="op">&gt;</span> {
+        <span class="macro">write_err</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="ident">span</span>, <span class="string">&quot;cannot assign to function &#39;{}&#39;&quot;</span>, <span class="ident">identifier</span>)
+      }
       <span class="self">Self</span>::<span class="ident">NotAFunction</span> { <span class="ident">span</span>, <span class="ident">identifier</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write_err</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="ident">span</span>, <span class="string">&quot;&#39;{}&#39; is not a function&quot;</span>, <span class="ident">identifier</span>),
       <span class="self">Self</span>::<span class="ident">InvalidAmountOfArguments</span> { <span class="ident">span</span>, <span class="ident">identifier</span>, <span class="ident">expected</span>, <span class="ident">actual</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write_err</span><span class="macro">!</span>(
         <span class="ident">f</span>,
@@ -331,7 +366,7 @@
         <span class="ident">actual</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">ty</span><span class="op">|</span> <span class="ident">ty</span>.<span class="ident">to_string</span>()).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;void&quot;</span>.<span class="ident">into</span>())
       ),
       <span class="self">Self</span>::<span class="ident">InvalidDeclarationType</span> { <span class="ident">span</span>, <span class="ident">identifier</span>, <span class="ident">expected</span>, <span class="ident">actual</span> } <span class="op">=</span><span class="op">&gt;</span> {
-        <span class="macro">write_err</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="ident">span</span>, <span class="string">&quot;variable &#39;{}&#39; expected type {}, found {}&quot;</span>, <span class="ident">identifier</span>, <span class="ident">expected</span>, <span class="ident">actual</span>)
+        <span class="macro">write_err</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="ident">span</span>, <span class="string">&quot;cannot assign {} to variable &#39;{}&#39; of type {}&quot;</span>, <span class="ident">actual</span>, <span class="ident">identifier</span>, <span class="ident">expected</span>)
       }
       <span class="self">Self</span>::<span class="ident">InvalidReturnType</span> { <span class="ident">span</span>, <span class="ident">expected</span>, <span class="ident">actual</span> } <span class="op">=</span><span class="op">&gt;</span> <span class="macro">write_err</span><span class="macro">!</span>(
         <span class="ident">f</span>,
@@ -340,9 +375,6 @@
         <span class="ident">expected</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">ty</span><span class="op">|</span> <span class="ident">ty</span>.<span class="ident">to_string</span>()).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;void&quot;</span>.<span class="ident">into</span>()),
         <span class="ident">actual</span>.<span class="ident">as_ref</span>().<span class="ident">map</span>(<span class="op">|</span><span class="ident">ty</span><span class="op">|</span> <span class="ident">ty</span>.<span class="ident">to_string</span>()).<span class="ident">unwrap_or_else</span>(<span class="op">|</span><span class="op">|</span> <span class="string">&quot;void&quot;</span>.<span class="ident">into</span>())
       ),
-      <span class="self">Self</span>::<span class="ident">InvalidArgument</span> { <span class="ident">span</span>, <span class="ident">identifier</span> } <span class="op">=</span><span class="op">&gt;</span> {
-        <span class="macro">write_err</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="ident">span</span>, <span class="string">&quot;invalid argument supplied to function &#39;{}&#39;&quot;</span>, <span class="ident">identifier</span>)
-      }
       <span class="self">Self</span>::<span class="ident">UnaryOperatorTypeError</span> { <span class="ident">span</span>, <span class="ident">op</span>, <span class="ident">ty</span> } <span class="op">=</span><span class="op">&gt;</span> {
         <span class="macro">write_err</span><span class="macro">!</span>(<span class="ident">f</span>, <span class="ident">span</span>, <span class="string">&quot;operator &#39;{}&#39; cannot be used with type &#39;{}&#39;&quot;</span>, <span class="ident">op</span>, <span class="ident">ty</span>)
       }
