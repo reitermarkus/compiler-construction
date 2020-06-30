@@ -6,6 +6,8 @@ use prettytable::Table;
 use mc_parser::ast::Program;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::io::{Read, Write};
+use mc_common::input_to_string;
 
 mod format_symbol_table;
 
@@ -17,9 +19,7 @@ use add_to_scope::AddToScope;
 
 use mc_common::error::*;
 
-mod cli;
 pub mod semantic_checks;
-pub use cli::cli;
 
 #[macro_export]
 macro_rules! push_error {
@@ -49,6 +49,34 @@ macro_rules! extend_errors {
       }
     }
   };
+}
+
+pub fn cli(input: impl Read, mut output: impl Write) -> Result<(), i32> {
+  fn string_to_ast(contents: &str) -> Result<Program<'_>, i32> {
+    match mc_parser::parse(contents) {
+      Ok(program) => Ok(program),
+      Err(err) => {
+        eprintln!("Error parsing input file: {:?}", err);
+        Err(1)
+      }
+    }
+  }
+
+  let contents = input_to_string(input)?;
+  let ast = string_to_ast(&contents)?;
+  match crate::check_semantics(&ast).map(|scope| crate::symbol_table(&scope.borrow())) {
+    Ok(table) => match table.print(&mut output) {
+      Ok(_) => Ok(()),
+      Err(err) => {
+        eprintln!("Error printing symbol table: {}", err);
+        Err(1)
+      }
+    },
+    Err(err) => {
+      eprintln!("{}", err);
+      Err(1)
+    }
+  }
 }
 
 /// Check semantics of a given `Program` and return the resulting `Scope` or `SemanticError`s.
