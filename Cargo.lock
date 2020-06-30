@@ -340,7 +340,6 @@ dependencies = [
  "mc_common",
  "mc_ir",
  "mc_parser",
- "mc_symbol_table",
  "ordered-float",
 ]
 

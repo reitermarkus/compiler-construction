@@ -8,6 +8,5 @@ edition = "2018"
 clap = "2.33"
 mc_common = { path = "../mc_common" }
 mc_parser = { path = "../mc_parser" }
-mc_symbol_table = { path = "../mc_symbol_table" }
 mc_ir = { path = "../mc_ir" }
 ordered-float = "1"
