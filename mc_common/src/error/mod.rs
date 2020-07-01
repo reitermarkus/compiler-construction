@@ -4,13 +4,15 @@ use std::io;
 use colored::*;
 use from_pest::ConversionError;
 
+use mc_parser::Rule;
+
 mod semantic_error;
 pub use semantic_error::SemanticError;
 
 #[derive(Debug)]
 pub enum SuperWauError2000<'a> {
   Io(io::Error),
-  ParseError(ConversionError<String>),
+  ParseError(ConversionError<pest::error::Error<Rule>>),
   SemanticError(Vec<SemanticError<'a>>),
 }
 
@@ -21,7 +23,18 @@ impl fmt::Display for SuperWauError2000<'_> {
         writeln!(f, "IO error encountered:")?;
         writeln!(f, "{}", error)
       }
-      Self::ParseError(_) => writeln!(f, "Syntax error encountered:"),
+      Self::ParseError(err) => {
+        writeln!(f, "{}", "Syntax error encountered:".bold().red())?;
+
+        match err {
+          ConversionError::NoMatch => unreachable!(),
+          ConversionError::Malformed(err) => {
+            writeln!(f, "{}", err)?;
+          }
+        }
+
+        Ok(())
+      }
       Self::SemanticError(errors) => {
         writeln!(f, "{}", "Semantic error(s) encountered:".bold().red())?;
         for e in errors.iter() {
@@ -40,8 +53,8 @@ impl<'a> From<io::Error> for SuperWauError2000<'a> {
   }
 }
 
-impl From<ConversionError<String>> for SuperWauError2000<'_> {
-  fn from(error: ConversionError<String>) -> Self {
+impl From<ConversionError<pest::error::Error<Rule>>> for SuperWauError2000<'_> {
+  fn from(error: ConversionError<pest::error::Error<Rule>>) -> Self {
     Self::ParseError(error)
   }
 }

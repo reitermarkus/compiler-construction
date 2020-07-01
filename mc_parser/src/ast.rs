@@ -10,13 +10,40 @@ use pest::{
 
 use crate::{McParser, Rule};
 
+fn rename_rule(r: &Rule) -> String {
+  match r {
+    Rule::plus => "+".to_owned(),
+    Rule::minus | Rule::unary_minus => "-".to_owned(),
+    Rule::times => "*".to_owned(),
+    Rule::divide => "/".to_owned(),
+    Rule::lte => "<=".to_owned(),
+    Rule::lt => "<".to_owned(),
+    Rule::gt => ">".to_owned(),
+    Rule::gte => ">=".to_owned(),
+    Rule::not => "!".to_owned(),
+    Rule::land => "||".to_owned(),
+    Rule::lor => "||".to_owned(),
+    Rule::eq => "==".to_owned(),
+    Rule::neq => "!=".to_owned(),
+    Rule::boolean => "a boolean".to_owned(),
+    Rule::expression => "an expression".to_owned(),
+    Rule::identifier => "an identifier".to_owned(),
+    Rule::ty => "a type".to_owned(),
+    Rule::COMMENT => "a comment".to_owned(),
+    Rule::WHITESPACE => "whitespace".to_owned(),
+    Rule::EOI => "end of input".to_owned(),
+    r => format!("{:?}", r),
+  }
+}
+
 macro_rules! impl_try_from_str {
   ($ty:ident, $rule:expr) => {
     impl<'a> TryFrom<&'a str> for $ty<'a> {
       type Error = ConversionError<pest::error::Error<Rule>>;
 
       fn try_from(s: &'a str) -> Result<Self, Self::Error> {
-        let mut parse_tree = McParser::parse($rule, s).map_err(|err| ConversionError::Malformed(err))?;
+        let mut parse_tree =
+          McParser::parse($rule, s).map_err(|err| ConversionError::Malformed(err.renamed_rules(rename_rule)))?;
         Self::from_pest(&mut parse_tree)
       }
     }

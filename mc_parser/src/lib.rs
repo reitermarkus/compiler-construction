@@ -12,11 +12,8 @@ use ast::Program;
 #[grammar = "grammar.pest"]
 pub struct McParser;
 
-pub fn parse(program: &str) -> Result<Program<'_>, ConversionError<String>> {
-  Program::try_from(program).map_err(|err| match err {
-    ConversionError::Malformed(err) => ConversionError::Malformed(err.to_string()),
-    ConversionError::NoMatch => ConversionError::NoMatch,
-  })
+pub fn parse(program: &str) -> Result<Program<'_>, ConversionError<pest::error::Error<Rule>>> {
+  Program::try_from(program)
 }
 
 #[cfg(test)]

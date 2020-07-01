@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::fmt;
 
 use colored::*;
@@ -105,20 +106,25 @@ pub enum SemanticError<'a> {
 
 macro_rules! write_err {
   ($f:expr, $span:expr, $($args:expr),*) => {{
-    let (start_line, start_col) = $span.start_pos().line_col();
+    let (start_line, mut start_col) = $span.start_pos().line_col();
     let (end_line, end_col) = $span.end_pos().line_col();
 
     let line_count = end_line + 1 - start_line;
     let skip_lines = if line_count <= 3 { 0 } else { line_count - 3 };
 
     for (line_number, line) in (start_line..=end_line).zip($span.lines()).skip(skip_lines) {
-      write!($f, "{}: {}", line_number.to_string().blue(), line)?;
+      write!($f, "{} | {}", line_number.to_string().blue(), line)?;
     }
 
     let line_number_len = (start_line as f64 + 1.0).log10().ceil() as usize;
-    let span_len = end_col - start_col;
 
-    write!($f, "{0: <indentation$}", "", indentation = start_col - 1 + line_number_len + 2)?;
+    if start_col > end_col {
+       start_col = end_col;
+    }
+
+    let span_len = max(1, end_col - start_col);
+
+    write!($f, "{0: <indentation$}", "", indentation = start_col - 1 + line_number_len + 3)?;
 
     write!($f, "{} ", format!("{0:^<1$}", "", span_len).red())?;
     write!($f, "{}", format!($($args,)*).red())

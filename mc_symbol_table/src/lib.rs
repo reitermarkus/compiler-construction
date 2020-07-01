@@ -52,18 +52,14 @@ macro_rules! extend_errors {
 }
 
 pub fn cli(input: impl Read, mut output: impl Write) -> Result<(), i32> {
-  fn string_to_ast(contents: &str) -> Result<Program<'_>, i32> {
-    match mc_parser::parse(contents) {
-      Ok(program) => Ok(program),
-      Err(err) => {
-        eprintln!("Error parsing input file: {:?}", err);
-        Err(1)
-      }
-    }
-  }
-
   let contents = input_to_string(input)?;
-  let ast = string_to_ast(&contents)?;
+  let ast = match mc_parser::parse(&contents) {
+    Ok(program) => program,
+    Err(err) => {
+      eprintln!("{}", SuperWauError2000::from(err));
+      return Err(1);
+    }
+  };
   match crate::check_semantics(&ast).map(|scope| crate::symbol_table(&scope.borrow())) {
     Ok(table) => match table.print(&mut output) {
       Ok(_) => Ok(()),
