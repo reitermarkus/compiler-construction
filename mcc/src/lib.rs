@@ -10,8 +10,6 @@ use mc_common::input_to_string;
 use mc_ir::AddToIr;
 use mc_ir::IntermediateRepresentation;
 
-
-
 pub fn cli(
   input: impl Read,
   out_file: impl AsRef<Path>,

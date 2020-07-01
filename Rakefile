@@ -47,7 +47,7 @@ task :failures, [:example] do |example: '*'|
       cargo_run 'mc_symbol_table', '-o', txt.to_s, mc.to_s
       raise StandardError, 'This example should have raised an error!'
     rescue RuntimeError => e
-      puts 'Errors recieved. Test passed!'
+      puts 'Errors received. Test passed!'
     end
   end
 end
