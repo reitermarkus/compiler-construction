@@ -1,7 +1,7 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
 
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use mc_asm::ToAsm;
@@ -9,6 +9,8 @@ use mc_asm::ToAsm;
 use mc_common::input_to_string;
 use mc_ir::AddToIr;
 use mc_ir::IntermediateRepresentation;
+
+
 
 pub fn cli(
   input: impl Read,
@@ -45,7 +47,7 @@ pub fn cli(
 
     let out_file = out_file.as_ref();
     let out_dir = out_file.parent().unwrap_or(&out_file);
-    let out_dir = match out_dir.canonicalize() {
+    let out_dir = match canonicalize_path(out_dir) {
       Ok(child) => child,
       Err(err) => {
         eprintln!("Failed resolving path {:?}: {}", out_dir, err);
@@ -107,4 +109,14 @@ pub fn cli(
   }
 
   Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn canonicalize_path(path: &Path) -> std::io::Result<PathBuf> {
+  Ok(path.to_path_buf())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn canonicalize_path(path: &Path) -> std::io::Result<PathBuf> {
+  path.canonicalize()
 }
