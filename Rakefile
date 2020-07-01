@@ -43,7 +43,12 @@ desc 'show error output for failing examples'
 task :failures, [:example] do |example: '*'|
   Pathname.glob("#{__dir__}/faliures/#{example}.mc").each do |mc|
     txt = mc.sub_ext('.txt')
-    cargo_run 'mc_symbol_table', '-o', txt.to_s, mc.to_s
+    begin
+      cargo_run 'mc_symbol_table', '-o', txt.to_s, mc.to_s
+      raise StandardError, 'This example should have raised an error!'
+    rescue RuntimeError => e
+      puts 'Errors recieved. Test passed!'
+    end
   end
 end
 
