@@ -13,7 +13,10 @@ use ast::Program;
 pub struct McParser;
 
 pub fn parse(program: &str) -> Result<Program<'_>, ConversionError<String>> {
-  Program::try_from(program)
+  Program::try_from(program).map_err(|err| match err {
+    ConversionError::Malformed(err) => ConversionError::Malformed(err.to_string()),
+    ConversionError::NoMatch => ConversionError::NoMatch,
+  })
 }
 
 #[cfg(test)]
