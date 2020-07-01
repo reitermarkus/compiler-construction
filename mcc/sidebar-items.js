@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["cli",""]]});
+initSidebarItems({"fn":[["canonicalize_path",""],["cli",""]]});
