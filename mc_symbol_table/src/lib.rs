@@ -3,11 +3,11 @@
 extern crate prettytable;
 use prettytable::Table;
 
+use mc_common::input_to_string;
 use mc_parser::ast::Program;
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::io::{Read, Write};
-use mc_common::input_to_string;
+use std::rc::Rc;
 
 mod format_symbol_table;
 
