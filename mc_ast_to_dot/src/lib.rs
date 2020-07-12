@@ -4,6 +4,7 @@ use std::io::{self, Read, Write};
 
 use petgraph::dot::{Config, Dot};
 
+use mc_common::error::*;
 use mc_common::input_to_string;
 
 mod add_to_graph;
@@ -24,7 +25,13 @@ fn write_graph(mut output: impl Write, graph: AstGraph) -> io::Result<()> {
 pub fn cli(input: impl Read, output: impl Write) -> Result<(), i32> {
   let contents = input_to_string(input)?;
 
-  let ast = mc_parser::parse(&contents).expect("failed to parse program");
+  let ast = match mc_parser::parse(&contents) {
+    Ok(program) => program,
+    Err(err) => {
+      eprintln!("{}", SuperWauError2000::from(err));
+      return Err(1);
+    }
+  };
 
   let mut graph = AstGraph::new();
   ast.add_to_graph(&mut graph);

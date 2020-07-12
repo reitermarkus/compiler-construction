@@ -6,7 +6,7 @@ use std::process::{Command, Stdio};
 
 use mc_asm::ToAsm;
 
-use mc_common::input_to_string;
+use mc_common::{error::*, input_to_string};
 use mc_ir::AddToIr;
 use mc_ir::IntermediateRepresentation;
 
@@ -19,9 +19,18 @@ pub fn cli(
 ) -> Result<(), i32> {
   let contents = input_to_string(input)?;
 
-  let ast = mc_parser::parse(&contents).expect("failed to parse program");
+  let ast = match mc_parser::parse(&contents) {
+    Ok(program) => program,
+    Err(err) => {
+      eprintln!("{}", SuperWauError2000::from(err));
+      return Err(1);
+    }
+  };
 
-  mc_symbol_table::check_semantics(&ast).expect("semantic checks failed");
+  if let Err(err) = mc_symbol_table::check_semantics(&ast) {
+    eprintln!("{}", err);
+    return Err(1);
+  }
 
   let mut ir = IntermediateRepresentation::default();
   ast.add_to_ir(&mut ir);
