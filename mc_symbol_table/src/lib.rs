@@ -4,8 +4,6 @@ use std::cell::RefCell;
 use std::io::{Read, Write};
 use std::rc::Rc;
 
-#[macro_use]
-extern crate prettytable;
 use prettytable::Table;
 
 use mc_common::input_to_string;
