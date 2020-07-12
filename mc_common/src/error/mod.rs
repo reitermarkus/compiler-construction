@@ -1,5 +1,4 @@
 use std::fmt;
-use std::io;
 
 use colored::*;
 use from_pest::ConversionError;
@@ -11,7 +10,6 @@ pub use semantic_error::SemanticError;
 
 #[derive(Debug)]
 pub enum SuperWauError2000<'a> {
-  Io(io::Error),
   ParseError(ConversionError<pest::error::Error<Rule>>),
   SemanticError(Vec<SemanticError<'a>>),
 }
@@ -19,10 +17,6 @@ pub enum SuperWauError2000<'a> {
 impl fmt::Display for SuperWauError2000<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Self::Io(error) => {
-        writeln!(f, "IO error encountered:")?;
-        writeln!(f, "{}", error)
-      }
       Self::ParseError(err) => {
         writeln!(f, "{}", "Syntax error encountered:".bold().red())?;
 
@@ -44,12 +38,6 @@ impl fmt::Display for SuperWauError2000<'_> {
         writeln!(f)
       }
     }
-  }
-}
-
-impl<'a> From<io::Error> for SuperWauError2000<'a> {
-  fn from(error: io::Error) -> Self {
-    Self::Io(error)
   }
 }
 
