@@ -1,5 +1,5 @@
 use format::consts::FORMAT_BOX_CHARS;
-use prettytable::{format, row, cell, Table};
+use prettytable::{cell, format, row, Table};
 
 use crate::symbol_table::Scope;
 
