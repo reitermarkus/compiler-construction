@@ -181,7 +181,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Stack</span> {
-  <span class="doccomment">/// Returns the [`StorageType`](crate::storage::Storage::StorageType), the offset in the stack, if there are parameters and if the returned value is of array type.</span>
+  <span class="doccomment">/// Returns the [`StorageType`](../storage/enum.StorageType.html), the offset in the stack, if there are parameters and if the returned value is of array type.</span>
   <span class="doccomment">///</span>
   <span class="doccomment">/// # Arguments</span>
   <span class="doccomment">///</span>
@@ -195,12 +195,12 @@
     (<span class="ident">ty</span>, <span class="ident">offset</span>, <span class="ident">parameter</span>, <span class="ident">array</span>)
   }
 
-  <span class="doccomment">/// Pushes onto the stack and returns a [`Pointer`](crate::storage::Storage::Pointer).</span>
+  <span class="doccomment">/// Pushes onto the stack and returns a [`Pointer`](../storage/struct.Pointer.html).</span>
   <span class="doccomment">///</span>
   <span class="doccomment">/// # Arguments</span>
   <span class="doccomment">///</span>
   <span class="doccomment">/// * `index` - The index where to insert.</span>
-  <span class="doccomment">/// * `storage_type` - The [`StorageType`](storage::StorageType) to insert.</span>
+  <span class="doccomment">/// * `storage_type` - The [`StorageType`](../storage/enum.StorageType.html) to insert.</span>
   <span class="doccomment">/// * `count` the count for the offset in case of an array.</span>
   <span class="doccomment">/// * `parameter` A boolean that specifies the direction of the offset on the stack +/-.</span>
   <span class="doccomment">/// * `array` -  A boolean that specifies if the element to put on the stack is of type array.</span>
@@ -259,7 +259,7 @@
     <span class="self">self</span>.<span class="ident">push_temporary</span>(<span class="ident">temp_var</span>);
   }
 
-  <span class="doccomment">/// Frees the temporary and puts it back into [`temporaries`](stack::Stack::temporaries).</span>
+  <span class="doccomment">/// Frees the temporary and puts it back into [`temporaries`](../stack/struct.Stack.html#sturctfield.temporaries).</span>
   <span class="doccomment">///</span>
   <span class="doccomment">/// # Arguments</span>
   <span class="doccomment">///</span>
@@ -275,11 +275,11 @@
     }
   }
 
-  <span class="doccomment">/// Pushes the register onto [`temporaries`](stack::Stack::temporaries) in case it is a *Storage Temporary*.</span>
+  <span class="doccomment">/// Pushes the register onto [`temporaries`](../stack/struct.Stack.html#sturctfield.temporaries) in case it is a *Storage Temporary*.</span>
   <span class="doccomment">///</span>
   <span class="doccomment">/// # Arguments</span>
   <span class="doccomment">///</span>
-  <span class="doccomment">/// * `storage` - The [`Storage`](storage::Storage) temporary to push.</span>
+  <span class="doccomment">/// * `storage` - The [`Storage`](../storage/enum.Storage.html) temporary to push.</span>
   <span class="doccomment">///</span>
   <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">push_storage_temporary</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">storage</span>: <span class="ident">Storage</span>) {
     <span class="kw">if</span> <span class="kw">let</span> <span class="ident">Storage</span>::<span class="ident">Register</span>(<span class="kw">_</span>, <span class="ident">reg</span>) <span class="op">=</span> <span class="ident">storage</span> {

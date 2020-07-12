@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Asm","`Asm` repreents a global struct for all components of the assembly output."]]});
+initSidebarItems({"struct":[["Asm","`Asm` represents a global struct for all components of the assembly output."]]});

@@ -156,7 +156,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">From</span><span class="op">&lt;</span><span class="kw-2">&amp;</span><span class="ident">Ty</span><span class="op">&gt;</span> <span class="kw">for</span> <span class="ident">StorageType</span> {
-  <span class="doccomment">/// Gets the [`StorageType`](storage::StorageType) from the [`Ty`](crate::ast::Ty).</span>
+  <span class="doccomment">/// Gets the [`StorageType`](../storage/enum.StorageType.html) from the  [`Ty`](../ast/enum.Ty.html).</span>
   <span class="kw">fn</span> <span class="ident">from</span>(<span class="ident">ty</span>: <span class="kw-2">&amp;</span><span class="ident">Ty</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
     <span class="kw">match</span> <span class="ident">ty</span> {
       <span class="ident">Ty</span>::<span class="ident">Float</span> <span class="op">=</span><span class="op">&gt;</span> <span class="self">Self</span>::<span class="ident">Dword</span>,
@@ -188,7 +188,7 @@
     }
   }
 
-  <span class="doccomment">/// Maps the [`Reg32`](crate::register::Reg32) register to a string.</span>
+  <span class="doccomment">/// Maps the [`Reg32`](../register/enum.Reg32.html) register to a string.</span>
   <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">map_register</span>(<span class="self">self</span>, <span class="ident">reg</span>: <span class="ident">Reg32</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">String</span> {
     <span class="kw">match</span> <span class="self">self</span> {
       <span class="self">Self</span>::<span class="ident">Dword</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">reg</span>.<span class="ident">to_string</span>(),
@@ -274,7 +274,7 @@
 }
 
 <span class="kw">impl</span> <span class="ident">Storage</span> {
-  <span class="doccomment">/// Returns the [`StorageType`](storage::StorageType) from the [`Storage`](storage::Storage).</span>
+  <span class="doccomment">/// Returns the [`StorageType`](../storage/enum.StorageType.html) from the [`Storage`](../storage/enum.Storage.html).</span>
   <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">storage_type</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">StorageType</span> {
     <span class="kw">match</span> <span class="kw-2">*</span><span class="self">self</span> {
       <span class="self">Self</span>::<span class="ident">Pointer</span>(<span class="ident">Pointer</span> { <span class="ident">storage_type</span>, .. }) <span class="op">=</span><span class="op">&gt;</span> <span class="ident">storage_type</span>,
