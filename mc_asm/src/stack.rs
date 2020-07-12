@@ -36,7 +36,7 @@ impl Default for Stack {
 }
 
 impl Stack {
-  /// Returns the [`StorageType`](crate::storage::Storage::StorageType), the offset in the stack, if there are parameters and if the returned value is of array type.
+  /// Returns the [`StorageType`](../storage/enum.StorageType.html), the offset in the stack, if there are parameters and if the returned value is of array type.
   ///
   /// # Arguments
   ///
@@ -50,12 +50,12 @@ impl Stack {
     (ty, offset, parameter, array)
   }
 
-  /// Pushes onto the stack and returns a [`Pointer`](crate::storage::Storage::Pointer).
+  /// Pushes onto the stack and returns a [`Pointer`](../storage/struct.Pointer.html).
   ///
   /// # Arguments
   ///
   /// * `index` - The index where to insert.
-  /// * `storage_type` - The [`StorageType`](storage::StorageType) to insert.
+  /// * `storage_type` - The [`StorageType`](../storage/enum.StorageType.html) to insert.
   /// * `count` the count for the offset in case of an array.
   /// * `parameter` A boolean that specifies the direction of the offset on the stack +/-.
   /// * `array` -  A boolean that specifies if the element to put on the stack is of type array.
@@ -114,7 +114,7 @@ impl Stack {
     self.push_temporary(temp_var);
   }
 
-  /// Frees the temporary and puts it back into [`temporaries`](stack::Stack::temporaries).
+  /// Frees the temporary and puts it back into [`temporaries`](../stack/struct.Stack.html#sturctfield.temporaries).
   ///
   /// # Arguments
   ///
@@ -130,11 +130,11 @@ impl Stack {
     }
   }
 
-  /// Pushes the register onto [`temporaries`](stack::Stack::temporaries) in case it is a *Storage Temporary*.
+  /// Pushes the register onto [`temporaries`](../stack/struct.Stack.html#sturctfield.temporaries) in case it is a *Storage Temporary*.
   ///
   /// # Arguments
   ///
-  /// * `storage` - The [`Storage`](storage::Storage) temporary to push.
+  /// * `storage` - The [`Storage`](../storage/enum.Storage.html) temporary to push.
   ///
   pub fn push_storage_temporary(&mut self, storage: Storage) {
     if let Storage::Register(_, reg) = storage {

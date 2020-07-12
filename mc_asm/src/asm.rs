@@ -49,7 +49,7 @@ macro_rules! i {
   );
 }
 
-/// `Asm` repreents a global struct for all components of the assembly output.
+/// `Asm` represents a global struct for all components of the assembly output.
 #[derive(Debug)]
 pub struct Asm {
   /// All assembly lines, that will be in the output of the assembly file.
@@ -86,7 +86,7 @@ impl fmt::Display for Asm {
 }
 
 impl Asm {
-  /// Returns a [`Label`](crate::storage::Storage::Label) containing a [`Dword`](crate::storage::StorageType::Dword), the actual label and a boolean, that specifies that *OFFSET FLAT* is not required in the output.
+  /// Returns a [`Label`](../storage/enum.Storage.html#variant.Label)  containing a [`Dword`](../storage/enum.StorageType.html#variant.Dword), the actual label and a boolean, that specifies that *OFFSET FLAT* is not required in the output.
   ///
   /// # Arguments
   ///
@@ -100,7 +100,7 @@ impl Asm {
     Storage::Label(StorageType::Dword, label.to_owned(), false)
   }
 
-  /// Returns a [`Label`](storage::Storage::Label) containing a [`Dword`](storage::StorageType::Dword), the actual label and a boolean, that specifies that *OFFSET FLAT* is required in the output.
+  /// Returns a [`Label`](../storage/enum.Storage.html#variant.Label) containing a [`Dword`](../storage/enum.StorageType.html#variant.Dword), the actual label and a boolean, that specifies that *OFFSET FLAT* is required in the output.
   ///
   /// # Arguments
   ///
@@ -116,7 +116,7 @@ impl Asm {
   ///
   /// # Arguments
   ///
-  /// * `storage` - The [`Storage`](storage::Storage) enum representing the float to be loaded.
+  /// * `storage` - The [`Storage`](../storage/enum.Storage.html) enum representing the float to be loaded.
   ///
   pub fn load_float(&mut self, storage: &Storage) {
     if matches!(storage, Storage::Fpu(..)) {

@@ -12,7 +12,7 @@ pub enum StorageType {
 }
 
 impl From<&Ty> for StorageType {
-  /// Gets the [`StorageType`](storage::StorageType) from the [`Ty`](crate::ast::Ty).
+  /// Gets the [`StorageType`](../storage/enum.StorageType.html) from the  [`Ty`](../ast/enum.Ty.html).
   fn from(ty: &Ty) -> Self {
     match ty {
       Ty::Float => Self::Dword,
@@ -44,7 +44,7 @@ impl StorageType {
     }
   }
 
-  /// Maps the [`Reg32`](crate::register::Reg32) register to a string.
+  /// Maps the [`Reg32`](../register/enum.Reg32.html) register to a string.
   pub fn map_register(self, reg: Reg32) -> String {
     match self {
       Self::Dword => reg.to_string(),
@@ -130,7 +130,7 @@ impl fmt::Display for Offset {
 }
 
 impl Storage {
-  /// Returns the [`StorageType`](storage::StorageType) from the [`Storage`](storage::Storage).
+  /// Returns the [`StorageType`](../storage/enum.StorageType.html) from the [`Storage`](../storage/enum.Storage.html).
   pub fn storage_type(&self) -> StorageType {
     match *self {
       Self::Pointer(Pointer { storage_type, .. }) => storage_type,
