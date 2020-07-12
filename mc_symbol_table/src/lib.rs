@@ -1,13 +1,15 @@
 #![deny(missing_debug_implementations, rust_2018_idioms)]
+
+use std::cell::RefCell;
+use std::io::{Read, Write};
+use std::rc::Rc;
+
 #[macro_use]
 extern crate prettytable;
 use prettytable::Table;
 
 use mc_common::input_to_string;
 use mc_parser::ast::Program;
-use std::cell::RefCell;
-use std::io::{Read, Write};
-use std::rc::Rc;
 
 mod format_symbol_table;
 
