@@ -485,10 +485,18 @@ pub fn check_binary_expression<'a>(
   let lhs_ty = get_expression_type(scope, lhs);
   let rhs_ty = get_expression_type(scope, rhs);
 
-  if (lhs_ty != rhs_ty) || lhs_ty.is_none() || rhs_ty.is_none() {
+  let mismatched_types = match (lhs_ty, rhs_ty) {
+    (None, _) | (_, None) => true,
+    (Some(lhs), Some(rhs)) => match (lhs, rhs) {
+      (Ty::Bool, Ty::Bool) => [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(&op),
+      (Ty::Int, Ty::Int) | (Ty::Float, Ty::Float) => [BinaryOp::Land, BinaryOp::Lor].contains(&op),
+      (Ty::String, Ty::String) => ![BinaryOp::Eq, BinaryOp::Neq].contains(&op),
+      (lhs, rhs) => lhs != rhs,
+    },
+  };
+
+  if mismatched_types {
     push_error!(res, SemanticError::BinaryOperatorTypeError { span: span.clone(), op, lhs_ty, rhs_ty });
-  } else {
-    extend_errors!(res, check_binary_operator_compatibility(op, lhs_ty, rhs_ty, span));
   }
 
   res
@@ -505,26 +513,6 @@ pub fn check_unary_operator_compatability<'a>(
       Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty }])
     }
     Ty::String => Err(vec![SemanticError::UnaryOperatorTypeError { span: span.clone(), op, ty }]),
-    _ => Ok(()),
-  }
-}
-
-pub fn check_binary_operator_compatibility<'a>(
-  op: BinaryOp,
-  lhs_ty: Option<Ty>,
-  rhs_ty: Option<Ty>,
-  span: &Span<'a>,
-) -> Result<(), Vec<SemanticError<'a>>> {
-  match lhs_ty.expect("no ty") {
-    Ty::Bool if [BinaryOp::Divide, BinaryOp::Times, BinaryOp::Minus, BinaryOp::Plus].contains(&op) => {
-      Err(vec![SemanticError::BinaryOperatorTypeError { span: span.clone(), op, lhs_ty, rhs_ty }])
-    }
-    Ty::Int | Ty::Float if [BinaryOp::Land, BinaryOp::Lor].contains(&op) => {
-      Err(vec![SemanticError::BinaryOperatorTypeError { span: span.clone(), op, lhs_ty, rhs_ty }])
-    }
-    Ty::String if ![BinaryOp::Eq, BinaryOp::Neq].contains(&op) => {
-      Err(vec![SemanticError::BinaryOperatorTypeError { span: span.clone(), op, lhs_ty, rhs_ty }])
-    }
     _ => Ok(()),
   }
 }
