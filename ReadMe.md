@@ -42,10 +42,22 @@ rake symbol_table
 rake ir
 ```
 
+## Generation of Context Flow Graphs
+
+```
+rake cfg
+```
+
 ## Generation of Assembly Code
 
 ```
 rake asm
+```
+
+## Example error output
+
+```
+rake failures
 ```
 
 
